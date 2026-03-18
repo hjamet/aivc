@@ -159,4 +159,5 @@ aivc/
 | **2** | [Moteur Sémantique et Graphe](docs/tasks/phase2_semantic_graph.md) | Bi/Cross Encoder, ChromaDB, install.sh MCP | 🟢 Terminé |
 | **3** | [Interface MCP et Outils](docs/tasks/phase3_mcp_interface.md) | Entonnoir Recall, 8 outils, prompt système | 🟢 Terminé |
 | **4** | [Interface CLI & Web Dashboard](docs/tasks/phase4_cli_and_dashboard.md) | Outils terminaux (`aivc`), Graphe interactif (Taille/Couleur) avec recherche sémantique ciblée | 🟢 Terminé |
+| **5** | [Stabilisation MVP & Bugfixes](docs/tasks/phase5_stabilization.md) | Chemins absolus, autodiscovery de port, vendoring de Cytoscape | 🟡 À faire |
 
