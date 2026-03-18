@@ -105,6 +105,28 @@
             color: var(--highlight);
         }
 
+        /* Relayout Button */
+        .relayout-btn {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            z-index: 10;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            padding: 8px 16px;
+            transition: all 0.2s;
+        }
+        .relayout-btn:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
         /* Sidebar: Commits */
         .sidebar {
             position: absolute;
@@ -241,6 +263,9 @@
     <!-- Graph Container -->
     <div id="cy"></div>
 
+    <!-- Relayout Button -->
+    <button class="relayout-btn" id="relayoutBtn" title="Relancer la simulation de forces">⟳ Relayout</button>
+
     <!-- Results Sidebar -->
     <div class="sidebar glass" id="sidebar">
         <div class="sidebar-header">
@@ -264,7 +289,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            
+            try {
             // 1. Fetch graph data
             let graphData;
             try {
@@ -279,7 +304,7 @@
             // Prepare elements for Cytoscape
             const elements = [];
             
-            // Nodes
+            // Nodes — smaller sizes to avoid overlap
             const maxCommitCnt = Math.max(...graphData.nodes.map(n => n.commit_count), 1);
             graphData.nodes.forEach(n => {
                 elements.push({
@@ -287,8 +312,8 @@
                         id: n.id,
                         label: n.label,
                         dir: n.directory,
-                        // Base size 15, max scale logarithmic
-                        size: 15 + (Math.log1p(n.commit_count) / Math.log1p(maxCommitCnt)) * 35,
+                        // Base size 10, max +20 logarithmic
+                        size: 10 + (Math.log1p(n.commit_count) / Math.log1p(maxCommitCnt)) * 20,
                         color: hashColor(n.directory)
                     }
                 });
@@ -370,18 +395,30 @@
                     }
                 ],
                 layout: {
-                    name: 'fcose',
-                    quality: 'proof',
-                    randomize: true,
+                    name: 'cose',
                     animate: true,
-                    animationDuration: 1000,
+                    animationDuration: 800,
                     fit: true,
-                    nodeRepulsion: 4500,
-                    idealEdgeLength: 100,
-                    edgeElasticity: 0.45,
-                    gravity: 0.25,
-                    numIter: 2500,
-                    initialEnergyOnIncremental: 0.5
+                    padding: 40,
+                    randomize: true,
+                    // Force-directed parameters:
+                    // Higher repulsion = nodes push apart more
+                    nodeRepulsion: function(node) { return 12000; },
+                    // Edge length inversely proportional to weight:
+                    // High co-occurrence = short edge (attraction)
+                    idealEdgeLength: function(edge) {
+                        return Math.max(40, 180 / edge.data('weight'));
+                    },
+                    // Elasticity proportional to weight:
+                    // High co-occurrence = strong spring pulling nodes together
+                    edgeElasticity: function(edge) {
+                        return edge.data('weight') * 80;
+                    },
+                    gravity: 0.4,
+                    numIter: 1000,
+                    nestingFactor: 1.2,
+                    componentSpacing: 80,
+                    nodeOverlap: 20,
                 },
                 wheelSensitivity: 0.1
             });
@@ -392,6 +429,30 @@
                 loader.style.opacity = '0';
                 setTimeout(() => loader.remove(), 500);
             }, 1000);
+
+            // Relayout button: re-run the force simulation
+            document.getElementById('relayoutBtn').addEventListener('click', () => {
+                cy.layout({
+                    name: 'cose',
+                    animate: true,
+                    animationDuration: 800,
+                    fit: true,
+                    padding: 40,
+                    randomize: false,
+                    nodeRepulsion: function(node) { return 12000; },
+                    idealEdgeLength: function(edge) {
+                        return Math.max(40, 180 / edge.data('weight'));
+                    },
+                    edgeElasticity: function(edge) {
+                        return edge.data('weight') * 80;
+                    },
+                    gravity: 0.4,
+                    numIter: 1000,
+                    nestingFactor: 1.2,
+                    componentSpacing: 80,
+                    nodeOverlap: 20,
+                }).run();
+            });
 
             // 3. Search Logic
             const searchInput = document.getElementById('searchInput');
@@ -541,6 +602,10 @@
                 cy.animate({ fit: { padding: 30 } }, { duration: 500 });
                 resetBtn.style.display = 'none';
                 if (closeSidebar) sidebar.classList.remove('open');
+            }
+            } catch (globalError) {
+                console.error("Global JS Error: ", globalError);
+                document.getElementById('init-loader').innerHTML = '<div style="color:#ff7b72; font-weight:bold;">Erreur JS : ' + globalError.message + '</div>';
             }
         });
     </script>
