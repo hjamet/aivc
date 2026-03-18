@@ -9,3 +9,4 @@
 | [Phase 5 : Stabilisation MVP](tasks/phase5_stabilization.md) | Chemins absolus, autodiscovery port, vendoring Cytoscape | 2026-03-18 | `Up to date` |
 | [Phase 6 : Consolidation Absolue & CLI](tasks/phase6_absolute_paths_fix.md) | Migration historique absolu, ajout `aivc track` | 2026-03-18 | `Up to date` |
 | [Phase 7 : Scoped Semantic Search](tasks/phase7_scoped_search.md) | Filtrage par glob dans `search_memory` | 2026-03-18 | `Up to date` |
+| [Phase 8 : Injection GEMINI.md](tasks/phase8_gemini_injection.md) | Bonnes pratiques agent injectées via `install.sh` | 2026-03-18 | `Up to date` |
