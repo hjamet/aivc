@@ -176,6 +176,7 @@ aivc/
 | **7** | [Scoped Semantic Search](docs/tasks/phase7_scoped_search.md) | Filtrage par glob dans `search_memory` (MCP + CLI) | 🟢 Terminé |
 | **8** | [Injection GEMINI.md](docs/tasks/phase8_gemini_injection.md) | Bonnes pratiques agent injectées via `install.sh` | 🟢 Terminé |
 | **9** | [Exposition CLI](docs/tasks/phase9_cli_exposure.md) | Symlink automatique vers `~/.local/bin/aivc` | 🟢 Terminé |
+| **10** | [Search Result Snippets](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats `search_memory` | 🟡 À faire |
 
 ### Documentation Index
 | Titre (Lien) | Description |
@@ -184,3 +185,4 @@ aivc/
 | [Spec Phase 7](docs/tasks/phase7_scoped_search.md) | Filtrage sémantique par glob. |
 | [Spec Phase 8](docs/tasks/phase8_gemini_injection.md) | Injection bonnes pratiques agent dans GEMINI.md. |
 | [Spec Phase 9](docs/tasks/phase9_cli_exposure.md) | Création d'un lien symbolique pour l'accès global à la commande CLI. |
+| [Spec Phase 10](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats de recherche sémantique. |
