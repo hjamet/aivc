@@ -9,6 +9,9 @@ description = "AI Version Control — long-term memory server for LLM agents"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 
+[project.scripts]
+aivc = "aivc.cli:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 semantic = [

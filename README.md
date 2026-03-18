@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟢 Phase 3 terminée — Interface MCP complète (8 outils, prompt système, entonnoir de recall).
+> **État** : 🟢 Phase 4 terminée — Interface complète avec CLI (`aivc`) et Web Dashboard interactif.
 
 ### Concept
 
@@ -135,6 +135,7 @@ aivc/
 | Commande | Description |
 |----------|-------------|
 | `bash install.sh` | Installer AIVC et configurer le serveur MCP |
+| `aivc status`, `log`, `search` | Interagir avec la mémoire via le CLI en terminal |
 | `python -m pytest src/tests/ -v` | Lancer la suite de tests complète |
 | `uv pip install -e ".[dev]"` | Installer uniquement le core (stdlib) |
 | `uv pip install -e ".[semantic]"` | Installer avec les dépendances IA (Phase 2) |
@@ -143,7 +144,9 @@ aivc/
 
 ## Scripts Exécutables Secondaires & Utilitaires
 
-> Aucun -- interface MCP en Phase 3.
+| Commande | Description |
+|----------|-------------|
+| `python -m aivc.web.dashboard` | Lancer le Web Dashboard (graphe interactif sur le port 8765) |
 
 ---
 
@@ -154,4 +157,4 @@ aivc/
 | **1** | [Moteur de Versioning Interne (Core)](docs/tasks/phase1_versioning_engine.md) | Blobs SHA-256, Garbage Collection | 🟢 Terminé |
 | **2** | [Moteur Sémantique et Graphe](docs/tasks/phase2_semantic_graph.md) | Bi/Cross Encoder, ChromaDB, install.sh MCP | 🟢 Terminé |
 | **3** | [Interface MCP et Outils](docs/tasks/phase3_mcp_interface.md) | Entonnoir Recall, 8 outils, prompt système | 🟢 Terminé |
-| **4** | [Interface CLI & Web Dashboard](docs/tasks/phase4_cli_and_dashboard.md) | Outils terminaux (`aivc`), Graphe interactif (Taille/Couleur) avec recherche sémantique ciblée | 🔴 À faire |
+| **4** | [Interface CLI & Web Dashboard](docs/tasks/phase4_cli_and_dashboard.md) | Outils terminaux (`aivc`), Graphe interactif (Taille/Couleur) avec recherche sémantique ciblée | 🟢 Terminé |

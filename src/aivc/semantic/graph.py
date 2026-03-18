@@ -270,3 +270,50 @@ class CooccurrenceGraph:
             edges_list.append({"source": row[0], "target": row[1]})
 
         return {"nodes": nodes, "edges": edges_list}
+
+    def get_file_node_data(self) -> list[dict]:
+        """Return enriched data for file nodes (documents) for visualisation.
+
+        Returns:
+            A list of dicts: ``{"id": file_path, "label": file_name, "full_path": file_path, "commit_count": int, "directory": str}``
+        """
+        nodes = []
+        rows = self._execute(
+            """
+            SELECT f.file_path, COUNT(e.commit_id) as cnt
+            FROM file_nodes f
+            LEFT JOIN edges e ON f.file_path = e.file_path
+            GROUP BY f.file_path
+            """
+        ).fetchall()
+
+        for file_path, count in rows:
+            directory = str(Path(file_path).parent)
+            if directory == ".":
+                directory = "/"
+            nodes.append({
+                "id": file_path,
+                "label": Path(file_path).name,
+                "full_path": file_path,
+                "commit_count": count,
+                "directory": directory,
+            })
+        return nodes
+
+    def get_file_cooccurrences(self) -> list[dict]:
+        """Return weighted edges between files that are modified together.
+
+        Returns:
+            A list of dicts: ``{"source": file_path_1, "target": file_path_2, "weight": int}``
+        """
+        rows = self._execute(
+            """
+            SELECT e1.file_path, e2.file_path, COUNT(*) as weight
+            FROM edges e1
+            JOIN edges e2 ON e1.commit_id = e2.commit_id
+            WHERE e1.file_path < e2.file_path
+            GROUP BY e1.file_path, e2.file_path
+            """
+        ).fetchall()
+
+        return [{"source": r[0], "target": r[1], "weight": r[2]} for r in rows]

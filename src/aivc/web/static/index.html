@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIVC | Long-Term Memory Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --panel-bg: rgba(22, 27, 34, 0.7);
+            --border-color: rgba(48, 54, 61, 0.5);
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --accent-glow: rgba(88, 166, 255, 0.4);
+            --highlight: #d2a8ff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+
+        #cy {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Glassmorphism utility */
+        .glass {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Top Bar: Search */
+        .top-bar {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            width: 500px;
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            transition: all 0.3s ease;
+        }
+
+        .top-bar input {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            width: 100%;
+            padding: 8px;
+            outline: none;
+        }
+
+        .top-bar input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--text-muted);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 12px;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Reset Button */
+        .reset-btn {
+            display: none;
+            background: transparent;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            margin-left: 12px;
+        }
+
+        .reset-btn:hover {
+            color: var(--highlight);
+        }
+
+        /* Sidebar: Commits */
+        .sidebar {
+            position: absolute;
+            top: 24px;
+            right: -400px; /* hidden initially */
+            bottom: 24px;
+            width: 350px;
+            z-index: 10;
+            transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .sidebar.open {
+            right: 24px;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-header h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        /* Commit Card */
+        .commit-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: transform 0.2s, border-color 0.2s;
+            cursor: pointer;
+        }
+
+        .commit-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent);
+        }
+
+        .commit-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 0 0 8px 0;
+        }
+
+        .commit-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .commit-snippet {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-main);
+            margin: 0 0 10px 0;
+            opacity: 0.9;
+        }
+
+        .commit-files {
+            font-size: 11px;
+            color: #d2a8ff;
+            background: rgba(210, 168, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            word-break: break-all;
+            margin-top: 4px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
+        /* Loader Overlay */
+        #init-loader {
+            position: absolute;
+            inset: 0;
+            background: var(--bg-color);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: var(--text-muted);
+            font-size: 18px;
+            transition: opacity 0.5s;
+        }
+        #init-loader .big-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="init-loader">
+        <div class="big-spinner"></div>
+        <div>Chargement du Graphe...</div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="top-bar glass">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); margin-right: 8px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="searchInput" placeholder="Recherche sémantique dans la mémoire..." autocomplete="off">
+        <div class="spinner" id="searchSpinner"></div>
+        <button class="reset-btn" id="resetBtn">Reset</button>
+    </div>
+
+    <!-- Graph Container -->
+    <div id="cy"></div>
+
+    <!-- Results Sidebar -->
+    <div class="sidebar glass" id="sidebar">
+        <div class="sidebar-header">
+            <h2 id="resultsTitle">Résultats</h2>
+        </div>
+        <div class="sidebar-content" id="resultsContent">
+            <!-- Cards go here -->
+        </div>
+    </div>
+
+    <script>
+        // Simple hash function to generate consistent colors for directories
+        function hashColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            // Generate HSL: Hue based on hash, fixed lightness for premium dark mode look
+            let hue = Math.abs(hash) % 360;
+            return `hsl(${hue}, 70%, 65%)`;
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            
+            // 1. Fetch graph data
+            let graphData;
+            try {
+                const res = await fetch('/api/graph');
+                graphData = await res.json();
+            } catch (err) {
+                console.error("Failed to load graph data", err);
+                document.getElementById('init-loader').innerHTML = 'Erreur de connexion au serveur AIVC.';
+                return;
+            }
+
+            // Prepare elements for Cytoscape
+            const elements = [];
+            
+            // Nodes
+            const maxCommitCnt = Math.max(...graphData.nodes.map(n => n.commit_count), 1);
+            graphData.nodes.forEach(n => {
+                elements.push({
+                    data: {
+                        id: n.id,
+                        label: n.label,
+                        dir: n.directory,
+                        // Base size 15, max scale logarithmic
+                        size: 15 + (Math.log1p(n.commit_count) / Math.log1p(maxCommitCnt)) * 35,
+                        color: hashColor(n.directory)
+                    }
+                });
+            });
+
+            // Edges
+            const maxWeight = Math.max(...graphData.edges.map(e => e.weight), 1);
+            graphData.edges.forEach(e => {
+                elements.push({
+                    data: {
+                        source: e.source,
+                        target: e.target,
+                        weight: e.weight,
+                        opacity: 0.1 + (e.weight / maxWeight) * 0.4
+                    }
+                });
+            });
+
+            // 2. Initialize Cytoscape
+            const cy = cytoscape({
+                container: document.getElementById('cy'),
+                elements: elements,
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': 'data(color)',
+                            'width': 'data(size)',
+                            'height': 'data(size)',
+                            'label': 'data(label)',
+                            'color': '#c9d1d9',
+                            'font-size': '11px',
+                            'font-family': 'Inter, sans-serif',
+                            'text-valign': 'bottom',
+                            'text-margin-y': 6,
+                            'text-outline-width': 2,
+                            'text-outline-color': '#0d1117',
+                            'transition-property': 'background-color, line-color, target-arrow-color, width, height, opacity',
+                            'transition-duration': '0.3s'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 'mapData(weight, 1, 10, 1, 4)',
+                            'line-color': '#444',
+                            'opacity': 'data(opacity)',
+                            'curve-style': 'bezier',
+                            'transition-property': 'opacity',
+                            'transition-duration': '0.3s'
+                        }
+                    },
+                    // Highlight UI
+                    {
+                        selector: 'node.highlight',
+                        style: {
+                            'border-width': 3,
+                            'border-color': '#fff',
+                            'width': ele => ele.data('size') * 1.5,
+                            'height': ele => ele.data('size') * 1.5,
+                            'z-index': 100,
+                            'color': '#ffffff',
+                            'font-weight': 'bold',
+                            'font-size': '13px'
+                        }
+                    },
+                    {
+                        selector: 'node.dim',
+                        style: {
+                            'opacity': 0.15,
+                            'color': '#444'
+                        }
+                    },
+                    {
+                        selector: 'edge.dim',
+                        style: {
+                            'opacity': 0.05
+                        }
+                    }
+                ],
+                layout: {
+                    name: 'fcose',
+                    quality: 'proof',
+                    randomize: true,
+                    animate: true,
+                    animationDuration: 1000,
+                    fit: true,
+                    nodeRepulsion: 4500,
+                    idealEdgeLength: 100,
+                    edgeElasticity: 0.45,
+                    gravity: 0.25,
+                    numIter: 2500,
+                    initialEnergyOnIncremental: 0.5
+                },
+                wheelSensitivity: 0.1
+            });
+
+            // Remove loader
+            setTimeout(() => {
+                const loader = document.getElementById('init-loader');
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 500);
+            }, 1000);
+
+            // 3. Search Logic
+            const searchInput = document.getElementById('searchInput');
+            const searchSpinner = document.getElementById('searchSpinner');
+            const resetBtn = document.getElementById('resetBtn');
+            const sidebar = document.getElementById('sidebar');
+            const resultsContent = document.getElementById('resultsContent');
+            const resultsTitle = document.getElementById('resultsTitle');
+
+            // Handle Node Hover
+            cy.on('mouseover', 'node', function(e){
+                let node = e.target;
+                document.body.style.cursor = 'pointer';
+            });
+            cy.on('mouseout', 'node', function(e){
+                document.body.style.cursor = 'default';
+            });
+
+            // Click node to focus
+            cy.on('tap', 'node', function(e){
+                let node = e.target;
+                cy.animate({
+                    center: { eles: node },
+                    zoom: 2.5
+                }, { duration: 500 });
+            });
+
+            let involvedFilesGlobal = new Set();
+
+            searchInput.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter') {
+                    const query = searchInput.value.trim();
+                    if (!query) {
+                        resetSearch();
+                        return;
+                    }
+                    doSearch(query);
+                }
+            });
+
+            resetBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                resetSearch();
+            });
+
+            async function doSearch(query) {
+                searchSpinner.style.display = 'block';
+                resetBtn.style.display = 'none';
+                
+                try {
+                    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                    const commits = await res.json();
+                    
+                    searchSpinner.style.display = 'none';
+                    resetBtn.style.display = 'block';
+
+                    if (commits.length === 0) {
+                        resultsTitle.innerText = "Aucun résultat";
+                        resultsContent.innerHTML = "<p style='color: var(--text-muted);'>Essayez une autre requête ou des mots-clés différents.</p>";
+                        sidebar.classList.add('open');
+                        resetSearch(false);
+                        return;
+                    }
+
+                    // Extract all files involved
+                    involvedFilesGlobal.clear();
+                    commits.forEach(c => {
+                        c.file_paths.forEach(f => involvedFilesGlobal.add(f));
+                    });
+
+                    // Update Graph Style
+                    cy.batch(() => {
+                        cy.elements().removeClass('highlight dim');
+                        
+                        cy.nodes().forEach(node => {
+                            if (involvedFilesGlobal.has(node.id())) {
+                                node.addClass('highlight');
+                            } else {
+                                node.addClass('dim');
+                            }
+                        });
+
+                        cy.edges().addClass('dim');
+                    });
+
+                    // Fit view to highlighted nodes
+                    if(involvedFilesGlobal.size > 0) {
+                        const highlightedElems = cy.nodes('.highlight');
+                        cy.animate({
+                            fit: {
+                                eles: highlightedElems,
+                                padding: 50
+                            }
+                        }, { duration: 700 });
+                    }
+
+                    // Update Sidebar
+                    resultsTitle.innerText = `${commits.length} Commit${commits.length > 1 ? 's' : ''}`;
+                    resultsContent.innerHTML = commits.map(c => `
+                        <div class="commit-card" data-files='${JSON.stringify(c.file_paths)}'>
+                            <h3 class="commit-title">${c.title}</h3>
+                            <div class="commit-meta">
+                                <span>${c.timestamp.substring(0,10)}</span>
+                                <span>Score: ${c.score.toFixed(3)}</span>
+                            </div>
+                            <p class="commit-snippet">${c.snippet}...</p>
+                            ${c.file_paths.length ? `<div class="commit-files">${c.file_paths.length} fichier(s) associé(s)</div>` : ''}
+                        </div>
+                    `).join('');
+
+                    sidebar.classList.add('open');
+
+                    // Bind hover on cards
+                    document.querySelectorAll('.commit-card').forEach(card => {
+                        card.addEventListener('mouseenter', () => {
+                            const files = JSON.parse(card.getAttribute('data-files'));
+                            cy.batch(() => {
+                                cy.nodes().removeClass('highlight');
+                                cy.nodes().forEach(n => {
+                                    if(files.includes(n.id())) n.addClass('highlight');
+                                });
+                            });
+                        });
+                        card.addEventListener('mouseleave', () => {
+                            cy.batch(() => {
+                                cy.nodes().removeClass('highlight');
+                                cy.nodes().forEach(n => {
+                                    if(involvedFilesGlobal.has(n.id())) n.addClass('highlight');
+                                });
+                            });
+                        });
+                    });
+
+                } catch (err) {
+                    console.error("Search failed", err);
+                    searchSpinner.style.display = 'none';
+                    resetBtn.style.display = 'block';
+                    alert("Erreur lors de la recherche sémantique.");
+                }
+            }
+
+            function resetSearch(closeSidebar = true) {
+                involvedFilesGlobal.clear();
+                cy.batch(() => {
+                    cy.elements().removeClass('highlight dim');
+                });
+                cy.animate({ fit: { padding: 30 } }, { duration: 500 });
+                resetBtn.style.display = 'none';
+                if (closeSidebar) sidebar.classList.remove('open');
+            }
+        });
+    </script>
+</body>
+</html>

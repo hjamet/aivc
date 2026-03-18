@@ -158,6 +158,14 @@ class SemanticEngine:
         """Return the graph in visualisation format (nodes + edges)."""
         return self._graph.to_vis_data()
 
+    def get_file_node_data(self) -> list[dict]:
+        """Return enriched data for file nodes (dashboard vis)."""
+        return self._graph.get_file_node_data()
+
+    def get_file_cooccurrences(self) -> list[dict]:
+        """Return weighted file-to-file co-occurrence edges (dashboard vis)."""
+        return self._graph.get_file_cooccurrences()
+
     # ------------------------------------------------------------------
     # Workspace pass-throughs
     # ------------------------------------------------------------------
