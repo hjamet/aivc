@@ -134,7 +134,8 @@ aivc/
 
 | Commande | Description |
 |----------|-------------|
-| `bash install.sh` | Installer AIVC et configurer le serveur MCP |
+| `bash install.sh` | Installer AIVC (prod ~/.aivc) et configurer le serveur MCP |
+| `bash install_dev.sh` | Installer AIVC (dev local .venv) pour tester avec le code local |
 | `aivc status`, `log`, `search` | Interagir avec la mémoire via le CLI en terminal |
 | `python -m pytest src/tests/ -v` | Lancer la suite de tests complète |
 | `uv pip install -e ".[dev]"` | Installer uniquement le core (stdlib) |
