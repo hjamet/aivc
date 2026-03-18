@@ -204,6 +204,13 @@ success "AIVC installed successfully!"
 echo ""
 echo "  Storage root : ${AIVC_HOME}/storage"
 echo "  Venv         : ${VENV_DIR}"
+
+# 7. Symlink CLI to ~/.local/bin
+USER_BIN_DIR="${HOME}/.local/bin"
+mkdir -p "${USER_BIN_DIR}"
+ln -sf "${VENV_DIR}/bin/aivc" "${USER_BIN_DIR}/aivc"
+
+echo "  CLI Command  : aivc (symlinked in ${USER_BIN_DIR})"
 echo "  MCP config   : ${MCP_CONFIG}"
 echo "  Agent rules  : ${GEMINI_MD}"
 echo ""

@@ -93,7 +93,8 @@ aivc/
 │   │   ├── phase1_versioning_engine.md
 │   │   ├── phase2_semantic_graph.md
 │   │   ├── phase3_mcp_interface.md
-│   │   └── phase6_absolute_paths_fix.md
+│   │   ├── phase6_absolute_paths_fix.md
+│   │   └── phase9_cli_exposure.md
 │   ├── index_architecture.md
 │   └── index_tasks.md
 ├── scripts/
@@ -174,6 +175,7 @@ aivc/
 | **6** | [Consolidation Absolue & CLI](docs/tasks/phase6_absolute_paths_fix.md) | Assainir l'historique vers l'absolu 100%, ajouter `aivc track` | 🟢 Terminé |
 | **7** | [Scoped Semantic Search](docs/tasks/phase7_scoped_search.md) | Filtrage par glob dans `search_memory` (MCP + CLI) | 🟢 Terminé |
 | **8** | [Injection GEMINI.md](docs/tasks/phase8_gemini_injection.md) | Bonnes pratiques agent injectées via `install.sh` | 🟢 Terminé |
+| **9** | [Exposition CLI](docs/tasks/phase9_cli_exposure.md) | Symlink automatique vers `~/.local/bin/aivc` | 🟢 Terminé |
 
 ### Documentation Index
 | Titre (Lien) | Description |
@@ -181,3 +183,4 @@ aivc/
 | [Spec Phase 6](docs/tasks/phase6_absolute_paths_fix.md) | Spécification technique pour finaliser l'absolu. |
 | [Spec Phase 7](docs/tasks/phase7_scoped_search.md) | Filtrage sémantique par glob. |
 | [Spec Phase 8](docs/tasks/phase8_gemini_injection.md) | Injection bonnes pratiques agent dans GEMINI.md. |
+| [Spec Phase 9](docs/tasks/phase9_cli_exposure.md) | Création d'un lien symbolique pour l'accès global à la commande CLI. |
