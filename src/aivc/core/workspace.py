@@ -56,6 +56,21 @@ class Workspace:
 
         if self._workspace_path.exists():
             self._state = self._load_state()
+            
+            # Migration: convert stored relative paths to absolute
+            migrated = False
+            new_tracked = {}
+            for path_str, hash_val in self._state["tracked_files"].items():
+                p = Path(path_str)
+                if not p.is_absolute():
+                    migrated = True
+                    new_tracked[str(Path.cwd() / p)] = hash_val
+                else:
+                    new_tracked[path_str] = hash_val
+            
+            if migrated:
+                self._state["tracked_files"] = new_tracked
+                self._save_state()
         else:
             self._state: dict[str, Any] = {
                 "tracked_files": {},
@@ -142,9 +157,10 @@ class Workspace:
         files = self._expand_path(path)
         newly_tracked = []
         for f in files:
-            if f not in self._state["tracked_files"]:
-                self._state["tracked_files"][f] = None  # never committed yet
-                newly_tracked.append(f)
+            abs_f = str(Path(f).resolve())
+            if abs_f not in self._state["tracked_files"]:
+                self._state["tracked_files"][abs_f] = None  # never committed yet
+                newly_tracked.append(abs_f)
         self._save_state()
         return newly_tracked
 

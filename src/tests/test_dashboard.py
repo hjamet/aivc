@@ -51,3 +51,16 @@ def test_dashboard_api_search_empty():
     res = handler._api_search("")
     assert res == []
     engine.search.assert_not_called()
+
+
+def test_dashboard_api_head():
+    handler = DashboardHandler.__new__(DashboardHandler)
+    handler.path = "/api/graph"
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+    
+    handler.do_HEAD()
+    
+    handler.send_response.assert_called_once_with(200)
+    handler.end_headers.assert_called_once()

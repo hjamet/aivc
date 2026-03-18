@@ -21,6 +21,18 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         static_dir = Path(__file__).parent / "static"
         super().__init__(*args, directory=str(static_dir), **kwargs)
 
+    def do_HEAD(self):
+        parsed = urlparse(self.path)
+        
+        if parsed.path in ("/api/graph", "/api/search"):
+            self.send_response(200)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            return
+            
+        super().do_HEAD()
+
     def do_GET(self):
         parsed = urlparse(self.path)
         
@@ -87,8 +99,23 @@ def main():
     def handler_factory(*args, **kwargs):
         return DashboardHandler(*args, engine=engine, **kwargs)
 
-    server = HTTPServer(("localhost", args.port), handler_factory)
-    print(f"✅ Dashboard running at http://localhost:{args.port}/")
+    port = args.port
+    server = None
+    for p in range(args.port, args.port + 20):
+        try:
+            server = HTTPServer(("localhost", p), handler_factory)
+            port = p
+            break
+        except OSError as e:
+            if getattr(e, "errno", 0) == 98 or "already in use" in str(e):
+                continue
+            raise
+
+    if not server:
+        print(f"[aivc] FATAL: Could not find an open port in range {args.port}-{args.port+19}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"✅ Dashboard running at http://localhost:{port}/")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
