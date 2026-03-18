@@ -45,6 +45,11 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             query = qs.get("q", [""])[0]
             self.send_json(self._api_search(query))
             return
+
+        if parsed.path.startswith("/api/commit/"):
+            commit_id = parsed.path[len("/api/commit/"):]
+            self.send_json(self._api_commit(commit_id))
+            return
             
         # Default behavior: serve static files
         super().do_GET()
@@ -81,6 +86,28 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 "file_paths": r.file_paths,
             })
         return out
+
+    def _api_commit(self, commit_id: str):
+        """Return full commit details."""
+        try:
+            commit = self.engine.get_commit(commit_id)
+        except (KeyError, FileNotFoundError):
+            return {"error": f"Commit {commit_id} not found"}
+        return {
+            "id": commit.id,
+            "title": commit.title,
+            "timestamp": commit.timestamp,
+            "note": commit.note,
+            "changes": [
+                {
+                    "path": c.path,
+                    "action": c.action,
+                    "size_before": c.size_before,
+                    "size_after": c.size_after,
+                }
+                for c in commit.changes
+            ],
+        }
 
 
 def main():

@@ -214,6 +214,45 @@
             margin-top: 4px;
         }
 
+        /* Commit Detail View */
+        .commit-detail-back {
+            background: transparent;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 0;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .commit-detail-back:hover { color: var(--highlight); }
+
+        .commit-detail-note {
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--text-main);
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .commit-detail-change {
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(48,54,61,0.3);
+        }
+        .commit-detail-change:last-child { border-bottom: none; }
+
         /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -430,28 +469,36 @@
                 setTimeout(() => loader.remove(), 500);
             }, 1000);
 
-            // Relayout button: re-run the force simulation
+            // Reusable layout config
+            const layoutConfig = (randomize = false, fit = false) => ({
+                name: 'cose',
+                animate: true,
+                animationDuration: 2500,
+                fit: fit,
+                padding: 40,
+                randomize: randomize,
+                nodeRepulsion: function(node) { return 12000; },
+                idealEdgeLength: function(edge) {
+                    return Math.max(40, 180 / edge.data('weight'));
+                },
+                edgeElasticity: function(edge) {
+                    return edge.data('weight') * 80;
+                },
+                gravity: 0.4,
+                numIter: 1000,
+                nestingFactor: 1.2,
+                componentSpacing: 80,
+                nodeOverlap: 20,
+            });
+
+            // Relayout button: re-run with fit to recenter
             document.getElementById('relayoutBtn').addEventListener('click', () => {
-                cy.layout({
-                    name: 'cose',
-                    animate: true,
-                    animationDuration: 800,
-                    fit: true,
-                    padding: 40,
-                    randomize: false,
-                    nodeRepulsion: function(node) { return 12000; },
-                    idealEdgeLength: function(edge) {
-                        return Math.max(40, 180 / edge.data('weight'));
-                    },
-                    edgeElasticity: function(edge) {
-                        return edge.data('weight') * 80;
-                    },
-                    gravity: 0.4,
-                    numIter: 1000,
-                    nestingFactor: 1.2,
-                    componentSpacing: 80,
-                    nodeOverlap: 20,
-                }).run();
+                cy.layout(layoutConfig(false, true)).run();
+            });
+
+            // Dynamic forces: after dragging a node, re-run without zoom reset
+            cy.on('free', 'node', function(e) {
+                cy.layout(layoutConfig(false, false)).run();
             });
 
             // 3. Search Logic
@@ -471,7 +518,7 @@
                 document.body.style.cursor = 'default';
             });
 
-            // Click node to focus
+            // Click node to focus (zoom + center)
             cy.on('tap', 'node', function(e){
                 let node = e.target;
                 cy.animate({
@@ -481,6 +528,7 @@
             });
 
             let involvedFilesGlobal = new Set();
+            let lastSearchResults = [];  // Store for commit detail navigation
 
             searchInput.addEventListener('keydown', async (e) => {
                 if (e.key === 'Enter') {
@@ -549,42 +597,9 @@
                         }, { duration: 700 });
                     }
 
-                    // Update Sidebar
-                    resultsTitle.innerText = `${commits.length} Commit${commits.length > 1 ? 's' : ''}`;
-                    resultsContent.innerHTML = commits.map(c => `
-                        <div class="commit-card" data-files='${JSON.stringify(c.file_paths)}'>
-                            <h3 class="commit-title">${c.title}</h3>
-                            <div class="commit-meta">
-                                <span>${c.timestamp.substring(0,10)}</span>
-                                <span>Score: ${c.score.toFixed(3)}</span>
-                            </div>
-                            <p class="commit-snippet">${c.snippet}...</p>
-                            ${c.file_paths.length ? `<div class="commit-files">${c.file_paths.length} fichier(s) associé(s)</div>` : ''}
-                        </div>
-                    `).join('');
-
+                    // Update Sidebar using centralized renderer
+                    renderSearchResults(commits);
                     sidebar.classList.add('open');
-
-                    // Bind hover on cards
-                    document.querySelectorAll('.commit-card').forEach(card => {
-                        card.addEventListener('mouseenter', () => {
-                            const files = JSON.parse(card.getAttribute('data-files'));
-                            cy.batch(() => {
-                                cy.nodes().removeClass('highlight');
-                                cy.nodes().forEach(n => {
-                                    if(files.includes(n.id())) n.addClass('highlight');
-                                });
-                            });
-                        });
-                        card.addEventListener('mouseleave', () => {
-                            cy.batch(() => {
-                                cy.nodes().removeClass('highlight');
-                                cy.nodes().forEach(n => {
-                                    if(involvedFilesGlobal.has(n.id())) n.addClass('highlight');
-                                });
-                            });
-                        });
-                    });
 
                 } catch (err) {
                     console.error("Search failed", err);
@@ -602,6 +617,105 @@
                 cy.animate({ fit: { padding: 30 } }, { duration: 500 });
                 resetBtn.style.display = 'none';
                 if (closeSidebar) sidebar.classList.remove('open');
+            }
+
+            // Commit Detail View
+            async function showCommitDetail(commitId) {
+                resultsTitle.innerText = 'Chargement...';
+                resultsContent.innerHTML = '';
+
+                try {
+                    const res = await fetch(`/api/commit/${commitId}`);
+                    const commit = await res.json();
+
+                    if (commit.error) {
+                        resultsTitle.innerText = 'Erreur';
+                        resultsContent.innerHTML = `<p style="color: #ff7b72;">${commit.error}</p>`;
+                        return;
+                    }
+
+                    resultsTitle.innerText = commit.title;
+                    resultsContent.innerHTML = `
+                        <button class="commit-detail-back" id="backToResults">← Retour aux résultats</button>
+                        <div class="commit-meta">
+                            <span>${commit.timestamp.substring(0, 10)}</span>
+                            <span style="font-family: monospace; font-size: 11px;">${commit.id.substring(0, 8)}</span>
+                        </div>
+                        <div class="commit-detail-note">${commit.note}</div>
+                        <h3 style="font-size: 14px; margin: 16px 0 8px; color: var(--highlight);">Fichiers modifiés (${commit.changes.length})</h3>
+                        ${commit.changes.map(c => `
+                            <div class="commit-detail-change">
+                                <span style="color: ${c.action === 'added' ? '#7ee787' : c.action === 'deleted' ? '#ff7b72' : '#d2a8ff'};">[${c.action}]</span>
+                                ${c.path.split('/').pop()}
+                                <span style="color: var(--text-muted); margin-left: 8px;">${formatSize(c.size_after - c.size_before)}</span>
+                            </div>
+                        `).join('')}
+                    `;
+
+                    document.getElementById('backToResults').addEventListener('click', () => {
+                        if (lastSearchResults.length > 0) {
+                            renderSearchResults(lastSearchResults);
+                        } else {
+                            sidebar.classList.remove('open');
+                        }
+                    });
+
+                } catch (err) {
+                    resultsTitle.innerText = 'Erreur';
+                    resultsContent.innerHTML = `<p style="color: #ff7b72;">${err.message}</p>`;
+                }
+            }
+
+            function formatSize(bytes) {
+                if (bytes === 0) return '±0';
+                const sign = bytes > 0 ? '+' : '';
+                if (Math.abs(bytes) < 1024) return `${sign}${bytes} B`;
+                return `${sign}${(bytes / 1024).toFixed(1)} KB`;
+            }
+
+            function renderSearchResults(commits) {
+                lastSearchResults = commits;
+                resultsTitle.innerText = `${commits.length} Commit${commits.length > 1 ? 's' : ''}`;
+                resultsContent.innerHTML = commits.map(c => `
+                    <div class="commit-card" data-files='${JSON.stringify(c.file_paths)}' data-commit-id='${c.commit_id}'>
+                        <h3 class="commit-title">${c.title}</h3>
+                        <div class="commit-meta">
+                            <span>${c.timestamp.substring(0,10)}</span>
+                            <span>Score: ${c.score.toFixed(3)}</span>
+                        </div>
+                        <p class="commit-snippet">${c.snippet}...</p>
+                        ${c.file_paths.length ? `<div class="commit-files">${c.file_paths.length} fichier(s) associé(s)</div>` : ''}
+                    </div>
+                `).join('');
+
+                // Re-bind click handlers
+                document.querySelectorAll('.commit-card').forEach(card => {
+                    card.addEventListener('click', async () => {
+                        const commitId = card.getAttribute('data-commit-id');
+                        await showCommitDetail(commitId);
+                    });
+                });
+
+                // Re-bind hover handlers
+                document.querySelectorAll('.commit-card').forEach(card => {
+                    card.addEventListener('mouseenter', () => {
+                        const files = JSON.parse(card.getAttribute('data-files'));
+                        cy.batch(() => {
+                            cy.nodes().removeClass('highlight');
+                            cy.nodes().forEach(n => {
+                                if(files.includes(n.id())) n.addClass('highlight');
+                            });
+                        });
+                    });
+                    card.addEventListener('mouseleave', () => {
+                        cy.batch(() => {
+                            cy.nodes().removeClass('highlight');
+                            cy.nodes().forEach(n => {
+                                if(involvedFilesGlobal.has(n.id())) n.addClass('highlight');
+                            });
+                        });
+                    });
+                });
             }
             } catch (globalError) {
                 console.error("Global JS Error: ", globalError);
