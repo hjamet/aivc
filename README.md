@@ -160,4 +160,9 @@ aivc/
 | **3** | [Interface MCP et Outils](docs/tasks/phase3_mcp_interface.md) | Entonnoir Recall, 8 outils, prompt système | 🟢 Terminé |
 | **4** | [Interface CLI & Web Dashboard](docs/tasks/phase4_cli_and_dashboard.md) | Outils terminaux (`aivc`), Graphe interactif (Taille/Couleur) avec recherche sémantique ciblée | 🟢 Terminé |
 | **5** | [Stabilisation MVP & Bugfixes](docs/tasks/phase5_stabilization.md) | Chemins absolus, autodiscovery de port, vendoring de Cytoscape | 🟢 Terminé |
+| **6** | [Consolidation Absolue & CLI](docs/tasks/phase6_absolute_paths_fix.md) | Assainir l'historique vers l'absolu 100%, ajouter `aivc track` | 🔴 À faire |
 
+### Documentation Index
+| Titre (Lien) | Description |
+|--------------|-------------|
+| [Spec Phase 6](docs/tasks/phase6_absolute_paths_fix.md) | Spécification technique pour finaliser l'absolu. |
