@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟡 Phase 1 implémentée — Moteur de versioning interne opérationnel. Phase 2 (sémantique) à venir.
+> **État** : 🟡 Phase 2 en cours — Moteur sémantique (ChromaDB + Bi/Cross-Encoder) + Graphe de co-occurrence.
 
 ### Concept
 
@@ -18,16 +18,22 @@ AIVC transforme les **commits** en souvenirs pour un agent IA. Le système conto
 ## Installation
 
 ```bash
-# Installer le moteur core en mode développement
-pip install -e ".[dev]"
+# Installation rapide (configure automatiquement le serveur MCP)
+curl -fsSL https://raw.githubusercontent.com/hjamet/aivc/main/install.sh | bash
+
+# OU installation locale depuis le repo
+bash install.sh
+
+# Installer uniquement le moteur core en mode développement
+uv pip install -e ".[dev]"
 
 # Lancer les tests
 python -m pytest src/tests/ -v
 ```
 
-**Pré-requis** : Python 3.11+
+**Pré-requis** : Python 3.11+, `uv` (`curl -fsSL https://astral.sh/uv/install.sh | sh`)
 **Stack Phase 1** : stdlib uniquement (`hashlib`, `uuid`, `json`, `pathlib`)
-**Stack Phase 2+** : ChromaDB, SentenceTransformers (`all-MiniLM-L6-v2`), Cross-Encoder.
+**Stack Phase 2** : ChromaDB, SentenceTransformers (`all-MiniLM-L6-v2`), Cross-Encoder (`ms-marco-MiniLM-L-6-v2`).
 
 ---
 
@@ -89,17 +95,28 @@ aivc/
 ├── src/
 │   ├── aivc/
 │   │   ├── __init__.py
-│   │   └── core/
+│   │   ├── core/
+│   │   │   ├── __init__.py
+│   │   │   ├── blob_store.py    # SHA-256 + Refcount/GC
+│   │   │   ├── commit.py        # Dataclasses Commit + FileChange
+│   │   │   ├── diff.py          # Détection des changements
+│   │   │   └── workspace.py     # Orchestrateur Phase 1
+│   │   └── semantic/
 │   │       ├── __init__.py
-│   │       ├── blob_store.py    # SHA-256 + Refcount/GC
-│   │       ├── commit.py        # Dataclasses Commit + FileChange
-│   │       ├── diff.py          # Détection des changements
-│   │       └── workspace.py     # Orchestrateur principal
+│   │       ├── indexer.py       # ChromaDB + SentenceTransformer
+│   │       ├── searcher.py      # Pipeline Bi-Encoder → Cross-Encoder
+│   │       ├── graph.py         # Graphe bipartite fichiers↔commits
+│   │       └── engine.py        # Façade SemanticEngine (Phase 2)
 │   └── tests/
 │       ├── test_blob_store.py
 │       ├── test_commit.py
 │       ├── test_diff.py
-│       └── test_workspace.py
+│       ├── test_workspace.py
+│       ├── test_indexer.py      # Phase 2
+│       ├── test_searcher.py     # Phase 2
+│       ├── test_graph.py        # Phase 2
+│       └── test_engine.py       # Phase 2
+├── install.sh                   # Installation + config MCP automatique
 ├── pyproject.toml
 ├── .gitignore
 └── README.md
@@ -111,8 +128,10 @@ aivc/
 
 | Commande | Description |
 |----------|-------------|
-| `python -m pytest src/tests/ -v` | Lancer la suite de tests (48 tests) |
-| `pip install -e ".[dev]"` | Installer le package en mode développement |
+| `bash install.sh` | Installer AIVC et configurer le serveur MCP |
+| `python -m pytest src/tests/ -v` | Lancer la suite de tests complète |
+| `uv pip install -e ".[dev]"` | Installer uniquement le core (stdlib) |
+| `uv pip install -e ".[semantic]"` | Installer avec les dépendances IA (Phase 2) |
 
 ---
 
@@ -127,5 +146,5 @@ aivc/
 | Phase | Nom | Spec | État |
 |-------|-----|------|------|
 | **1** | [Moteur de Versioning Interne (Core)](docs/tasks/phase1_versioning_engine.md) | Blobs SHA-256, Garbage Collection | 🟢 Terminé |
-| **2** | [Moteur Sémantique et Graphe](docs/tasks/phase2_semantic_graph.md) | Bi/Cross Encoder, ChromaDB, UI | 🔴 À faire |
+| **2** | [Moteur Sémantique et Graphe](docs/tasks/phase2_semantic_graph.md) | Bi/Cross Encoder, ChromaDB, install.sh MCP | 🔴 À faire |
 | **3** | [Interface MCP et Outils](docs/tasks/phase3_mcp_interface.md) | Entonnoir Recall, Untrack destructif | 🔴 À faire |

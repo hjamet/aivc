@@ -1,0 +1,131 @@
+"""
+Searcher: Bi-Encoder → Cross-Encoder reranking pipeline.
+
+Stage 1 (Bi-Encoder): ChromaDB retrieves the top-K semantically close
+commits using the SentenceTransformer embeddings already stored by the Indexer.
+
+Stage 2 (Cross-Encoder): the top-K candidates are re-ranked by the Cross-Encoder
+for more precise relevance scoring.  Only top-K candidates are passed to the
+Cross-Encoder (default cap: 50) to keep latency acceptable.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from sentence_transformers import CrossEncoder
+
+if TYPE_CHECKING:
+    from aivc.semantic.indexer import Indexer
+
+_CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+_MAX_CROSS_ENCODER_INPUTS = 50  # hard ceiling to keep latency under control
+
+
+@dataclass
+class SearchResult:
+    """A single result from the semantic search pipeline."""
+
+    commit_id: str
+    """UUID of the matching commit."""
+
+    title: str
+    """Short commit title."""
+
+    timestamp: str
+    """ISO 8601 UTC creation timestamp."""
+
+    score: float
+    """Cross-Encoder relevance score (higher is better)."""
+
+    snippet: str
+    """First ~200 characters of the commit note (for preview)."""
+
+    file_paths: list[str]
+    """Files that were changed in this commit (excluding deleted files)."""
+
+
+class Searcher:
+    """Two-stage semantic search: Bi-Encoder (fast recall) → Cross-Encoder (precise rank).
+
+    Args:
+        indexer: A fully initialised :class:`Indexer` instance.
+    """
+
+    def __init__(self, indexer: "Indexer") -> None:
+        self._indexer = indexer
+        self._cross_encoder = CrossEncoder(_CROSS_ENCODER_MODEL)
+
+    def search(
+        self,
+        query: str,
+        top_k: int = 50,
+        top_n: int = 5,
+    ) -> list[SearchResult]:
+        """Search for commits semantically similar to *query*.
+
+        Args:
+            query: Free-text search query.
+            top_k: Number of candidates retrieved by the Bi-Encoder stage.
+                   Capped internally at ``_MAX_CROSS_ENCODER_INPUTS`` (50).
+            top_n: Number of results returned after Cross-Encoder reranking.
+
+        Returns:
+            A list of at most *top_n* :class:`SearchResult` objects sorted
+            descending by Cross-Encoder score.
+
+        Raises:
+            ValueError: if the index is empty or ``top_n`` > ``top_k``.
+        """
+        if top_n > top_k:
+            raise ValueError(
+                f"top_n ({top_n}) must be ≤ top_k ({top_k})."
+            )
+
+        effective_k = min(top_k, _MAX_CROSS_ENCODER_INPUTS)
+
+        # ----------------------------------------------------------------
+        # Stage 1: Bi-Encoder retrieval via ChromaDB
+        # ----------------------------------------------------------------
+        candidates = self._indexer.query(query, top_k=effective_k)
+
+        if not candidates:
+            return []
+
+        # ----------------------------------------------------------------
+        # Stage 2: Cross-Encoder reranking
+        # ----------------------------------------------------------------
+        # Build (query, document) pairs for the cross-encoder.
+        pairs = [(query, c["document"]) for c in candidates]
+        scores: list[float] = self._cross_encoder.predict(pairs).tolist()
+
+        # Sort candidates by descending cross-encoder score.
+        ranked = sorted(
+            zip(scores, candidates),
+            key=lambda x: x[0],
+            reverse=True,
+        )
+
+        results = []
+        for score, hit in ranked[:top_n]:
+            # Build a short snippet from the first sentence of the document.
+            doc: str = hit["document"]
+            # Skip the title line (first line) to produce a note snippet.
+            lines = doc.split("\n", 2)
+            note_part = lines[2] if len(lines) >= 3 else doc
+            snippet = note_part[:200].strip()
+
+            results.append(
+                SearchResult(
+                    commit_id=hit["commit_id"],
+                    title=hit["title"],
+                    timestamp=hit["timestamp"],
+                    score=score,
+                    snippet=snippet,
+                    file_paths=hit["file_paths"],
+                )
+            )
+
+        return results
