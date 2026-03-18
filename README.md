@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🔴 Phase de conception — Aucun code implémenté.
+> **État** : 🟡 Phase 1 implémentée — Moteur de versioning interne opérationnel. Phase 2 (sémantique) à venir.
 
 ### Concept
 
@@ -17,22 +17,42 @@ AIVC transforme les **commits** en souvenirs pour un agent IA. Le système conto
 
 ## Installation
 
-> ⚠️ Pas encore disponible — en cours de conception.
-
-Le serveur sera installé de manière isolée pour éviter de polluer l'environnement système :
 ```bash
-# L'installation créera un venv dédié dans ~/.aivc/
-bash install.sh
+# Installer le moteur core en mode développement
+pip install -e ".[dev]"
+
+# Lancer les tests
+python -m pytest src/tests/ -v
 ```
 
 **Pré-requis** : Python 3.11+
-**Stack** : ChromaDB, SentenceTransformers (`all-MiniLM-L6-v2`), Cross-Encoder.
+**Stack Phase 1** : stdlib uniquement (`hashlib`, `uuid`, `json`, `pathlib`)
+**Stack Phase 2+** : ChromaDB, SentenceTransformers (`all-MiniLM-L6-v2`), Cross-Encoder.
 
 ---
 
-## Fonctionnalités Clés
+## Description Détaillée
 
-### Outils MCP Exposés
+### Coeur — Moteur de Versioning (Phase 1)
+
+Stockage adressable par contenu SHA-256, inspiré de Git :
+
+- **BlobStore** : stocke des blobs binaires immuables, dédupliqués par hash. Reference Counting intégré — un blob est supprimé physiquement seulement quand plus aucun fichier ne le référence (Garbage Collection).
+- **Commit** : unité atomique de mémoire. Titre court + note Markdown détaillée + liste des `FileChange` avec impact de taille (`+X B / -Y B`).
+- **Diff** : compare l'état connu (dernier hash) au disque actuel — détecte `added`, `modified`, `deleted`.
+- **Workspace** : orchestrateur. Track des fichiers/dossiers/globs, crée des commits, calcule le statut (taille courante + historique), gère l'untrack avec GC.
+
+### Flux
+
+```
+track(path/glob/dir) --> workspace.json
+    | create_commit(title, note)
+    --> compute_diff() --> BlobStore.store() --> Commit.json
+    | untrack(file)
+    --> BlobStore.decrement_ref() --> GC si refcount=0
+```
+
+### Outils MCP Exposés (Phase 3)
 
 | Outil | Type | Description |
 |-------|------|-------------|
@@ -42,10 +62,6 @@ bash install.sh
 | `get_status` | Lecture | Liste les fichiers surveillés, avec leur taille courante et la taille de leur historique. |
 | `untrack` | Gestion | Retire un fichier de la surveillance ET supprime son historique (Garbage Collected). |
 | `read_historical_file` | Lecture | Consulte une version passée d'un fichier. |
-
-### Interface Visuelle (Graphe)
-
-Le système inclut une interface web locale facultative permettant de visualiser le **graphe de co-occurrence** (liens entre fichiers et commits).
 
 ---
 
@@ -71,11 +87,20 @@ aivc/
 │   ├── index_architecture.md
 │   └── index_tasks.md
 ├── src/
-│   └── aivc/
-│       ├── core/              # Moteur de versioning (SHA-256, GC)
-│       ├── semantic/          # Base vectorielle, Bi/Cross Encoder
-│       ├── tools/             # Outils MCP
-│       └── ui/                # Serveur de visualisation (Graphe)
+│   ├── aivc/
+│   │   ├── __init__.py
+│   │   └── core/
+│   │       ├── __init__.py
+│   │       ├── blob_store.py    # SHA-256 + Refcount/GC
+│   │       ├── commit.py        # Dataclasses Commit + FileChange
+│   │       ├── diff.py          # Détection des changements
+│   │       └── workspace.py     # Orchestrateur principal
+│   └── tests/
+│       ├── test_blob_store.py
+│       ├── test_commit.py
+│       ├── test_diff.py
+│       └── test_workspace.py
+├── pyproject.toml
 ├── .gitignore
 └── README.md
 ```
@@ -84,13 +109,16 @@ aivc/
 
 ## Scripts d'Entrée Principaux
 
-> Aucun script — projet en phase de conception.
+| Commande | Description |
+|----------|-------------|
+| `python -m pytest src/tests/ -v` | Lancer la suite de tests (48 tests) |
+| `pip install -e ".[dev]"` | Installer le package en mode développement |
 
 ---
 
 ## Scripts Exécutables Secondaires & Utilitaires
 
-> Aucun — projet en phase de conception.
+> Aucun -- interface MCP en Phase 3.
 
 ---
 
@@ -98,6 +126,6 @@ aivc/
 
 | Phase | Nom | Spec | État |
 |-------|-----|------|------|
-| **1** | [Moteur de Versioning Interne (Core)](docs/tasks/phase1_versioning_engine.md) | Blobs SHA-256, Garbage Collection | 🔴 À faire |
+| **1** | [Moteur de Versioning Interne (Core)](docs/tasks/phase1_versioning_engine.md) | Blobs SHA-256, Garbage Collection | 🟢 Terminé |
 | **2** | [Moteur Sémantique et Graphe](docs/tasks/phase2_semantic_graph.md) | Bi/Cross Encoder, ChromaDB, UI | 🔴 À faire |
 | **3** | [Interface MCP et Outils](docs/tasks/phase3_mcp_interface.md) | Entonnoir Recall, Untrack destructif | 🔴 À faire |
