@@ -172,7 +172,7 @@ def create_commit(title: str, note: str) -> str:
 
 
 @mcp.tool()
-def search_memory(query: str, top_n: int = 5) -> str:
+def search_memory(query: str, top_n: int = 5, filter_glob: str = "") -> str:
     """Search past commit notes by semantic meaning.
 
     Uses a Bi-Encoder + Cross-Encoder pipeline to retrieve the most relevant
@@ -185,12 +185,14 @@ def search_memory(query: str, top_n: int = 5) -> str:
     Args:
         query: Free-text search query. Write it as a question or a short description.
         top_n: Number of results to return (default 5, max 20).
+        filter_glob: Optional glob pattern (e.g. "src/*.py") to restrict search to commits
+                     that touched matching files.
 
     Returns:
         A ranked list of matching commits + the most relevant file paths.
     """
     top_n = min(top_n, 20)
-    results = _engine.search(query, top_n=top_n)
+    results = _engine.search(query, top_n=top_n, filter_glob=filter_glob)
 
     if not results:
         return "No matching commits found in memory."

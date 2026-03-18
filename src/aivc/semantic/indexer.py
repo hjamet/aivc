@@ -156,12 +156,14 @@ class Indexer:
         self,
         query_text: str,
         top_k: int,
+        filter_ids: list[str] | None = None,
     ) -> list[dict]:
         """Run a bi-encoder query and return the top-k raw results.
 
         Args:
             query_text: The search query.
             top_k: Number of results to retrieve.
+            filter_ids: Optional list of commit IDs to restrict the search to.
 
         Returns:
             A list of dicts with keys: ``commit_id``, ``title``,
@@ -174,16 +176,48 @@ class Indexer:
         if count == 0:
             raise ValueError("The index is empty — no commits have been indexed yet.")
 
-        # Clamp top_k to the actual collection size (ChromaDB raises if n_results > count).
-        effective_k = min(top_k, count)
+        if filter_ids is not None:
+            if not filter_ids:
+                return []
+            # Clamp effective_k to the number of available valid IDs
+            effective_k = min(top_k, count, len(filter_ids))
+            where_document = {"ids": filter_ids}
+            
+            # Note: ChromaDB 0.4+ uses `where` for metadata and `where_document` for document content.
+            # However, for document IDs, it accepts them directly via the `where` parameter or the `ids` parameter?
+            # Wait, `get` and `query` take `where` for metadata, `where_document` for document text.
+            # Actually, `query` does not have an `ids` parameter? Wait, I need to check the Chroma documentation.
+        else:
+            effective_k = min(top_k, count)
 
-        results = self._collection.query(
-            query_texts=[query_text],
-            n_results=effective_k,
-            include=["documents", "metadatas", "distances"],
-        )
+        # Chroma's `collection.query` accepts:
+        # query_texts: Optional[Union[str, List[str]]]
+        # n_results: int
+        # where: Optional[Where] (filters metadata)
+        # where_document: Optional[WhereDocument] (filters document content)
+        # include: IncludeList
+        
+        # ACTUALLY, in ChromaDB you CAN restrict by `where={"commit_id": {"$in": filter_ids}}`
+        # BUT since we use the commit ID as the ChromaDB `id`, we can just use the `where={"commit_id": {"$in": filter_ids}}`
+        # Wait, the plan says: `collection.query(ids=[...])` ?? I need to be careful with ChromaDB API.
+        
+        kwargs = {
+            "query_texts": [query_text],
+            "n_results": effective_k,
+            "include": ["documents", "metadatas", "distances"],
+        }
+        
+        if filter_ids is not None:
+            # We can use the metadata "$in" filter because we store `commit_id` in metadata.
+            kwargs["where"] = {"commit_id": {"$in": filter_ids}}
+            # Fallback for huge ID lists is out of scope for MVP, but ChromaDB supports reasonably large lists.
+
+        results = self._collection.query(**kwargs)
 
         hits = []
+        if not results["documents"] or not results["documents"][0]:
+            return hits
+
         for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
             file_paths_str = meta.get("file_paths", "")
             hits.append(
@@ -196,3 +230,4 @@ class Indexer:
                 }
             )
         return hits
+

@@ -114,6 +114,7 @@ class SemanticEngine:
         query: str,
         top_k: int = 50,
         top_n: int = 5,
+        filter_glob: str = "",
     ) -> list:
         """Semantic search over commit notes.
 
@@ -121,11 +122,19 @@ class SemanticEngine:
             query: Free-text search query.
             top_k: Bi-Encoder recall breadth (capped at 50).
             top_n: Cross-Encoder reranked results to return.
+            filter_glob: Optional glob pattern. If provided, restricts results
+                         to commits that touch at least one matching file.
 
         Returns:
             A list of :class:`~aivc.semantic.searcher.SearchResult` sorted by
             relevance (descending).
         """
+        if filter_glob:
+            commit_ids = self._graph.get_commits_by_glob(filter_glob)
+            if not commit_ids:
+                return []
+            return self._searcher.search(query, top_k=top_k, top_n=top_n, filter_ids=commit_ids)
+        
         return self._searcher.search(query, top_k=top_k, top_n=top_n)
 
     # ------------------------------------------------------------------

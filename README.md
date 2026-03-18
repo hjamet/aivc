@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟢 Phase 6 terminée — Historique 100% absolu, CLI complète.
+> **État** : 🟢 Phase 7 terminée — Scoped Semantic Search (Filtrage par Glob).
 
 ### Concept
 
@@ -64,7 +64,7 @@ track(path/glob/dir) --> workspace.json
 | Outil | Type | Description |
 |-------|------|-------------|
 | `create_commit` | Écriture | Mémorise un accomplissement (Titre + Détails Markdown) et snapshots les fichiers. **Appeler souvent — après chaque étape.** |
-| `search_memory` | Lecture | Recherche sémantique. Retourne Top Commits (ID, titre, score) + fichiers les plus fréquents. |
+| `search_memory` | Lecture | Recherche sémantique. Retourne Top Commits (ID, titre, score) + fichiers les plus fréquents. Supporte un filtre glob optionnel. |
 | `get_recent_commits`| Lecture | Journal des N derniers commits (paginable par offset/limit), façon `git log`. |
 | `consult_commit`| Lecture | Contenu complet (note Markdown + FileChange) d'un commit spécifique. |
 | `consult_file` | Lecture | Historique AIVC d'un fichier : liste des commits qui l'ont touché. |
@@ -145,7 +145,7 @@ aivc/
 | `aivc status` | Afficher les fichiers suivis et leur poids |
 | `aivc track <path>` | Ajouter un fichier/dossier/glob au tracking |
 | `aivc log [-n N]` | Afficher l'historique des commits |
-| `aivc search <query>` | Recherche sémantique dans la mémoire |
+| `aivc search <query> [-g GLOB]` | Recherche sémantique dans la mémoire, avec filtre optionnel |
 | `aivc web [-p PORT]` | Lancer le Web Dashboard interactif |
 | `python -m pytest src/tests/ -v` | Lancer la suite de tests complète |
 | `uv pip install -e ".[dev]"` | Installer uniquement le core (stdlib) |
@@ -172,7 +172,7 @@ aivc/
 | **4** | [Interface CLI & Web Dashboard](docs/tasks/phase4_cli_and_dashboard.md) | Outils terminaux (`aivc`), Graphe interactif (Taille/Couleur) avec recherche sémantique ciblée | 🟢 Terminé |
 | **5** | [Stabilisation MVP & Bugfixes](docs/tasks/phase5_stabilization.md) | Chemins absolus, autodiscovery de port, vendoring de Cytoscape | 🟢 Terminé |
 | **6** | [Consolidation Absolue & CLI](docs/tasks/phase6_absolute_paths_fix.md) | Assainir l'historique vers l'absolu 100%, ajouter `aivc track` | 🟢 Terminé |
-| **7** | [Scoped Semantic Search](docs/tasks/phase7_scoped_search.md) | Filtrage par glob dans `search_memory` (MCP + CLI) | 🔴 À faire |
+| **7** | [Scoped Semantic Search](docs/tasks/phase7_scoped_search.md) | Filtrage par glob dans `search_memory` (MCP + CLI) | 🟢 Terminé |
 
 ### Documentation Index
 | Titre (Lien) | Description |

@@ -15,6 +15,7 @@ a row appears in the ``edges`` table.
 
 from __future__ import annotations
 
+import fnmatch
 import sqlite3
 from collections import Counter
 from pathlib import Path
@@ -194,6 +195,41 @@ class CooccurrenceGraph:
                 "SELECT commit_id FROM edges WHERE file_path = ?", (file_path,)
             ).fetchall()
         ]
+
+    def get_commits_by_glob(self, pattern: str) -> list[str]:
+        """Return commit IDs that touched any file matching a glob pattern.
+
+        Matches the absolute file paths in the graph against the given glob pattern.
+
+        Args:
+            pattern: A glob pattern (e.g. "*/tests/*.py").
+
+        Returns:
+            A list of unique commit IDs.
+        """
+        all_files = [
+            r[0] for r in self._execute("SELECT file_path FROM file_nodes").fetchall()
+        ]
+
+        matched_files = [fp for fp in all_files if fnmatch.fnmatch(fp, pattern)]
+
+        if not matched_files:
+            return []
+
+        commit_ids = set()
+        chunk_size = 900  # Safe limit for SQLite `IN` clause parameters
+
+        for i in range(0, len(matched_files), chunk_size):
+            chunk = tuple(matched_files[i : i + chunk_size])
+            placeholders = ",".join("?" for _ in chunk)
+            rows = self._execute(
+                f"SELECT DISTINCT commit_id FROM edges WHERE file_path IN ({placeholders})",
+                chunk,
+            ).fetchall()
+            for r in rows:
+                commit_ids.add(r[0])
+
+        return list(commit_ids)
 
     def get_related_files(
         self, file_path: str, top_n: int = 10

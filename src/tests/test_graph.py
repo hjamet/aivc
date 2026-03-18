@@ -167,3 +167,35 @@ def test_to_vis_data_structure(graph) -> None:
 
     edge_sources = {e["source"] for e in data["edges"]}
     assert "c1" in edge_sources
+
+# ---------------------------------------------------------------------------
+# get_commits_by_glob
+# ---------------------------------------------------------------------------
+
+def test_get_commits_by_glob_basic(graph) -> None:
+    c1 = _make_commit("c1", file_paths=["/abs/path/src/a.py", "/abs/path/src/b.py"])
+    c2 = _make_commit("c2", file_paths=["/abs/path/docs/readme.md"])
+    graph.add_commit(c1)
+    graph.add_commit(c2)
+    commits = graph.get_commits_by_glob("*.py")
+    assert set(commits) == {"c1"}
+
+def test_get_commits_by_glob_specific_dir(graph) -> None:
+    c1 = _make_commit("c1", file_paths=["/usr/src/semantic/a.py"])
+    c2 = _make_commit("c2", file_paths=["/usr/src/core/b.py"])
+    graph.add_commit(c1)
+    graph.add_commit(c2)
+    commits = graph.get_commits_by_glob("*/semantic/*.py")
+    assert set(commits) == {"c1"}
+
+def test_get_commits_by_glob_no_match(graph) -> None:
+    c1 = _make_commit("c1", file_paths=["/src/a.py"])
+    graph.add_commit(c1)
+    assert graph.get_commits_by_glob("*.md") == []
+
+def test_get_commits_by_glob_all_match(graph) -> None:
+    c1 = _make_commit("c1", file_paths=["/src/a.py"])
+    c2 = _make_commit("c2", file_paths=["/docs/b.md"])
+    graph.add_commit(c1)
+    graph.add_commit(c2)
+    assert set(graph.get_commits_by_glob("*")) == {"c1", "c2"}

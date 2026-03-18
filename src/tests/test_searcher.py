@@ -113,3 +113,13 @@ def test_search_returns_empty_list_on_empty_index(tmp_path) -> None:
     s = Searcher(indexer)
     with pytest.raises(ValueError, match="index is empty"):
         s.search("anything")
+
+def test_search_with_filter_ids_restricts_results(loaded_searcher) -> None:
+    results = loaded_searcher.search("sql database", top_k=5, filter_ids=["id-sorting"])
+    assert len(results) <= 1
+    if results:
+        assert results[0].commit_id == "id-sorting"
+
+def test_search_with_empty_filter_ids_returns_empty(loaded_searcher) -> None:
+    results = loaded_searcher.search("sql database", top_k=5, filter_ids=[])
+    assert results == []

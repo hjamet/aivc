@@ -90,9 +90,12 @@ def cmd_log(args: argparse.Namespace) -> None:
 
 def cmd_search(args: argparse.Namespace) -> None:
     engine = _get_engine()
-    print(f"{DIM}Searching memory for: '{args.query}'...{RESET}\n")
+    if args.glob:
+        print(f"{DIM}Searching memory for: '{args.query}' (filter: '{args.glob}')...{RESET}\n")
+    else:
+        print(f"{DIM}Searching memory for: '{args.query}'...{RESET}\n")
     
-    results = engine.search(args.query, top_n=args.top_n)
+    results = engine.search(args.query, top_n=args.top_n, filter_glob=args.glob)
     
     if not results:
         print("No matching commits found.")
@@ -172,6 +175,10 @@ def main() -> None:
     parser_search.add_argument(
         "-n", "--top-n", type=int, default=5, 
         help="Number of results to return (default: 5)"
+    )
+    parser_search.add_argument(
+        "-g", "--glob", type=str, default="", 
+        help="Optional glob pattern to restrict search to matching files"
     )
 
     # web

@@ -73,6 +73,7 @@ class Searcher:
         query: str,
         top_k: int = 50,
         top_n: int = 5,
+        filter_ids: list[str] | None = None,
     ) -> list[SearchResult]:
         """Search for commits semantically similar to *query*.
 
@@ -81,6 +82,7 @@ class Searcher:
             top_k: Number of candidates retrieved by the Bi-Encoder stage.
                    Capped internally at ``_MAX_CROSS_ENCODER_INPUTS`` (50).
             top_n: Number of results returned after Cross-Encoder reranking.
+            filter_ids: Optional list of commit IDs to restrict the search to.
 
         Returns:
             A list of at most *top_n* :class:`SearchResult` objects sorted
@@ -99,7 +101,7 @@ class Searcher:
         # ----------------------------------------------------------------
         # Stage 1: Bi-Encoder retrieval via ChromaDB
         # ----------------------------------------------------------------
-        candidates = self._indexer.query(query, top_k=effective_k)
+        candidates = self._indexer.query(query, top_k=effective_k, filter_ids=filter_ids)
 
         if not candidates:
             return []

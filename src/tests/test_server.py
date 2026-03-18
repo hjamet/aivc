@@ -172,7 +172,7 @@ class TestSearchMemory(unittest.TestCase):
         _mock_engine.search.return_value = []
         _search_memory("x", top_n=100)
         # top_n is capped to 20 before passing to engine
-        _mock_engine.search.assert_called_once_with("x", top_n=20)
+        _mock_engine.search.assert_called_once_with("x", top_n=20, filter_glob="")
 
 
 class TestConsultCommit(unittest.TestCase):
