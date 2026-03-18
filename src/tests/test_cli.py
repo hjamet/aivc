@@ -49,6 +49,23 @@ def test_cli_search(mock_engine, capsys):
     assert "No matching commits found" in captured.out
 
 
+def test_cli_track_single_file(mock_engine, capsys):
+    mock_engine.track.return_value = ["/home/user/project/src/app.py"]
+    with patch("sys.argv", ["aivc", "track", "src/app.py"]):
+        main()
+    captured = capsys.readouterr()
+    assert "Tracked 1 new file(s)" in captured.out
+    mock_engine.track.assert_called_once_with("src/app.py")
+
+
+def test_cli_track_already_tracked(mock_engine, capsys):
+    mock_engine.track.return_value = []
+    with patch("sys.argv", ["aivc", "track", "src/app.py"]):
+        main()
+    captured = capsys.readouterr()
+    assert "No new files to track" in captured.out
+
+
 def test_cli_no_env_var(capsys):
     # Tests that omitting AIVC_STORAGE_ROOT exits with error
     with patch.dict(os.environ, clear=True):

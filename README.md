@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟢 Phase 5 terminée — MVP stable et robuste (bugs levés).
+> **État** : 🟢 Phase 6 terminée — Historique 100% absolu, CLI complète.
 
 ### Concept
 
@@ -92,31 +92,39 @@ aivc/
 │   ├── tasks/
 │   │   ├── phase1_versioning_engine.md
 │   │   ├── phase2_semantic_graph.md
-│   │   └── phase3_mcp_interface.md
+│   │   ├── phase3_mcp_interface.md
+│   │   └── phase6_absolute_paths_fix.md
 │   ├── index_architecture.md
 │   └── index_tasks.md
+├── scripts/
+│   └── migrate_commit_paths.py  # Migration one-shot chemins relatifs → absolus
 ├── src/
 │   ├── aivc/
 │   │   ├── __init__.py
 │   │   ├── server.py             # Serveur MCP (Phase 3) — 8 outils FastMCP
+│   │   ├── cli.py                # CLI (aivc status/track/log/search/web)
 │   │   ├── core/
 │   │   │   ├── __init__.py
 │   │   │   ├── blob_store.py    # SHA-256 + Refcount/GC
 │   │   │   ├── commit.py        # Dataclasses Commit + FileChange
 │   │   │   ├── diff.py          # Détection des changements
 │   │   │   └── workspace.py     # Orchestrateur Phase 1
-│   │   └── semantic/
-│   │       ├── __init__.py
-│   │       ├── indexer.py       # ChromaDB + SentenceTransformer
-│   │       ├── searcher.py      # Pipeline Bi-Encoder → Cross-Encoder
-│   │       ├── graph.py         # Graphe bipartite fichiers↔commits
-│   │       └── engine.py        # Façade SemanticEngine (Phase 2)
+│   │   ├── semantic/
+│   │   │   ├── __init__.py
+│   │   │   ├── indexer.py       # ChromaDB + SentenceTransformer
+│   │   │   ├── searcher.py      # Pipeline Bi-Encoder → Cross-Encoder
+│   │   │   ├── graph.py         # Graphe bipartite fichiers↔commits
+│   │   │   └── engine.py        # Façade SemanticEngine (Phase 2)
+│   │   └── web/
+│   │       └── dashboard.py     # Web Dashboard Cytoscape.js
 │   └── tests/
 │       ├── conftest.py           # Marker requires_ml + --run-ml flag
 │       ├── test_blob_store.py
 │       ├── test_commit.py
 │       ├── test_diff.py
 │       ├── test_workspace.py
+│       ├── test_migrate.py      # Phase 6
+│       ├── test_cli.py          # Phase 4 + 6
 │       ├── test_indexer.py      # Phase 2
 │       ├── test_searcher.py     # Phase 2
 │       ├── test_graph.py        # Phase 2
@@ -134,9 +142,11 @@ aivc/
 
 | Commande | Description |
 |----------|-------------|
-| `bash install.sh` | Installer AIVC (prod ~/.aivc) et configurer le serveur MCP |
-| `bash install_dev.sh` | Installer AIVC (dev local .venv) pour tester avec le code local |
-| `aivc status`, `log`, `search` | Interagir avec la mémoire via le CLI en terminal |
+| `aivc status` | Afficher les fichiers suivis et leur poids |
+| `aivc track <path>` | Ajouter un fichier/dossier/glob au tracking |
+| `aivc log [-n N]` | Afficher l'historique des commits |
+| `aivc search <query>` | Recherche sémantique dans la mémoire |
+| `aivc web [-p PORT]` | Lancer le Web Dashboard interactif |
 | `python -m pytest src/tests/ -v` | Lancer la suite de tests complète |
 | `uv pip install -e ".[dev]"` | Installer uniquement le core (stdlib) |
 | `uv pip install -e ".[semantic]"` | Installer avec les dépendances IA (Phase 2) |
@@ -145,9 +155,10 @@ aivc/
 
 ## Scripts Exécutables Secondaires & Utilitaires
 
-| Commande | Description |
-|----------|-------------|
+| `bash install.sh` | Installer AIVC (prod ~/.aivc) et configurer le serveur MCP |
+| `bash install_dev.sh` | Installer AIVC (dev local .venv) pour tester avec le code local |
 | `python -m aivc.web.dashboard` | Lancer le Web Dashboard (graphe interactif sur le port 8765) |
+| `python scripts/migrate_commit_paths.py` | Migration one-shot des chemins relatifs → absolus (Phase 6) |
 
 ---
 
@@ -160,7 +171,7 @@ aivc/
 | **3** | [Interface MCP et Outils](docs/tasks/phase3_mcp_interface.md) | Entonnoir Recall, 8 outils, prompt système | 🟢 Terminé |
 | **4** | [Interface CLI & Web Dashboard](docs/tasks/phase4_cli_and_dashboard.md) | Outils terminaux (`aivc`), Graphe interactif (Taille/Couleur) avec recherche sémantique ciblée | 🟢 Terminé |
 | **5** | [Stabilisation MVP & Bugfixes](docs/tasks/phase5_stabilization.md) | Chemins absolus, autodiscovery de port, vendoring de Cytoscape | 🟢 Terminé |
-| **6** | [Consolidation Absolue & CLI](docs/tasks/phase6_absolute_paths_fix.md) | Assainir l'historique vers l'absolu 100%, ajouter `aivc track` | 🔴 À faire |
+| **6** | [Consolidation Absolue & CLI](docs/tasks/phase6_absolute_paths_fix.md) | Assainir l'historique vers l'absolu 100%, ajouter `aivc track` | 🟢 Terminé |
 
 ### Documentation Index
 | Titre (Lien) | Description |

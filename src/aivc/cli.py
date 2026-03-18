@@ -105,6 +105,20 @@ def cmd_search(args: argparse.Namespace) -> None:
         print(f"   {DIM}Files:{RESET} {', '.join(r.file_paths) if r.file_paths else '—'}")
         print(f"\n      {r.snippet}\n")
 
+def cmd_track(args: argparse.Namespace) -> None:
+    """Track a file, directory, or glob pattern."""
+    engine = _get_engine()
+    newly_tracked = engine.track(args.path)
+
+    if not newly_tracked:
+        print(f"{YELLOW}No new files to track{RESET} (already tracked or no match).")
+        return
+
+    print(f"{GREEN}{BOLD}Tracked {len(newly_tracked)} new file(s):{RESET}")
+    for f in newly_tracked:
+        print(f"  {CYAN}+{RESET} {f}")
+
+
 def cmd_web(args: argparse.Namespace) -> None:
     """Launch the Web Dashboard server."""
     from aivc.web.dashboard import main as dashboard_main
@@ -124,6 +138,16 @@ def main() -> None:
     subparsers.add_parser(
         "status", 
         help="List all tracked files with storage usage"
+    )
+
+    # track
+    parser_track = subparsers.add_parser(
+        "track",
+        help="Track a file, directory, or glob pattern"
+    )
+    parser_track.add_argument(
+        "path", type=str,
+        help="File path, directory, or glob pattern to track"
     )
 
     # log
@@ -164,6 +188,8 @@ def main() -> None:
 
     if args.command == "status":
         cmd_status(args)
+    elif args.command == "track":
+        cmd_track(args)
     elif args.command == "log":
         cmd_log(args)
     elif args.command == "search":
