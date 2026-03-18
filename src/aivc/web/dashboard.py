@@ -102,8 +102,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 {
                     "path": c.path,
                     "action": c.action,
-                    "size_before": c.size_before,
-                    "size_after": c.size_after,
+                    "size_before": c.bytes_removed,
+                    "size_after": c.bytes_added,
                 }
                 for c in commit.changes
             ],
