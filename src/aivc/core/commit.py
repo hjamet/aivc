@@ -178,3 +178,4 @@ def _format_bytes(n: int) -> str:
     if n < 1024 ** 2:
         return f"{n / 1024:.1f} KB"
     return f"{n / 1024 ** 2:.1f} MB"
+

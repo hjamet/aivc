@@ -293,3 +293,4 @@ class Workspace:
         raise KeyError(
             f"File {file_path!r} was not found in the history up to commit {commit_id!r}."
         )
+

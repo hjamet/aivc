@@ -193,3 +193,4 @@ class SemanticEngine:
     def read_file_at_commit(self, file_path: str, commit_id: str) -> bytes:
         """Read a tracked file as it was at a specific commit."""
         return self._workspace.read_file_at_commit(file_path, commit_id)
+

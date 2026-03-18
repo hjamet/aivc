@@ -317,3 +317,5 @@ class CooccurrenceGraph:
         ).fetchall()
 
         return [{"source": r[0], "target": r[1], "weight": r[2]} for r in rows]
+
+

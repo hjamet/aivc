@@ -140,3 +140,4 @@ class BlobStore:
     def exists(self, hash_: str) -> bool:
         """Return True if the blob exists (regardless of refcount)."""
         return self._blob_path(hash_).exists()
+

@@ -105,6 +105,13 @@ def cmd_search(args: argparse.Namespace) -> None:
         print(f"   {DIM}Files:{RESET} {', '.join(r.file_paths) if r.file_paths else '—'}")
         print(f"\n      {r.snippet}\n")
 
+def cmd_web(args: argparse.Namespace) -> None:
+    """Launch the Web Dashboard server."""
+    from aivc.web.dashboard import main as dashboard_main
+    # Override sys.argv so dashboard's own argparse picks up the port
+    sys.argv = ["aivc-web", "--port", str(args.port)]
+    dashboard_main()
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -143,6 +150,16 @@ def main() -> None:
         help="Number of results to return (default: 5)"
     )
 
+    # web
+    parser_web = subparsers.add_parser(
+        "web",
+        help="Launch the interactive Web Dashboard"
+    )
+    parser_web.add_argument(
+        "-p", "--port", type=int, default=8765,
+        help="Port to serve the dashboard on (default: 8765)"
+    )
+
     args = parser.parse_args()
 
     if args.command == "status":
@@ -151,7 +168,10 @@ def main() -> None:
         cmd_log(args)
     elif args.command == "search":
         cmd_search(args)
+    elif args.command == "web":
+        cmd_web(args)
 
 
 if __name__ == "__main__":
     main()
+
