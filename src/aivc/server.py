@@ -1,0 +1,440 @@
+"""
+AIVC MCP Server — Long-term memory for LLM agents.
+
+Exposes the SemanticEngine as a set of MCP tools via FastMCP (stdio transport).
+The server is started by: ``python -m aivc.server``
+
+Environment variables:
+    AIVC_STORAGE_ROOT  (required) — absolute path to the AIVC data directory.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from collections import Counter
+from pathlib import Path
+
+from mcp.server.fastmcp import FastMCP
+
+# ---------------------------------------------------------------------------
+# System prompt — injected into every LLM context using this server
+# ---------------------------------------------------------------------------
+
+_SYSTEM_PROMPT = """
+# AIVC — AI Version Control (Long-Term Memory)
+
+You have access to a persistent, versioned memory system called AIVC.
+AIVC is your long-term memory. Use it actively — it is the only way to preserve
+context beyond a single conversation.
+
+## Core Concept
+
+AIVC stores **commits**: a short title + a detailed Markdown note you write yourself.
+Every commit also automatically snapshots any tracked files that were modified.
+Commits are indexed semantically, so you can retrieve them by meaning later.
+
+## CRITICAL RULE — COMMIT OFTEN
+
+**You MUST create a commit after EVERY significant step.**
+
+A commit is required after:
+- Completing a sub-task or an entire task.
+- Creating or modifying any artifact (file, script, document, test, config…).
+- Discovering a key finding or making an architectural decision.
+- Finishing any phase of a plan, even if work is still ongoing.
+- Any identifiable "checkpoint" in your reasoning.
+
+The commit note must be **detailed**. Do not write one-liners.
+Document your reasoning, the decisions made, the problems encountered,
+and the solutions found. Think of it as a handover memo to your future self.
+
+## Recall Funnel
+
+To retrieve memory, follow this two-step funnel:
+
+1. **`search_memory`** — for semantic search by meaning (idea, topic, solution).
+   → Returns commit titles/dates/IDs + the most relevant file paths. NEVER the full note.
+2. **`get_recent_commits`** — for recalling recent history without a specific query.
+   → Returns the last N commits with their files (chronological).
+3. **`consult_commit`** — to read the full note of a specific commit.
+   → Call this AFTER identifying a relevant commit via `search_memory` or `get_recent_commits`.
+
+Do NOT call `consult_commit` blindly on many commits. Use `search_memory` first to
+narrow down, then call `consult_commit` only on the most relevant ID.
+
+## Tool Reference
+
+| Tool | Purpose |
+|------|---------|
+| `create_commit` | Save a memory checkpoint. Call this VERY often. |
+| `search_memory` | Semantic search over all past commit notes. |
+| `get_recent_commits` | Recent commit log (paginable). |
+| `consult_commit` | Read a specific commit note in full. |
+| `consult_file` | Get the AIVC history of a specific file (which commits touched it). |
+| `read_historical_file` | Read the content of a file as it was at a specific past commit. |
+| `get_status` | List tracked files with current size and history weight. |
+| `untrack` | **DESTRUCTIVE** — remove a file from tracking and erase its entire history. |
+
+## `untrack` Warning
+
+`untrack(file_path)` is irreversible. It erases all stored blobs and history
+for that file. Use it only to free storage on files you are certain you no
+longer need to track.
+"""
+
+# ---------------------------------------------------------------------------
+# Bootstrap — engine initialisation
+# ---------------------------------------------------------------------------
+
+_STORAGE_ROOT_ENV = "AIVC_STORAGE_ROOT"
+
+_storage_root_str = os.environ.get(_STORAGE_ROOT_ENV)
+if not _storage_root_str:
+    sys.exit(
+        f"[aivc] ERROR: Environment variable {_STORAGE_ROOT_ENV!r} is not set. "
+        "Cannot start the AIVC MCP server. "
+        "Run install.sh to configure the server correctly."
+    )
+
+_storage_root = Path(_storage_root_str)
+
+# SemanticEngine is imported here (triggering a fast eager init of Workspace +
+# SQLite graph; the heavy ML components remain lazy until first use).
+from aivc.semantic.engine import SemanticEngine  # noqa: E402
+
+_engine = SemanticEngine(_storage_root)
+
+# ---------------------------------------------------------------------------
+# FastMCP server instance
+# ---------------------------------------------------------------------------
+
+mcp = FastMCP(name="aivc", instructions=_SYSTEM_PROMPT)
+
+# ---------------------------------------------------------------------------
+# Helper formatting functions
+# ---------------------------------------------------------------------------
+
+
+def _format_bytes(n: int) -> str:
+    """Format a byte count as a human-readable string."""
+    if n < 1024:
+        return f"{n} B"
+    if n < 1024 ** 2:
+        return f"{n / 1024:.1f} KB"
+    return f"{n / 1024 ** 2:.1f} MB"
+
+
+# ---------------------------------------------------------------------------
+# Tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def create_commit(title: str, note: str) -> str:
+    """Persist a memory checkpoint in AIVC.
+
+    Call this tool after EVERY meaningful step: task completion, artefact creation,
+    architectural decision, key discovery, or any checkpoint in your work.
+    The note should be a rich, detailed Markdown document — your future self will
+    read it to recall this moment. All tracked files that have changed since the last
+    commit are automatically associated with this commit.
+
+    Args:
+        title: Short, descriptive title (e.g. "Implemented user auth module").
+        note: Detailed Markdown note documenting what was done, why, how, and any
+              important context. The more detail, the better the future recall.
+
+    Returns:
+        Confirmation with the commit ID and the list of files that were snapshotted.
+
+    Raises:
+        RuntimeError: If no tracked file has changed since the last commit.
+    """
+    commit = _engine.create_commit(title, note)
+
+    files_summary = (
+        "\n".join(
+            f"  - [{c.action}] {c.path} ({c.format_impact()})"
+            for c in commit.changes
+        )
+        if commit.changes
+        else "  (no tracked files changed)"
+    )
+
+    return (
+        f"✅ Commit created successfully.\n"
+        f"ID        : {commit.id}\n"
+        f"Timestamp : {commit.timestamp}\n"
+        f"Title     : {commit.title}\n"
+        f"Files     :\n{files_summary}"
+    )
+
+
+@mcp.tool()
+def search_memory(query: str, top_n: int = 5) -> str:
+    """Search past commit notes by semantic meaning.
+
+    Uses a Bi-Encoder + Cross-Encoder pipeline to retrieve the most relevant
+    commits for a natural-language query. Returns only commit metadata (ID,
+    title, date, score) — never the full note content — to avoid context bloat.
+    Also surfaces the files most frequently associated with the top results.
+
+    Call `consult_commit(commit_id)` on a specific result to read its full note.
+
+    Args:
+        query: Free-text search query. Write it as a question or a short description.
+        top_n: Number of results to return (default 5, max 20).
+
+    Returns:
+        A ranked list of matching commits + the most relevant file paths.
+    """
+    top_n = min(top_n, 20)
+    results = _engine.search(query, top_n=top_n)
+
+    if not results:
+        return "No matching commits found in memory."
+
+    # Build commit list
+    commit_lines = []
+    for i, r in enumerate(results, 1):
+        commit_lines.append(
+            f"{i}. [{r.timestamp[:10]}] {r.title}\n"
+            f"   ID    : {r.commit_id}\n"
+            f"   Score : {r.score:.3f}"
+        )
+
+    # Aggregate file paths across top results (most frequently mentioned)
+    file_counter: Counter[str] = Counter()
+    for r in results:
+        file_counter.update(r.file_paths)
+
+    file_lines = []
+    for fp, count in file_counter.most_common(10):
+        file_lines.append(f"  - {fp} (in {count}/{len(results)} results)")
+
+    output = "## Matching Commits\n\n"
+    output += "\n".join(commit_lines)
+
+    if file_lines:
+        output += "\n\n## Most Relevant Files\n"
+        output += "\n".join(file_lines)
+    else:
+        output += "\n\n(No file associations found for these commits.)"
+
+    output += "\n\n💡 Use `consult_commit(commit_id)` to read a full note."
+    return output
+
+
+@mcp.tool()
+def consult_commit(commit_id: str) -> str:
+    """Read the full content of a specific commit.
+
+    Returns the complete Markdown note written when the commit was created,
+    along with a summary of the files that were changed (path, action, size impact).
+
+    Args:
+        commit_id: The UUID of the commit to read (obtained from `search_memory`
+                   or `get_recent_commits`).
+
+    Returns:
+        The full Markdown note and the list of file changes.
+
+    Raises:
+        KeyError: If the commit_id does not exist.
+    """
+    commit = _engine.get_commit(commit_id)
+
+    changes_summary = (
+        "\n".join(
+            f"  - [{c.action}] {c.path} ({c.format_impact()})"
+            for c in commit.changes
+        )
+        if commit.changes
+        else "  (no file changes recorded)"
+    )
+
+    return (
+        f"# Commit: {commit.title}\n\n"
+        f"**ID**        : {commit.id}\n"
+        f"**Timestamp** : {commit.timestamp}\n"
+        f"**Parent**    : {commit.parent_id or 'none (initial commit)'}\n\n"
+        f"## Files Changed\n{changes_summary}\n\n"
+        f"## Note\n\n{commit.note}"
+    )
+
+
+@mcp.tool()
+def get_recent_commits(limit: int = 10, offset: int = 0) -> str:
+    """Display the recent commit history (like `git log`).
+
+    Use this tool at the start of a session or when you need to recall what
+    was done recently without having a specific search query.
+    Results are in reverse chronological order (newest first).
+    Use `offset` and `limit` to paginate (e.g. offset=10 to see commits 11-20).
+
+    Args:
+        limit:  Number of commits to show (default 10, max 50).
+        offset: Number of commits to skip from the most recent (default 0).
+
+    Returns:
+        A formatted list of recent commits with their associated file paths.
+    """
+    limit = min(limit, 50)
+
+    # get_log fetches `offset + limit` commits and then slices.
+    all_recent = _engine.get_log(limit=offset + limit)
+    page = all_recent[offset : offset + limit]
+
+    if not page:
+        return "No commits found in this range."
+
+    lines = [f"Showing commits {offset + 1}–{offset + len(page)} (newest first)\n"]
+    for i, commit in enumerate(page, offset + 1):
+        try:
+            files = _engine.get_commit_files(commit.id)
+            files_str = ", ".join(files) if files else "—"
+        except KeyError:
+            files_str = "—"
+
+        lines.append(
+            f"{i:>3}. [{commit.timestamp[:10]}] {commit.title}\n"
+            f"      ID    : {commit.id}\n"
+            f"      Files : {files_str}"
+        )
+
+    lines.append("\n💡 Use `consult_commit(commit_id)` to read a full commit note.")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def consult_file(file_path: str) -> str:
+    """Get the AIVC history of a specific file.
+
+    Returns the list of commits that have ever touched this file,
+    sorted from most recent to oldest based on graph order.
+    This does NOT return the file's current content — use your text editor tools
+    or `read_historical_file` for that.
+
+    Args:
+        file_path: The path of the file to look up (as tracked by AIVC).
+
+    Returns:
+        A list of commits that touched this file (ID, Date, Title).
+
+    Raises:
+        KeyError: If the file is not in the AIVC co-occurrence graph.
+    """
+    commit_ids = _engine.get_file_commits(file_path)
+
+    if not commit_ids:
+        return f"No commits found for file: {file_path}"
+
+    lines = [f"## AIVC History for: `{file_path}`\n"]
+    lines.append(f"{len(commit_ids)} commit(s) have touched this file:\n")
+
+    for cid in commit_ids:
+        try:
+            commit = _engine.get_commit(cid)
+            lines.append(
+                f"  - [{commit.timestamp[:10]}] {commit.title}\n"
+                f"    ID: {commit.id}"
+            )
+        except KeyError:
+            lines.append(f"  - [unknown date] Commit {cid} (metadata not found)")
+
+    lines.append(
+        "\n💡 Use `consult_commit(commit_id)` to read the full note of a specific commit."
+        "\n💡 Use `read_historical_file(file_path, commit_id)` to read the file content at that commit."
+    )
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def read_historical_file(file_path: str, commit_id: str) -> str:
+    """Read the content of a tracked file as it was at a specific past commit.
+
+    Scans the commit chain backwards from `commit_id` to find the most recent
+    blob for `file_path` at or before that commit.
+
+    Args:
+        file_path: The path of the file to read.
+        commit_id: The UUID of the commit at which to read the file.
+
+    Returns:
+        The UTF-8 decoded content of the file at that point in time.
+
+    Raises:
+        KeyError: If the file or commit is not found in history.
+        UnicodeDecodeError: If the file content is not valid UTF-8.
+    """
+    raw: bytes = _engine.read_file_at_commit(file_path, commit_id)
+    return raw.decode("utf-8")
+
+
+@mcp.tool()
+def get_status() -> str:
+    """List all files currently tracked by AIVC with their storage usage.
+
+    Shows the current on-disk size of each tracked file and the total size
+    of its historical blobs in AIVC storage. Use this to understand which
+    files are consuming the most history space.
+
+    Returns:
+        A formatted table of tracked files with size information.
+    """
+    statuses = _engine.get_status()
+
+    if not statuses:
+        return "No files are currently tracked by AIVC."
+
+    header = f"{'File Path':<60} {'Current':>10} {'History':>10}"
+    separator = "-" * len(header)
+    rows = [header, separator]
+
+    for s in statuses:
+        current = _format_bytes(s.current_size) if s.current_size is not None else "missing"
+        history = _format_bytes(s.history_size)
+        rows.append(f"{s.path:<60} {current:>10} {history:>10}")
+
+    rows.append(separator)
+    rows.append(f"Total tracked: {len(statuses)} file(s)")
+    return "\n".join(rows)
+
+
+@mcp.tool()
+def untrack(file_path: str) -> str:
+    """⚠️ DESTRUCTIVE — Remove a file from AIVC tracking and erase its full history.
+
+    This operation:
+    1. Removes the file from the tracked files list.
+    2. Decrements blob reference counts for every historical version of the file.
+    3. Physically deletes blobs whose reference count drops to zero (Garbage Collection).
+    4. Strips the file's `FileChange` entries from all existing commits.
+
+    This action is IRREVERSIBLE. All stored history for this file will be lost.
+    Use this only to free storage when you are certain you no longer need the
+    history for a given file.
+
+    Args:
+        file_path: The exact path of the file to untrack (as shown in `get_status`).
+
+    Returns:
+        Confirmation message.
+
+    Raises:
+        KeyError: If the file is not currently tracked.
+    """
+    _engine.untrack(file_path)
+    return (
+        f"🗑️  File untracked and history erased: {file_path}\n"
+        "All associated blobs have been garbage-collected."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")

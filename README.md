@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟡 Phase 2 en cours — Moteur sémantique (ChromaDB + Bi/Cross-Encoder) + Graphe de co-occurrence.
+> **État** : 🟢 Phase 3 terminée — Interface MCP complète (8 outils, prompt système, entonnoir de recall).
 
 ### Concept
 
@@ -34,6 +34,7 @@ python -m pytest src/tests/ -v
 **Pré-requis** : Python 3.11+, `uv` (`curl -fsSL https://astral.sh/uv/install.sh | sh`)
 **Stack Phase 1** : stdlib uniquement (`hashlib`, `uuid`, `json`, `pathlib`)
 **Stack Phase 2** : ChromaDB, SentenceTransformers (`all-MiniLM-L6-v2`), Cross-Encoder (`ms-marco-MiniLM-L-6-v2`).
+**Stack Phase 3** : MCP Python SDK (`mcp>=1.0`), FastMCP (transport stdio).
 
 ---
 
@@ -62,12 +63,14 @@ track(path/glob/dir) --> workspace.json
 
 | Outil | Type | Description |
 |-------|------|-------------|
-| `create_commit` | Écriture | Mémorise un événement (Titre + Détails Markdown) et snapshot les fichiers. |
-| `search_memory` | Lecture | Recherche intelligente. Retourne Top Commits/Fichiers (titres uniquement). |
-| `consult_commit`| Lecture | Plonge dans un commit spécifique pour voir le message complet et les diffs. |
-| `get_status` | Lecture | Liste les fichiers surveillés, avec leur taille courante et la taille de leur historique. |
-| `untrack` | Gestion | Retire un fichier de la surveillance ET supprime son historique (Garbage Collected). |
-| `read_historical_file` | Lecture | Consulte une version passée d'un fichier. |
+| `create_commit` | Écriture | Mémorise un accomplissement (Titre + Détails Markdown) et snapshots les fichiers. **Appeler souvent — après chaque étape.** |
+| `search_memory` | Lecture | Recherche sémantique. Retourne Top Commits (ID, titre, score) + fichiers les plus fréquents. |
+| `get_recent_commits`| Lecture | Journal des N derniers commits (paginable par offset/limit), façon `git log`. |
+| `consult_commit`| Lecture | Contenu complet (note Markdown + FileChange) d'un commit spécifique. |
+| `consult_file` | Lecture | Historique AIVC d'un fichier : liste des commits qui l'ont touché. |
+| `get_status` | Lecture | Fichiers suivis avec taille courante et poids de l'historique. |
+| `untrack` | Gestion | ⚠️ DESTRUCTIF — Retire un fichier et supprime son historique (GC). |
+| `read_historical_file` | Lecture | Contenu d'un fichier tel qu'il était lors d'un commit passé. |
 
 ---
 
@@ -95,6 +98,7 @@ aivc/
 ├── src/
 │   ├── aivc/
 │   │   ├── __init__.py
+│   │   ├── server.py             # Serveur MCP (Phase 3) — 8 outils FastMCP
 │   │   ├── core/
 │   │   │   ├── __init__.py
 │   │   │   ├── blob_store.py    # SHA-256 + Refcount/GC
@@ -108,6 +112,7 @@ aivc/
 │   │       ├── graph.py         # Graphe bipartite fichiers↔commits
 │   │       └── engine.py        # Façade SemanticEngine (Phase 2)
 │   └── tests/
+│       ├── conftest.py           # Marker requires_ml + --run-ml flag
 │       ├── test_blob_store.py
 │       ├── test_commit.py
 │       ├── test_diff.py
@@ -115,7 +120,8 @@ aivc/
 │       ├── test_indexer.py      # Phase 2
 │       ├── test_searcher.py     # Phase 2
 │       ├── test_graph.py        # Phase 2
-│       └── test_engine.py       # Phase 2
+│       ├── test_engine.py       # Phase 2
+│       └── test_server.py       # Phase 3 — mock SemanticEngine
 ├── install.sh                   # Installation + config MCP automatique
 ├── pyproject.toml
 ├── .gitignore
@@ -147,4 +153,5 @@ aivc/
 |-------|-----|------|------|
 | **1** | [Moteur de Versioning Interne (Core)](docs/tasks/phase1_versioning_engine.md) | Blobs SHA-256, Garbage Collection | 🟢 Terminé |
 | **2** | [Moteur Sémantique et Graphe](docs/tasks/phase2_semantic_graph.md) | Bi/Cross Encoder, ChromaDB, install.sh MCP | 🟢 Terminé |
-| **3** | [Interface MCP et Outils](docs/tasks/phase3_mcp_interface.md) | Entonnoir Recall, Untrack destructif | 🔴 À faire |
+| **3** | [Interface MCP et Outils](docs/tasks/phase3_mcp_interface.md) | Entonnoir Recall, 8 outils, prompt système | 🟢 Terminé |
+| **4** | [Interface CLI & Web Dashboard](docs/tasks/phase4_cli_and_dashboard.md) | Outils terminaux (`aivc`), Graphe interactif (Taille/Couleur) avec recherche sémantique ciblée | 🔴 À faire |
