@@ -7,14 +7,16 @@ commits using the SentenceTransformer embeddings already stored by the Indexer.
 Stage 2 (Cross-Encoder): the top-K candidates are re-ranked by the Cross-Encoder
 for more precise relevance scoring.  Only top-K candidates are passed to the
 Cross-Encoder (default cap: 50) to keep latency acceptable.
+
+The CrossEncoder model is loaded lazily on first ``search()`` call, so that
+importing this module or creating a Searcher instance is fast — critical for
+CLI-style usage or when only Workspace features are needed.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-
-from sentence_transformers import CrossEncoder
 
 if TYPE_CHECKING:
     from aivc.semantic.indexer import Indexer
@@ -56,7 +58,15 @@ class Searcher:
 
     def __init__(self, indexer: "Indexer") -> None:
         self._indexer = indexer
-        self._cross_encoder = CrossEncoder(_CROSS_ENCODER_MODEL)
+        self.__cross_encoder = None  # lazy-loaded
+
+    @property
+    def _cross_encoder(self):
+        """Lazy-loaded CrossEncoder model."""
+        if self.__cross_encoder is None:
+            from sentence_transformers import CrossEncoder
+            self.__cross_encoder = CrossEncoder(_CROSS_ENCODER_MODEL)
+        return self.__cross_encoder
 
     def search(
         self,

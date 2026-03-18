@@ -7,6 +7,10 @@ This is the single public facade for Phase 2.  It wraps the Phase 1 Workspace
 
 Option B architecture: Workspace is *owned* by SemanticEngine; the core module
 is never aware of ChromaDB or SentenceTransformers.
+
+Lazy Loading: The Indexer (ChromaDB + SentenceTransformer) and Searcher
+(CrossEncoder) are only instantiated on first use, keeping ``__init__`` fast
+for CLI-style invocations that only need Workspace or Graph features.
 """
 
 from __future__ import annotations
@@ -16,36 +20,57 @@ from pathlib import Path
 from aivc.core.commit import Commit
 from aivc.core.workspace import FileStatus, Workspace
 from aivc.semantic.graph import CooccurrenceGraph
-from aivc.semantic.indexer import Indexer
-from aivc.semantic.searcher import SearchResult, Searcher
 
 
 class SemanticEngine:
     """High-level facade combining versioning + semantic search.
 
     Creates and owns:
-    - A :class:`~aivc.core.workspace.Workspace` (Phase 1 core)
-    - An :class:`~aivc.semantic.indexer.Indexer` (ChromaDB)
-    - A :class:`~aivc.semantic.graph.CooccurrenceGraph`
-    - A :class:`~aivc.semantic.searcher.Searcher` (Bi-Encoder + Cross-Encoder)
+    - A :class:`~aivc.core.workspace.Workspace` (Phase 1 core) — loaded eagerly
+    - A :class:`~aivc.semantic.graph.CooccurrenceGraph` — loaded eagerly (SQLite, fast)
+    - An :class:`~aivc.semantic.indexer.Indexer` (ChromaDB) — **lazy**
+    - A :class:`~aivc.semantic.searcher.Searcher` (Cross-Encoder) — **lazy**
 
     All data is stored under ``storage_root``.
     """
 
     def __init__(self, storage_root: Path) -> None:
-        """Initialise all sub-systems.
+        """Initialise the lightweight sub-systems.
+
+        Heavy ML dependencies (sentence-transformers, chromadb) are NOT loaded
+        here.  They are loaded lazily on first ``create_commit`` or ``search``
+        call.
 
         Args:
             storage_root: Single root directory for all AIVC data
-                          (blobs, commits, ChromaDB, graph JSON).
-
-        Raises:
-            RuntimeError: if any sub-system fails to initialise.
+                          (blobs, commits, ChromaDB, graph SQLite).
         """
+        self._storage_root = storage_root
         self._workspace = Workspace(storage_root)
-        self._indexer = Indexer(storage_root)
         self._graph = CooccurrenceGraph(storage_root)
-        self._searcher = Searcher(self._indexer)
+        # Lazy — will be initialised on first access.
+        self.__indexer = None
+        self.__searcher = None
+
+    # ------------------------------------------------------------------
+    # Lazy properties for heavy ML components
+    # ------------------------------------------------------------------
+
+    @property
+    def _indexer(self):
+        """Lazy-loaded Indexer (ChromaDB + SentenceTransformer bi-encoder)."""
+        if self.__indexer is None:
+            from aivc.semantic.indexer import Indexer
+            self.__indexer = Indexer(self._storage_root)
+        return self.__indexer
+
+    @property
+    def _searcher(self):
+        """Lazy-loaded Searcher (Cross-Encoder reranking pipeline)."""
+        if self.__searcher is None:
+            from aivc.semantic.searcher import Searcher
+            self.__searcher = Searcher(self._indexer)
+        return self.__searcher
 
     # ------------------------------------------------------------------
     # Commit lifecycle
@@ -72,10 +97,10 @@ class SemanticEngine:
         # Step 1: core versioning (may raise RuntimeError if no changes)
         commit = self._workspace.create_commit(title, note)
 
-        # Step 2: semantic indexing — must not silently swallow errors
+        # Step 2: semantic indexing — triggers lazy load on first call
         self._indexer.index_commit(commit)
 
-        # Step 3: graph update
+        # Step 3: graph update (SQLite, always fast)
         self._graph.add_commit(commit)
 
         return commit
@@ -89,7 +114,7 @@ class SemanticEngine:
         query: str,
         top_k: int = 50,
         top_n: int = 5,
-    ) -> list[SearchResult]:
+    ) -> list:
         """Semantic search over commit notes.
 
         Args:

@@ -50,7 +50,7 @@ def test_create_commit_updates_graph(engine, tmp_path) -> None:
     _write(f, "x = 1")
     engine.track(str(f))
     commit = engine.create_commit("Graph commit", "This should appear in the graph.")
-    assert commit.id in engine._graph._data["commit_nodes"]
+    assert str(f) in engine._graph.get_commit_files(commit.id)
 
 
 def test_create_commit_raises_if_no_changes(engine, tmp_path) -> None:

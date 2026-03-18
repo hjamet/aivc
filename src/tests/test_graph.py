@@ -1,4 +1,4 @@
-"""Unit tests for aivc.semantic.graph.CooccurrenceGraph."""
+"""Unit tests for aivc.semantic.graph.CooccurrenceGraph (SQLite backend)."""
 
 from __future__ import annotations
 
@@ -45,22 +45,24 @@ def graph(tmp_path: Path):
 def test_add_commit_registers_commit_node(graph) -> None:
     c = _make_commit("c1", file_paths=["a.py", "b.py"])
     graph.add_commit(c)
-    assert "c1" in graph._data["commit_nodes"]
+    # Verify via public API
+    assert graph.get_commit_files("c1") == ["a.py", "b.py"] or \
+           set(graph.get_commit_files("c1")) == {"a.py", "b.py"}
 
 
 def test_add_commit_registers_file_nodes(graph) -> None:
     c = _make_commit("c1", file_paths=["a.py", "b.py"])
     graph.add_commit(c)
-    assert "a.py" in graph._data["file_nodes"]
-    assert "b.py" in graph._data["file_nodes"]
+    assert "c1" in graph.get_file_commits("a.py")
+    assert "c1" in graph.get_file_commits("b.py")
 
 
 def test_add_commit_is_idempotent(graph) -> None:
     c = _make_commit("c1", file_paths=["a.py"])
     graph.add_commit(c)
     graph.add_commit(c)
-    # commit_ids list must not have duplicates
-    assert graph._data["file_nodes"]["a.py"]["commit_ids"].count("c1") == 1
+    # File must still list commit only once.
+    assert graph.get_file_commits("a.py").count("c1") == 1
 
 
 def test_add_commit_persists_to_disk(tmp_path) -> None:
@@ -72,7 +74,7 @@ def test_add_commit_persists_to_disk(tmp_path) -> None:
 
     # Load a fresh instance from the same root — data must persist.
     g2 = CooccurrenceGraph(storage)
-    assert "c1" in g2._data["commit_nodes"]
+    assert set(g2.get_commit_files("c1")) == {"a.py"}
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +85,8 @@ def test_remove_commit_deletes_commit_node(graph) -> None:
     c = _make_commit("c1", file_paths=["a.py"])
     graph.add_commit(c)
     graph.remove_commit("c1")
-    assert "c1" not in graph._data["commit_nodes"]
+    with pytest.raises(KeyError):
+        graph.get_commit_files("c1")
 
 
 def test_remove_commit_cleans_up_orphan_file_node(graph) -> None:
@@ -91,7 +94,8 @@ def test_remove_commit_cleans_up_orphan_file_node(graph) -> None:
     graph.add_commit(c)
     graph.remove_commit("c1")
     # "solo.py" has no remaining commits → must be removed.
-    assert "solo.py" not in graph._data["file_nodes"]
+    with pytest.raises(KeyError):
+        graph.get_file_commits("solo.py")
 
 
 def test_remove_commit_keeps_shared_file_node(graph) -> None:
@@ -101,7 +105,7 @@ def test_remove_commit_keeps_shared_file_node(graph) -> None:
     graph.add_commit(c2)
     graph.remove_commit("c1")
     # "shared.py" is still referenced by c2.
-    assert "shared.py" in graph._data["file_nodes"]
+    assert "c2" in graph.get_file_commits("shared.py")
 
 
 def test_remove_commit_raises_if_not_in_graph(graph) -> None:
