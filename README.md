@@ -177,6 +177,9 @@ aivc/
 | **8** | [Injection GEMINI.md](docs/tasks/phase8_gemini_injection.md) | Bonnes pratiques agent injectées via `install.sh` | 🟢 Terminé |
 | **9** | [Exposition CLI](docs/tasks/phase9_cli_exposure.md) | Symlink automatique vers `~/.local/bin/aivc` | 🟢 Terminé |
 | **10** | [Search Result Snippets](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats `search_memory` | 🟡 À faire |
+| **11** | [Track MCP Tool](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP | 🟡 À faire |
+| **12** | [Fichiers Consultés](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits, enrichissement graphe | 🟡 À faire |
+| **13** | [Recherche BM25 Fichiers](docs/tasks/phase13_bm25_file_search.md) | Recherche lexicale BM25 sur contenu des fichiers traqués | 🟡 À faire |
 
 ### Documentation Index
 | Titre (Lien) | Description |
@@ -186,3 +189,6 @@ aivc/
 | [Spec Phase 8](docs/tasks/phase8_gemini_injection.md) | Injection bonnes pratiques agent dans GEMINI.md. |
 | [Spec Phase 9](docs/tasks/phase9_cli_exposure.md) | Création d'un lien symbolique pour l'accès global à la commande CLI. |
 | [Spec Phase 10](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats de recherche sémantique. |
+| [Spec Phase 11](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP. |
+| [Spec Phase 12](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits. |
+| [Spec Phase 13](docs/tasks/phase13_bm25_file_search.md) | Recherche BM25 sur fichiers traqués. |
