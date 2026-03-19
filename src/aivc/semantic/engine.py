@@ -76,7 +76,12 @@ class SemanticEngine:
     # Commit lifecycle
     # ------------------------------------------------------------------
 
-    def create_commit(self, title: str, note: str) -> Commit:
+    def create_commit(
+        self,
+        title: str,
+        note: str,
+        consulted_files: list[str] | None = None
+    ) -> Commit:
         """Create a versioning commit and index it semantically.
 
         1. Delegates to :meth:`Workspace.create_commit` (which detects diffs,
@@ -87,15 +92,16 @@ class SemanticEngine:
         Args:
             title: Short commit title.
             note: Detailed Markdown note (the 'memory').
+            consulted_files: Optional list of file paths consulted.
 
         Returns:
             The newly created :class:`~aivc.core.commit.Commit`.
 
         Raises:
-            RuntimeError: if no tracked files changed (propagated from Workspace).
+            RuntimeError: if no changes detected and no files consulted.
         """
         # Step 1: core versioning (may raise RuntimeError if no changes)
-        commit = self._workspace.create_commit(title, note)
+        commit = self._workspace.create_commit(title, note, consulted_files=consulted_files)
 
         # Step 2: semantic indexing — triggers lazy load on first call
         self._indexer.index_commit(commit)

@@ -197,23 +197,57 @@ class Workspace:
         del self._state["tracked_files"][file_path]
         self._save_state()
 
-    def create_commit(self, title: str, note: str) -> Commit:
+    def create_commit(
+        self,
+        title: str,
+        note: str,
+        consulted_files: list[str] | None = None
+    ) -> Commit:
         """Detect changes in tracked files and create a new commit.
 
         Args:
             title: Short title for the commit.
             note: Detailed Markdown note (the LLM's 'memory').
+            consulted_files: Optional list of file paths that were consulted
+                             but not modified. Must be already tracked.
 
         Returns:
             The newly created Commit.
 
         Raises:
-            RuntimeError: if no tracked files have changed.
+            RuntimeError: if no changes are detected and no files were consulted.
+            KeyError: if a consulted file is not currently tracked.
         """
         changes = compute_diff(self._state["tracked_files"], self._blob_store)
-        if not changes:
+        
+        # Handle consulted files
+        consulted_changes = []
+        if consulted_files:
+            for path in consulted_files:
+                abs_path = str(Path(path).resolve())
+                if abs_path not in self._state["tracked_files"]:
+                    raise KeyError(f"Consulted file {path!r} is not tracked.")
+                
+                # Check if it was already modified/added/deleted.
+                # If it's already in 'changes', we don't add it as 'consulted'.
+                if any(c.path == abs_path for c in changes):
+                    continue
+
+                consulted_changes.append(
+                    FileChange(
+                        path=abs_path,
+                        action="consulted",
+                        blob_hash=None,
+                        bytes_added=0,
+                        bytes_removed=0,
+                    )
+                )
+        
+        all_changes = changes + consulted_changes
+
+        if not all_changes:
             raise RuntimeError(
-                "No changes detected in tracked files. "
+                "No changes detected in tracked files and no files consulted. "
                 "Nothing to commit."
             )
 
@@ -221,7 +255,7 @@ class Workspace:
             title=title,
             note=note,
             parent_id=self._state["head_commit_id"],
-            changes=changes,
+            changes=all_changes,
         )
         self._save_commit(commit)
         self._index.add_commit(commit)

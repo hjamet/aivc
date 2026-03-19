@@ -121,7 +121,12 @@ class TestCreateCommit(unittest.TestCase):
     def test_delegates_to_engine(self):
         _mock_engine.create_commit.return_value = _make_commit()
         _create_commit("T", "N")
-        _mock_engine.create_commit.assert_called_once_with("T", "N")
+        _mock_engine.create_commit.assert_called_once_with("T", "N", consulted_files=[])
+
+    def test_delegates_to_engine_with_consulted(self):
+        _mock_engine.create_commit.return_value = _make_commit()
+        _create_commit("T", "N", consulted_files=["f1.py"])
+        _mock_engine.create_commit.assert_called_once_with("T", "N", consulted_files=["f1.py"])
 
     def test_runtime_error_propagates(self):
         _mock_engine.create_commit.side_effect = RuntimeError("No changes detected")

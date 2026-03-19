@@ -35,15 +35,11 @@ def _format_bytes(n: int | None) -> str:
 
 def _get_engine() -> "SemanticEngine":
     """Instantiate the SemanticEngine from AIVC_STORAGE_ROOT."""
-    storage_root_str = os.environ.get("AIVC_STORAGE_ROOT")
-    if not storage_root_str:
-        sys.exit(
-            f"{BOLD}\033[31m[aivc] ERROR:{RESET} Environment variable 'AIVC_STORAGE_ROOT' is not set.\n"
-            "Cannot start AIVC CLI. Run install.sh to configure it or set the variable manually."
-        )
+    from aivc.config import get_storage_root
+    storage_root = get_storage_root()
 
     from aivc.semantic.engine import SemanticEngine
-    return SemanticEngine(Path(storage_root_str))
+    return SemanticEngine(storage_root)
 
 # ---------------------------------------------------------------------------
 # Commands

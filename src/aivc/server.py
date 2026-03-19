@@ -49,6 +49,17 @@ The commit note must be **detailed**. Do not write one-liners.
 Document your reasoning, the decisions made, the problems encountered,
 and the solutions found. Think of it as a handover memo to your future self.
 
+### Fichiers Consultés (Consulted Files)
+
+Lorsque vous créez un commit, vous pouvez spécifier une liste de `consulted_files`.
+Ce sont des fichiers que vous avez lus et qui vous ont été **véritablement utiles** pour
+accomplir votre tâche (ex: référence technique, exemple de code, documentation interne),
+mais que vous n'avez pas modifiés.
+
+**RÈGLE D'OR** : Ne mentionnez QUE les documents contenant des informations que vous ne
+connaissiez pas avant de les avoir lus. N'ajoutez pas de fichiers par "politesse" ou 
+utilité de surface. Cela polluerait votre mémoire à long terme.
+
 ## Recall Funnel
 
 To retrieve memory, follow this two-step funnel:
@@ -88,17 +99,9 @@ longer need to track.
 # Bootstrap — engine initialisation
 # ---------------------------------------------------------------------------
 
-_STORAGE_ROOT_ENV = "AIVC_STORAGE_ROOT"
+from aivc.config import get_storage_root
 
-_storage_root_str = os.environ.get(_STORAGE_ROOT_ENV)
-if not _storage_root_str:
-    sys.exit(
-        f"[aivc] ERROR: Environment variable {_STORAGE_ROOT_ENV!r} is not set. "
-        "Cannot start the AIVC MCP server. "
-        "Run install.sh to configure the server correctly."
-    )
-
-_storage_root = Path(_storage_root_str)
+_storage_root = get_storage_root()
 
 # SemanticEngine is imported here (triggering a fast eager init of Workspace +
 # SQLite graph; the heavy ML components remain lazy until first use).
@@ -132,7 +135,7 @@ def _format_bytes(n: int) -> str:
 
 
 @mcp.tool()
-def create_commit(title: str, note: str) -> str:
+def create_commit(title: str, note: str, consulted_files: list[str] = []) -> str:
     """Persist a memory checkpoint in AIVC.
 
     Call this tool after EVERY meaningful step: task completion, artefact creation,
@@ -145,18 +148,20 @@ def create_commit(title: str, note: str) -> str:
         title: Short, descriptive title (e.g. "Implemented user auth module").
         note: Detailed Markdown note documenting what was done, why, how, and any
               important context. The more detail, the better the future recall.
+        consulted_files: Optional list of tracked files that were consulted and
+                         provided CRUCIAL context for this task, but not modified.
 
     Returns:
         Confirmation with the commit ID and the list of files that were snapshotted.
 
     Raises:
-        RuntimeError: If no tracked file has changed since the last commit.
+        RuntimeError: If no tracked file has changed and no files were consulted.
     """
-    commit = _engine.create_commit(title, note)
+    commit = _engine.create_commit(title, note, consulted_files=consulted_files)
 
     files_summary = (
         "\n".join(
-            f"  - [{c.action}] {c.path} ({c.format_impact()})"
+            f"  - [{c.action}] {c.path}" + (f" ({c.format_impact()})" if c.action != "consulted" else "")
             for c in commit.changes
         )
         if commit.changes
@@ -272,7 +277,7 @@ def consult_commit(commit_id: str) -> str:
 
     changes_summary = (
         "\n".join(
-            f"  - [{c.action}] {c.path} ({c.format_impact()})"
+            f"  - [{c.action}] {c.path}" + (f" ({c.format_impact()})" if c.action != "consulted" else "")
             for c in commit.changes
         )
         if commit.changes

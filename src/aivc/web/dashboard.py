@@ -115,13 +115,11 @@ def main():
     parser.add_argument("--port", type=int, default=8765, help="Port to listen on (default 8765)")
     args = parser.parse_args()
 
-    storage_root_str = os.environ.get("AIVC_STORAGE_ROOT")
-    if not storage_root_str:
-        print("[aivc] WARN: AIVC_STORAGE_ROOT not set, falling back to ~/.aivc/storage", file=sys.stderr)
-        storage_root_str = str(Path.home() / ".aivc" / "storage")
+    from aivc.config import get_storage_root
+    storage_root = get_storage_root(allow_fallback=True)
 
-    print(f"Loading AIVC SemanticEngine from {storage_root_str} ...")
-    engine = SemanticEngine(Path(storage_root_str))
+    print(f"Loading AIVC SemanticEngine from {storage_root} ...")
+    engine = SemanticEngine(storage_root)
 
     def handler_factory(*args, **kwargs):
         return DashboardHandler(*args, engine=engine, **kwargs)

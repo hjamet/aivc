@@ -26,6 +26,8 @@ L'utilisateur a **fortement insisté** sur la qualité de la documentation de ce
 - `src/aivc/semantic/engine.py` — Pass-through du paramètre
 - `src/aivc/server.py` — Ajouter le paramètre à l'outil MCP `create_commit`
 - `src/aivc/server.py` — Mise à jour du `_SYSTEM_PROMPT` pour documenter le comportement
+- `src/aivc/cli.py` — Centralisation de la configuration (bonus)
+- `src/aivc/web/dashboard.py` — Centralisation de la configuration (bonus)
 - `src/tests/test_commit.py` — Tests de la nouvelle action
 - `src/tests/test_workspace.py` — Tests de `create_commit` avec fichiers consultés
 
@@ -38,3 +40,9 @@ L'utilisateur a **fortement insisté** sur la qualité de la documentation de ce
 * Le prompt système du serveur MCP documente clairement le comportement attendu : ne mentionner QUE les documents véritablement utiles, contenant des informations inconnues avant consultation.
 * Les fichiers consultés s'affichent distinctement dans `consult_commit` (ex: `[consulted]` vs `[modified]`).
 * La sérialisation/désérialisation (`commit_to_dict`/`commit_from_dict`) supporte la nouvelle action.
+
+### Bonus : Centralisation de la Configuration
+
+* La variable d'environnement `AIVC_STORAGE_ROOT` est chargée et validée à UN SEUL endroit (nouveau fichier `src/aivc/config.py` ou mécanisme équivalent).
+* `server.py`, `cli.py` et `dashboard.py` utilisent ce point d'entrée unique au lieu de chacun lire `os.environ` indépendamment.
+* Aucune régression sur les tests existants.
