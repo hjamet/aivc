@@ -201,6 +201,35 @@ def test_get_commit_crashes_on_unknown_id(ws: Workspace) -> None:
 
 
 # ---------------------------------------------------------------------------
+# find_child_commit()
+# ---------------------------------------------------------------------------
+
+def test_find_child_commit_returns_correct_child(tmp_path: Path, ws: Workspace) -> None:
+    f = _write(tmp_path / "child.py", b"v1")
+    ws.track(str(f))
+    c1 = ws.create_commit("v1", "note")
+    f.write_bytes(b"v2")
+    c2 = ws.create_commit("v2", "note")
+    f.write_bytes(b"v3")
+    c3 = ws.create_commit("v3", "note")
+
+    child1 = ws.find_child_commit(c1.id)
+    assert child1 is not None
+    assert child1.id == c2.id
+    
+    child2 = ws.find_child_commit(c2.id)
+    assert child2 is not None
+    assert child2.id == c3.id
+
+
+def test_find_child_commit_head_returns_none(tmp_path: Path, ws: Workspace) -> None:
+    f = _write(tmp_path / "head.py", b"v1")
+    ws.track(str(f))
+    c = ws.create_commit("v1", "note")
+    assert ws.find_child_commit(c.id) is None
+
+
+# ---------------------------------------------------------------------------
 # read_file_at_commit()
 # ---------------------------------------------------------------------------
 

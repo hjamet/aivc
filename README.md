@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟢 Phase 14 terminée — Contexte de Commit (Prev/Next).
+> **État** : 🟢 Phase 15 terminée — Refactoring Performance I/O (CoreIndex).
 
 ### Concept
 
@@ -110,7 +110,8 @@ aivc/
 │   │   │   ├── blob_store.py    # SHA-256 + Refcount/GC
 │   │   │   ├── commit.py        # Dataclasses Commit + FileChange
 │   │   │   ├── diff.py          # Détection des changements
-│   │   │   └── workspace.py     # Orchestrateur Phase 1
+│   │   │   ├── index.py         # SQLite CoreIndex (fast I/O)
+│   │   └── workspace.py     # Orchestrateur Phase 1
 │   │   ├── semantic/
 │   │   │   ├── __init__.py
 │   │   │   ├── indexer.py       # ChromaDB + SentenceTransformer
@@ -131,6 +132,7 @@ aivc/
 │       ├── test_searcher.py     # Phase 2
 │       ├── test_graph.py        # Phase 2
 │       ├── test_engine.py       # Phase 2
+│       ├── test_index.py        # Phase 15
 │       └── test_server.py       # Phase 3 — mock SemanticEngine
 ├── install.sh                   # Installation + config MCP automatique
 ├── pyproject.toml
@@ -182,7 +184,7 @@ aivc/
 | **12** | [Fichiers Consultés](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits, enrichissement graphe | 🟡 À faire |
 | **13** | [Recherche BM25 Fichiers](docs/tasks/phase13_bm25_file_search.md) | Recherche lexicale BM25 sur contenu des fichiers traqués | 🟡 À faire |
 | **14** | [Contexte de Commit](docs/tasks/phase14_commit_context.md) | Affichage du commit Parent/Enfant dans `consult_commit` | 🟢 Terminé |
-| **15** | [Refactoring Performance I/O (CoreIndex)](docs/tasks/phase15_io_refactoring.md) | CoreIndex SQLite autonome, élimination `_all_commits()` | 🟡 À faire |
+| **15** | [Refactoring Performance I/O (CoreIndex)](docs/tasks/phase15_io_refactoring.md) | CoreIndex SQLite autonome, élimination `_all_commits()` | 🟢 Terminé |
 
 ### Documentation Index
 | Titre (Lien) | Description |

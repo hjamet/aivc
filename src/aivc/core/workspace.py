@@ -16,6 +16,7 @@ from typing import Any
 from aivc.core.blob_store import BlobStore
 from aivc.core.commit import Commit, FileChange, commit_from_dict, commit_to_dict
 from aivc.core.diff import compute_diff
+from aivc.core.index import CoreIndex
 
 
 @dataclass
@@ -53,6 +54,10 @@ class Workspace:
 
         self._commits_dir.mkdir(parents=True, exist_ok=True)
         self._blob_store = BlobStore(self._root)
+        self._index = CoreIndex(self._root)
+
+        # Migration: ensure all existing JSON commits are in the SQLite index
+        self._index.migrate_from_json(self._commits_dir)
 
         if self._workspace_path.exists():
             self._state = self._load_state()
@@ -109,13 +114,6 @@ class Workspace:
         if not path.exists():
             raise KeyError(f"Commit {commit_id!r} not found.")
         return commit_from_dict(json.loads(path.read_text(encoding="utf-8")))
-
-    def _all_commits(self) -> list[Commit]:
-        """Load every commit from disk (unordered)."""
-        commits = []
-        for p in self._commits_dir.glob("*.json"):
-            commits.append(commit_from_dict(json.loads(p.read_text(encoding="utf-8"))))
-        return commits
 
     def _expand_path(self, path_or_glob: str) -> list[str]:
         """Expand a path, directory, or glob pattern to a list of relative file paths.
@@ -176,9 +174,10 @@ class Workspace:
         if file_path not in self._state["tracked_files"]:
             raise KeyError(f"File {file_path!r} is not tracked.")
 
-        # Collect blobs referenced by this file across all commits.
-        all_commits = self._all_commits()
-        for commit in all_commits:
+        # Collect commits referencing this file via the index (fast).
+        affected_commit_ids = self._index.get_commits_touching_file(file_path)
+        for cid in affected_commit_ids:
+            commit = self._load_commit(cid)
             updated_changes = []
             for change in commit.changes:
                 if change.path == file_path:
@@ -187,9 +186,13 @@ class Workspace:
                     # Drop this FileChange from the commit.
                 else:
                     updated_changes.append(change)
+            
             if len(updated_changes) != len(commit.changes):
                 commit.changes = updated_changes
                 self._save_commit(commit)
+
+        # Cleanup the index for this file.
+        self._index.remove_file_changes(file_path)
 
         del self._state["tracked_files"][file_path]
         self._save_state()
@@ -221,6 +224,7 @@ class Workspace:
             changes=changes,
         )
         self._save_commit(commit)
+        self._index.add_commit(commit)
 
         # Update tracked_files with the new hashes.
         for change in changes:
@@ -241,23 +245,17 @@ class Workspace:
         For each file: current on-disk size and total history size (all
         blobs ever associated with this file across all commits).
         """
-        # Build a map: file_path -> set of blob hashes across all commits.
-        all_commits = self._all_commits()
-        file_blobs: dict[str, set[str]] = {
-            p: set() for p in self._state["tracked_files"]
-        }
-        for commit in all_commits:
-            for change in commit.changes:
-                if change.path in file_blobs and change.blob_hash is not None:
-                    file_blobs[change.path].add(change.blob_hash)
-
         statuses = []
         for rel_path in self._state["tracked_files"]:
             p = Path(rel_path)
             current_size = p.stat().st_size if p.exists() and p.is_file() else None
+            
+            # Use the index to get all blobs associated with this file (fast).
+            blob_hashes = self._index.get_blob_hashes_for_file(rel_path)
             history_size = sum(
-                self._blob_store.get_size(h) for h in file_blobs[rel_path]
+                self._blob_store.get_size(h) for h in blob_hashes
             )
+            
             statuses.append(
                 FileStatus(
                     path=rel_path,
@@ -291,20 +289,13 @@ class Workspace:
     def find_child_commit(self, commit_id: str) -> Commit | None:
         """Find the commit that has *commit_id* as its parent.
 
-        Traverses the history from HEAD. Since it's a linear chain, there
-        is at most one child.
+        Uses the index for O(1) lookup. Since AIVC maintains a linear chain, 
+        there is at most one child.
         """
-        current_id = self._state["head_commit_id"]
-        while current_id is not None:
-            commit = self._load_commit(current_id)
-            if commit.parent_id == commit_id:
-                return commit
-            if current_id == commit_id:
-                # We found the commit itself, children must be in the part we already traversed
-                # But since it's a linear chain, the child was the PREVIOUS one in the loop.
-                # Let's optimize: build a child map if needed, or just return the child if we tracked it.
-                pass
-            current_id = commit.parent_id
+        child_info = self._index.find_child(commit_id)
+        if child_info:
+            child_id, _ = child_info
+            return self._load_commit(child_id)
         return None
 
     def read_file_at_commit(self, file_path: str, commit_id: str) -> bytes:

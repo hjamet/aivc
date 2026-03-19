@@ -143,6 +143,7 @@ class TestSearchMemory(unittest.TestCase):
         result = _search_memory("find something")
         self.assertIn("abc-123", result)
         self.assertIn("Old commit", result)
+        self.assertIn("> short snippet", result)
         # Must NOT contain the full note content
         self.assertNotIn("Detailed note", result)
 

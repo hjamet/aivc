@@ -122,12 +122,38 @@ class Searcher:
 
         results = []
         for score, hit in ranked[:top_n]:
-            # Build a short snippet from the first sentence of the document.
             doc: str = hit["document"]
-            # Skip the title line (first line) to produce a note snippet.
             lines = doc.split("\n", 2)
             note_part = lines[2] if len(lines) >= 3 else doc
-            snippet = note_part[:200].strip()
+            note_part = note_part.strip()
+            
+            snippet = note_part[:200]
+            if note_part:
+                import re
+                query_words = set(re.findall(r'\w+', query.lower()))
+                if query_words:
+                    best_score = -1
+                    best_idx = 0
+                    max_len = 200
+                    step = 50
+                    for i in range(0, max(1, len(note_part) - max_len + step), step):
+                        window = note_part[i:i+max_len]
+                        window_words = set(re.findall(r'\w+', window.lower()))
+                        window_score = len(query_words & window_words)
+                        if window_score > best_score:
+                            best_score = window_score
+                            best_idx = i
+                    
+                    if best_score > 0:
+                        start = best_idx
+                        end = start + max_len
+                        snippet = note_part[start:end].strip()
+                        if start > 0:
+                            snippet = "…" + snippet
+                        if end < len(note_part):
+                            snippet = snippet + "…"
+                        else:
+                            snippet = snippet
 
             results.append(
                 SearchResult(

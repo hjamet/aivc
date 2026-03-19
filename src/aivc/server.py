@@ -204,7 +204,8 @@ def search_memory(query: str, top_n: int = 5, filter_glob: str = "") -> str:
         commit_lines.append(
             f"{i}. [{r.timestamp[:10]}] {r.title}\n"
             f"   ID    : {r.commit_id}\n"
-            f"   Score : {r.score:.3f}"
+            f"   Score : {r.score:.3f}\n"
+            f"   > {r.snippet}"
         )
 
     # Aggregate file paths across top results (most frequently mentioned)

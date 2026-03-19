@@ -31,6 +31,10 @@ class _SentenceTransformerEF(EmbeddingFunction):
     def __init__(self, model: SentenceTransformer) -> None:
         self._model = model
 
+    @staticmethod
+    def name() -> str:
+        return "aivc_sentence_transformer"
+
     def __call__(self, input: Documents) -> Embeddings:  # noqa: A002
         return self._model.encode(list(input), convert_to_numpy=True).tolist()
 
