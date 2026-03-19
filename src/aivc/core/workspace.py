@@ -215,8 +215,29 @@ class Workspace:
         # 2. Expand and track existing files
         files, hidden_count = self._expand_path(path)
         newly_tracked = []
+        import fnmatch
+
         for f in files:
             abs_f = str(Path(f).resolve())
+            skip = False
+
+            # Check explicit ignores
+            if ignores:
+                if any(fnmatch.fnmatch(f, pat) or fnmatch.fnmatch(Path(f).name, pat) for pat in ignores):
+                    skip = True
+
+            # Check ignores from watched directories
+            if not skip:
+                for wdir, info in self._state.get("watched_dirs", {}).items():
+                    if abs_f.startswith(wdir + os.sep):
+                        w_ignores = info.get("ignores", [])
+                        if any(fnmatch.fnmatch(abs_f, pat) or fnmatch.fnmatch(Path(abs_f).name, pat) for pat in w_ignores):
+                            skip = True
+                            break
+
+            if skip:
+                continue
+
             if abs_f not in self._state["tracked_files"]:
                 self._state["tracked_files"][abs_f] = None  # never committed yet
                 newly_tracked.append(abs_f)

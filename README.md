@@ -153,6 +153,7 @@ aivc/
 |----------|-------------|
 | `aivc status` | Afficher les fichiers suivis et leur poids |
 | `aivc track <path>` | Ajouter un fichier/dossier/glob au tracking |
+| `aivc untrack <path>` | Retirer un fichier/dossier/glob du tracking (DESTRUCTIF) |
 | `aivc log [-n N]` | Afficher l'historique des commits |
 | `aivc search <query> [-g GLOB]` | Recherche sémantique dans la mémoire, avec filtre optionnel |
 | `aivc search-files <query>` | Recherche lexicale (BM25) dans les fichiers actuels |
