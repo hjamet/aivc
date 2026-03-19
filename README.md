@@ -182,7 +182,7 @@ aivc/
 | **12** | [Fichiers Consultés](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits, enrichissement graphe | 🟡 À faire |
 | **13** | [Recherche BM25 Fichiers](docs/tasks/phase13_bm25_file_search.md) | Recherche lexicale BM25 sur contenu des fichiers traqués | 🟡 À faire |
 | **14** | [Contexte de Commit](docs/tasks/phase14_commit_context.md) | Affichage du commit Parent/Enfant dans `consult_commit` | 🟢 Terminé |
-| **15** | [Refactoring Performance I/O](docs/tasks/phase15_io_refactoring.md) | Élimination de `_all_commits()`, migration vers SQLite | 🟡 À faire |
+| **15** | [Refactoring Performance I/O (CoreIndex)](docs/tasks/phase15_io_refactoring.md) | CoreIndex SQLite autonome, élimination `_all_commits()` | 🟡 À faire |
 
 ### Documentation Index
 | Titre (Lien) | Description |
