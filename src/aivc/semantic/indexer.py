@@ -35,6 +35,13 @@ class _SentenceTransformerEF(EmbeddingFunction):
     def name() -> str:
         return "aivc_sentence_transformer"
 
+    def get_config(self) -> dict:
+        return {"name": self.name()}
+
+    @staticmethod
+    def build_from_config(config: dict) -> "_SentenceTransformerEF":
+        return _SentenceTransformerEF(SentenceTransformer(_BI_ENCODER_MODEL))
+
     def __call__(self, input: Documents) -> Embeddings:  # noqa: A002
         return self._model.encode(list(input), convert_to_numpy=True).tolist()
 

@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟢 Phase 15 terminée — Refactoring Performance I/O (CoreIndex).
+> **État** : 🟢 Phase 10 terminée — Search Result Snippets.
 
 ### Concept
 
@@ -179,7 +179,7 @@ aivc/
 | **7** | [Scoped Semantic Search](docs/tasks/phase7_scoped_search.md) | Filtrage par glob dans `search_memory` (MCP + CLI) | 🟢 Terminé |
 | **8** | [Injection GEMINI.md](docs/tasks/phase8_gemini_injection.md) | Bonnes pratiques agent injectées via `install.sh` | 🟢 Terminé |
 | **9** | [Exposition CLI](docs/tasks/phase9_cli_exposure.md) | Symlink automatique vers `~/.local/bin/aivc` | 🟢 Terminé |
-| **10** | [Search Result Snippets](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats `search_memory` | 🟡 À faire |
+| **10** | [Search Result Snippets](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats `search_memory` | 🟢 Terminé |
 | **11** | [Track MCP Tool](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP | 🟢 Terminé |
 | **12** | [Fichiers Consultés](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits, enrichissement graphe | 🟡 À faire |
 | **13** | [Recherche BM25 Fichiers](docs/tasks/phase13_bm25_file_search.md) | Recherche lexicale BM25 sur contenu des fichiers traqués | 🟡 À faire |
