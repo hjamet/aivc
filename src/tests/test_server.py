@@ -170,6 +170,8 @@ class TestSearchMemory(unittest.TestCase):
 class TestConsultCommit(unittest.TestCase):
     def setUp(self):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
+        # Default: no child found
+        _mock_engine.find_child_commit.return_value = None
 
     def test_returns_full_note(self):
         _mock_engine.get_commit.return_value = _make_commit(note="# My Work\n\nDetails here.")
@@ -186,6 +188,55 @@ class TestConsultCommit(unittest.TestCase):
         _mock_engine.get_commit.side_effect = KeyError("Commit not found")
         with self.assertRaises(KeyError):
             _consult_commit("bad-id")
+
+    def test_shows_parent_context(self):
+        parent = _make_commit(commit_id="p-123", title="Parent commit")
+        child = _make_commit(commit_id="c-456", title="Child commit", parent_id="p-123")
+        
+        def side_effect(cid):
+            if cid == "p-123": return parent
+            if cid == "c-456": return child
+            raise KeyError(cid)
+            
+        _mock_engine.get_commit.side_effect = side_effect
+        
+        result = _consult_commit("c-456")
+        self.assertIn("⬆️ **Prev** : Parent commit (ID: p-123)", result)
+
+    def test_shows_child_context(self):
+        commit = _make_commit(commit_id="c-123", title="My commit")
+        child = _make_commit(commit_id="next-456", title="Next commit")
+        
+        _mock_engine.get_commit.return_value = commit
+        _mock_engine.find_child_commit.return_value = child
+        
+        result = _consult_commit("c-123")
+        self.assertIn("⬇️ **Next** : Next commit (ID: next-456)", result)
+
+    def test_no_parent_no_child(self):
+        _mock_engine.get_commit.return_value = _make_commit(parent_id=None)
+        _mock_engine.find_child_commit.return_value = None
+        
+        result = _consult_commit("initial-id")
+        self.assertNotIn("⬆️ **Prev**", result)
+        self.assertNotIn("⬇️ **Next**", result)
+
+    def test_both_parent_and_child(self):
+        parent = _make_commit(commit_id="p-1", title="P")
+        current = _make_commit(commit_id="curr", title="C", parent_id="p-1")
+        child = _make_commit(commit_id="next", title="N")
+
+        def side_effect(cid):
+            if cid == "p-1": return parent
+            if cid == "curr": return current
+            raise KeyError(cid)
+
+        _mock_engine.get_commit.side_effect = side_effect
+        _mock_engine.find_child_commit.return_value = child
+
+        result = _consult_commit("curr")
+        self.assertIn("⬆️ **Prev** : P (ID: p-1)", result)
+        self.assertIn("⬇️ **Next** : N (ID: next)", result)
 
 
 class TestGetRecentCommits(unittest.TestCase):

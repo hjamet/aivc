@@ -248,6 +248,27 @@ def consult_commit(commit_id: str) -> str:
     """
     commit = _engine.get_commit(commit_id)
 
+    # Context (Prev/Next)
+    prev_str = ""
+    if commit.parent_id:
+        try:
+            parent = _engine.get_commit(commit.parent_id)
+            prev_str = f"⬆️ **Prev** : {parent.title} (ID: {parent.id})\n"
+        except KeyError:
+            prev_str = f"⬆️ **Prev** : (metadata not found) (ID: {commit.parent_id})\n"
+
+    next_str = ""
+    try:
+        child = _engine.find_child_commit(commit_id)
+        if child:
+            next_str = f"⬇️ **Next** : {child.title} (ID: {child.id})\n"
+    except Exception:
+        pass
+
+    context_block = ""
+    if prev_str or next_str:
+        context_block = f"{prev_str}{next_str}\n"
+
     changes_summary = (
         "\n".join(
             f"  - [{c.action}] {c.path} ({c.format_impact()})"
@@ -262,6 +283,7 @@ def consult_commit(commit_id: str) -> str:
         f"**ID**        : {commit.id}\n"
         f"**Timestamp** : {commit.timestamp}\n"
         f"**Parent**    : {commit.parent_id or 'none (initial commit)'}\n\n"
+        f"{context_block}"
         f"## Files Changed\n{changes_summary}\n\n"
         f"## Note\n\n{commit.note}"
     )

@@ -288,6 +288,25 @@ class Workspace:
             current_id = commit.parent_id
         return commits
 
+    def find_child_commit(self, commit_id: str) -> Commit | None:
+        """Find the commit that has *commit_id* as its parent.
+
+        Traverses the history from HEAD. Since it's a linear chain, there
+        is at most one child.
+        """
+        current_id = self._state["head_commit_id"]
+        while current_id is not None:
+            commit = self._load_commit(current_id)
+            if commit.parent_id == commit_id:
+                return commit
+            if current_id == commit_id:
+                # We found the commit itself, children must be in the part we already traversed
+                # But since it's a linear chain, the child was the PREVIOUS one in the loop.
+                # Let's optimize: build a child map if needed, or just return the child if we tracked it.
+                pass
+            current_id = commit.parent_id
+        return None
+
     def read_file_at_commit(self, file_path: str, commit_id: str) -> bytes:
         """Read the content of a tracked file as it was at a specific commit.
 

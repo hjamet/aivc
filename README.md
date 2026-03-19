@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟢 Phase 7 terminée — Scoped Semantic Search (Filtrage par Glob).
+> **État** : 🟢 Phase 14 terminée — Contexte de Commit (Prev/Next).
 
 ### Concept
 
@@ -181,7 +181,7 @@ aivc/
 | **11** | [Track MCP Tool](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP | 🟢 Terminé |
 | **12** | [Fichiers Consultés](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits, enrichissement graphe | 🟡 À faire |
 | **13** | [Recherche BM25 Fichiers](docs/tasks/phase13_bm25_file_search.md) | Recherche lexicale BM25 sur contenu des fichiers traqués | 🟡 À faire |
-| **14** | [Contexte de Commit](docs/tasks/phase14_commit_context.md) | Affichage du commit Parent/Enfant dans `consult_commit` | 🟡 À faire |
+| **14** | [Contexte de Commit](docs/tasks/phase14_commit_context.md) | Affichage du commit Parent/Enfant dans `consult_commit` | 🟢 Terminé |
 | **15** | [Refactoring Performance I/O](docs/tasks/phase15_io_refactoring.md) | Élimination de `_all_commits()`, migration vers SQLite | 🟡 À faire |
 
 ### Documentation Index

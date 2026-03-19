@@ -199,6 +199,10 @@ class SemanticEngine:
         """Load a single commit by ID."""
         return self._workspace.get_commit(commit_id)
 
+    def find_child_commit(self, commit_id: str) -> Commit | None:
+        """Find the commit that has *commit_id* as its parent."""
+        return self._workspace.find_child_commit(commit_id)
+
     def read_file_at_commit(self, file_path: str, commit_id: str) -> bytes:
         """Read a tracked file as it was at a specific commit."""
         return self._workspace.read_file_at_commit(file_path, commit_id)
