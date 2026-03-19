@@ -181,6 +181,8 @@ aivc/
 | **11** | [Track MCP Tool](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP | 🟢 Terminé |
 | **12** | [Fichiers Consultés](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits, enrichissement graphe | 🟡 À faire |
 | **13** | [Recherche BM25 Fichiers](docs/tasks/phase13_bm25_file_search.md) | Recherche lexicale BM25 sur contenu des fichiers traqués | 🟡 À faire |
+| **14** | [Contexte de Commit](docs/tasks/phase14_commit_context.md) | Affichage du commit Parent/Enfant dans `consult_commit` | 🟡 À faire |
+| **15** | [Refactoring Performance I/O](docs/tasks/phase15_io_refactoring.md) | Élimination de `_all_commits()`, migration vers SQLite | 🟡 À faire |
 
 ### Documentation Index
 | Titre (Lien) | Description |
@@ -193,3 +195,5 @@ aivc/
 | [Spec Phase 11](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP. |
 | [Spec Phase 12](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits. |
 | [Spec Phase 13](docs/tasks/phase13_bm25_file_search.md) | Recherche BM25 sur fichiers traqués. |
+| [Spec Phase 14](docs/tasks/phase14_commit_context.md) | Graphe chronologique de commits. |
+| [Spec Phase 15](docs/tasks/phase15_io_refactoring.md) | Refactoring performance I/O. |
