@@ -75,6 +75,7 @@ narrow down, then call `consult_commit` only on the most relevant ID.
 | `read_historical_file` | Read the content of a file as it was at a specific past commit. |
 | `get_status` | List tracked files with current size and history weight. |
 | `untrack` | **DESTRUCTIVE** — remove a file from tracking and erase its entire history. |
+| `track` | Add new files to AIVC tracking (file, directory, or glob pattern). |
 
 ## `untrack` Warning
 
@@ -432,6 +433,34 @@ def untrack(file_path: str) -> str:
         f"🗑️  File untracked and history erased: {file_path}\n"
         "All associated blobs have been garbage-collected."
     )
+
+
+@mcp.tool()
+def track(path: str) -> str:
+    """Add files to AIVC tracking.
+
+    Accepts a file path, directory path, or glob pattern.
+    Paths are resolved to absolute paths relative to the current working directory.
+
+    Args:
+        path: File, directory, or glob pattern to track.
+
+    Returns:
+        Confirmation with the list of newly tracked files.
+
+    Raises:
+        ValueError: If no files match the given path/pattern.
+    """
+    newly_tracked = _engine.track(path)
+
+    if not newly_tracked:
+        return "No new files to track (already tracked or no match)."
+
+    lines = [f"✅ Tracked {len(newly_tracked)} new file(s):"]
+    for f in newly_tracked:
+        lines.append(f"  + {f}")
+
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------

@@ -70,6 +70,7 @@ track(path/glob/dir) --> workspace.json
 | `consult_file` | Lecture | Historique AIVC d'un fichier : liste des commits qui l'ont touché. |
 | `get_status` | Lecture | Fichiers suivis avec taille courante et poids de l'historique. |
 | `untrack` | Gestion | ⚠️ DESTRUCTIF — Retire un fichier et supprime son historique (GC). |
+| `track` | Gestion | Ajouter un fichier, dossier ou glob au suivi AIVC. |
 | `read_historical_file` | Lecture | Contenu d'un fichier tel qu'il était lors d'un commit passé. |
 
 ---
@@ -102,7 +103,7 @@ aivc/
 ├── src/
 │   ├── aivc/
 │   │   ├── __init__.py
-│   │   ├── server.py             # Serveur MCP (Phase 3) — 8 outils FastMCP
+│   │   ├── server.py             # Serveur MCP (Phase 3) — 9 outils FastMCP
 │   │   ├── cli.py                # CLI (aivc status/track/log/search/web)
 │   │   ├── core/
 │   │   │   ├── __init__.py
@@ -177,7 +178,7 @@ aivc/
 | **8** | [Injection GEMINI.md](docs/tasks/phase8_gemini_injection.md) | Bonnes pratiques agent injectées via `install.sh` | 🟢 Terminé |
 | **9** | [Exposition CLI](docs/tasks/phase9_cli_exposure.md) | Symlink automatique vers `~/.local/bin/aivc` | 🟢 Terminé |
 | **10** | [Search Result Snippets](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats `search_memory` | 🟡 À faire |
-| **11** | [Track MCP Tool](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP | 🟡 À faire |
+| **11** | [Track MCP Tool](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP | 🟢 Terminé |
 | **12** | [Fichiers Consultés](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits, enrichissement graphe | 🟡 À faire |
 | **13** | [Recherche BM25 Fichiers](docs/tasks/phase13_bm25_file_search.md) | Recherche lexicale BM25 sur contenu des fichiers traqués | 🟡 À faire |
 

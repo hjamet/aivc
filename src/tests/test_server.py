@@ -31,19 +31,10 @@ _mock_engine = MagicMock()
 
 def _import_server():
     """Import aivc.server with SemanticEngine fully mocked."""
-    # Remove previously cached module (if any) to force re-import.
-    sys.modules.pop("aivc.server", None)
-    with (
-        patch("aivc.semantic.engine.SemanticEngine", return_value=_mock_engine),
-        patch(
-            "aivc.server.SemanticEngine",
-            return_value=_mock_engine,
-        ),
-    ):
-        import aivc.server as srv
-        # Forcibly replace the module-level engine with our mock.
-        srv._engine = _mock_engine
-        return srv
+    import aivc.server as srv
+    # Forcibly replace the module-level engine with our mock.
+    srv._engine = _mock_engine
+    return srv
 
 
 # We import once for all tests.
@@ -58,6 +49,7 @@ _consult_file = _server.consult_file
 _read_hist = _server.read_historical_file
 _get_status = _server.get_status
 _untrack = _server.untrack
+_track = _server.track
 
 
 # ---------------------------------------------------------------------------
@@ -296,6 +288,28 @@ class TestUntrack(unittest.TestCase):
         _mock_engine.untrack.side_effect = KeyError("Not tracked")
         with self.assertRaises(KeyError):
             _untrack("src/unknown.py")
+
+
+class TestTrack(unittest.TestCase):
+    def setUp(self):
+        _mock_engine.reset_mock()
+
+    def test_delegates_and_lists_new_files(self):
+        _mock_engine.track.return_value = ["/abs/path/foo.py"]
+        result = _track("src/*.py")
+        _mock_engine.track.assert_called_once_with("src/*.py")
+        self.assertIn("✅ Tracked 1 new file(s)", result)
+        self.assertIn("/abs/path/foo.py", result)
+
+    def test_already_tracked_returns_message(self):
+        _mock_engine.track.return_value = []
+        result = _track("src/stable.py")
+        self.assertIn("No new files to track", result)
+
+    def test_value_error_propagates(self):
+        _mock_engine.track.side_effect = ValueError("No files found")
+        with self.assertRaises(ValueError):
+            _track("nonexistent/*")
 
 
 if __name__ == "__main__":
