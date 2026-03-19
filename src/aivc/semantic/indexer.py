@@ -21,7 +21,8 @@ from sentence_transformers import SentenceTransformer
 if TYPE_CHECKING:
     from aivc.core.commit import Commit
 
-_BI_ENCODER_MODEL = "all-MiniLM-L6-v2"
+from aivc.config import BI_ENCODER_MODEL
+
 _COLLECTION_NAME = "aivc_commits"
 
 
@@ -40,7 +41,7 @@ class _SentenceTransformerEF(EmbeddingFunction):
 
     @staticmethod
     def build_from_config(config: dict) -> "_SentenceTransformerEF":
-        return _SentenceTransformerEF(SentenceTransformer(_BI_ENCODER_MODEL))
+        return _SentenceTransformerEF(SentenceTransformer(BI_ENCODER_MODEL))
 
     def __call__(self, input: Documents) -> Embeddings:  # noqa: A002
         return self._model.encode(list(input), convert_to_numpy=True).tolist()
@@ -68,7 +69,7 @@ class Indexer:
         self._chroma_dir = storage_root / self._CHROMA_DIR
         self._chroma_dir.mkdir(parents=True, exist_ok=True)
 
-        self._model = SentenceTransformer(_BI_ENCODER_MODEL)
+        self._model = SentenceTransformer(BI_ENCODER_MODEL)
         self._ef = _SentenceTransformerEF(self._model)
 
         self._client = chromadb.PersistentClient(path=str(self._chroma_dir))

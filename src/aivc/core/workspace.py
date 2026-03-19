@@ -56,9 +56,6 @@ class Workspace:
         self._blob_store = BlobStore(self._root)
         self._index = CoreIndex(self._root)
 
-        # Migration: ensure all existing JSON commits are in the SQLite index
-        self._index.migrate_from_json(self._commits_dir)
-
         if self._workspace_path.exists():
             self._state = self._load_state()
             

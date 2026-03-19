@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from aivc.semantic.indexer import Indexer
 
-_CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+from aivc.config import CROSS_ENCODER_MODEL
 
 _MAX_CROSS_ENCODER_INPUTS = 50  # hard ceiling to keep latency under control
 
@@ -65,7 +65,7 @@ class Searcher:
         """Lazy-loaded CrossEncoder model."""
         if self.__cross_encoder is None:
             from sentence_transformers import CrossEncoder
-            self.__cross_encoder = CrossEncoder(_CROSS_ENCODER_MODEL)
+            self.__cross_encoder = CrossEncoder(CROSS_ENCODER_MODEL)
         return self.__cross_encoder
 
     def search(

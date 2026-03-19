@@ -8,6 +8,10 @@ from pathlib import Path
 
 _STORAGE_ROOT_ENV = "AIVC_STORAGE_ROOT"
 
+# ML Model configurations
+BI_ENCODER_MODEL = "all-MiniLM-L6-v2"
+CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
 def get_storage_root(allow_fallback: bool = False) -> Path:
     """Retrieve and validate the AIVC storage root directory.
 
