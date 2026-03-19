@@ -182,7 +182,7 @@ aivc/
 | **10** | [Search Result Snippets](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats `search_memory` | 🟢 Terminé |
 | **11** | [Track MCP Tool](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP | 🟢 Terminé |
 | **12** | [Fichiers Consultés](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits, enrichissement graphe | 🟢 Terminé |
-| **13** | [Recherche BM25 Fichiers](docs/tasks/phase13_bm25_file_search.md) | Recherche lexicale BM25 sur contenu des fichiers traqués | 🟡 À faire |
+| **13** | [Recherche BM25 & Optimisation CoreIndex](docs/tasks/phase13_bm25_and_optimisations.md) | Recherche lexicale + Centralisation config ML + Fix perf start | 🟡 À faire |
 | **14** | [Contexte de Commit](docs/tasks/phase14_commit_context.md) | Affichage du commit Parent/Enfant dans `consult_commit` | 🟢 Terminé |
 | **15** | [Refactoring Performance I/O (CoreIndex)](docs/tasks/phase15_io_refactoring.md) | CoreIndex SQLite autonome, élimination `_all_commits()` | 🟢 Terminé |
 
@@ -196,6 +196,6 @@ aivc/
 | [Spec Phase 10](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats de recherche sémantique. |
 | [Spec Phase 11](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP. |
 | [Spec Phase 12](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits. |
-| [Spec Phase 13](docs/tasks/phase13_bm25_file_search.md) | Recherche BM25 sur fichiers traqués. |
+| [Spec Phase 13](docs/tasks/phase13_bm25_and_optimisations.md) | Recherche lexicale BM25 et optimisations. |
 | [Spec Phase 14](docs/tasks/phase14_commit_context.md) | Graphe chronologique de commits. |
 | [Spec Phase 15](docs/tasks/phase15_io_refactoring.md) | Refactoring performance I/O. |
