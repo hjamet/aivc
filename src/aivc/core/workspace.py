@@ -132,6 +132,13 @@ class Workspace:
                 "Did you mean a file, directory, or glob pattern?"
             )
         return files
+    
+    def migrate_index(self) -> None:
+        """Ensure all existing JSON commits are in the SQLite index.
+        
+        This is an explicit migration call, usually triggered via CLI.
+        """
+        self._index.migrate_from_json(self._commits_dir)
 
     # ------------------------------------------------------------------
     # Public API

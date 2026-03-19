@@ -104,6 +104,21 @@ def cmd_search(args: argparse.Namespace) -> None:
         print(f"   {DIM}Files:{RESET} {', '.join(r.file_paths) if r.file_paths else '—'}")
         print(f"\n      {r.snippet}\n")
 
+
+def cmd_search_files(args: argparse.Namespace) -> None:
+    """Lexical search (BM25) over current tracked file contents."""
+    engine = _get_engine()
+    print(f"{DIM}Searching file contents for: '{args.query}' (BM25)...{RESET}\n")
+    results = engine.search_files_bm25(args.query, top_n=args.top_n)
+    
+    if not results:
+        print("No matching files found.")
+        return
+
+    for i, r in enumerate(results, 1):
+        print(f"{CYAN}{BOLD}{i}. {r['path']}{RESET} {DIM}(score: {r['score']:.3f}){RESET}")
+        print(f"   {r['snippet']}\n")
+
 def cmd_track(args: argparse.Namespace) -> None:
     """Track a file, directory, or glob pattern."""
     engine = _get_engine()
@@ -116,6 +131,14 @@ def cmd_track(args: argparse.Namespace) -> None:
     print(f"{GREEN}{BOLD}Tracked {len(newly_tracked)} new file(s):{RESET}")
     for f in newly_tracked:
         print(f"  {CYAN}+{RESET} {f}")
+
+
+def cmd_migrate(args: argparse.Namespace) -> None:
+    """Explicitly migrate JSON commits to SQLite index."""
+    print(f"{DIM}Checking for JSON commits to migrate to SQLite index...{RESET}")
+    engine = _get_engine()
+    engine.migrate_index()
+    print(f"{GREEN}Migration complete.{RESET}")
 
 
 def cmd_web(args: argparse.Namespace) -> None:
@@ -137,6 +160,12 @@ def main() -> None:
     subparsers.add_parser(
         "status", 
         help="List all tracked files with storage usage"
+    )
+
+    # migrate
+    subparsers.add_parser(
+        "migrate",
+        help="Explicitly migrate JSON commits to SQLite index"
     )
 
     # track
@@ -177,6 +206,20 @@ def main() -> None:
         help="Optional glob pattern to restrict search to matching files"
     )
 
+    # search-files (BM25)
+    parser_search_files = subparsers.add_parser(
+        "search-files", 
+        help="Lexical search (BM25) in current tracked files"
+    )
+    parser_search_files.add_argument(
+        "query", type=str, 
+        help="Keywords or exact terms to find"
+    )
+    parser_search_files.add_argument(
+        "-n", "--top-n", type=int, default=5, 
+        help="Number of results to return (default: 5)"
+    )
+
     # web
     parser_web = subparsers.add_parser(
         "web",
@@ -191,12 +234,16 @@ def main() -> None:
 
     if args.command == "status":
         cmd_status(args)
+    elif args.command == "migrate":
+        cmd_migrate(args)
     elif args.command == "track":
         cmd_track(args)
     elif args.command == "log":
         cmd_log(args)
     elif args.command == "search":
         cmd_search(args)
+    elif args.command == "search-files":
+        cmd_search_files(args)
     elif args.command == "web":
         cmd_web(args)
 

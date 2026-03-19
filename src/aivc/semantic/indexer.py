@@ -98,7 +98,7 @@ class Indexer:
             "timestamp": commit.timestamp,
             # ChromaDB metadata values must be str/int/float/bool.
             # Store file paths as a comma-joined string.
-            "file_paths": ",".join(file_paths),
+            "file_paths": "\n".join(file_paths),
         }
 
     # ------------------------------------------------------------------
@@ -217,7 +217,7 @@ class Indexer:
                     "commit_id": meta["commit_id"],
                     "title": meta["title"],
                     "timestamp": meta["timestamp"],
-                    "file_paths": [p for p in file_paths_str.split(",") if p],
+                    "file_paths": [p for p in file_paths_str.split("\n") if p],
                     "document": doc,
                 }
             )

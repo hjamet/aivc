@@ -212,6 +212,11 @@ ln -sf "${VENV_DIR}/bin/aivc" "${USER_BIN_DIR}/aivc"
 
 echo "  CLI Command  : aivc (symlinked in ${USER_BIN_DIR})"
 echo "  MCP config   : ${MCP_CONFIG}"
+
+# 8. Run migration
+info "Running CoreIndex migration..."
+"${VENV_DIR}/bin/aivc" migrate || info "Migration skipped (or not needed)."
+
 echo "  Agent rules  : ${GEMINI_MD}"
 echo ""
 echo "Restart Gemini Antigravity to pick up the new MCP server."

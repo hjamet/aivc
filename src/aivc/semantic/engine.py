@@ -143,6 +143,73 @@ class SemanticEngine:
         
         return self._searcher.search(query, top_k=top_k, top_n=top_n)
 
+    def search_files_bm25(self, query: str, top_n: int = 5) -> list[dict]:
+        """Perform a lexical search (BM25) on current tracked file contents.
+        
+        Args:
+            query: The search query text.
+            top_n: Number of results to return.
+            
+        Returns:
+            A list of dicts: {"path": str, "score": float, "snippet": str}.
+        """
+        tracked_files = self.get_status()
+        if not tracked_files:
+            return []
+
+        import re
+        from rank_bm25 import BM25Okapi
+
+        def tokenize(text: str) -> list[str]:
+            return re.findall(r'\w+', text.lower())
+
+        corpus = []
+        paths = []
+        for s in tracked_files:
+            p = Path(s.path)
+            if p.exists() and p.is_file():
+                try:
+                    content = p.read_text(encoding="utf-8", errors="ignore")
+                    corpus.append(tokenize(content))
+                    paths.append(s.path)
+                except Exception:
+                    continue
+
+        if not corpus:
+            return []
+
+        bm25 = BM25Okapi(corpus)
+        tokenized_query = tokenize(query)
+        scores = bm25.get_scores(tokenized_query)
+        
+        # Rank and filter scores > 0
+        results = []
+        for path, score, tokens in zip(paths, scores, corpus):
+            if score > 0:
+                # Build a snippet around the first matched keyword
+                snippet = ""
+                content = Path(path).read_text(encoding="utf-8", errors="ignore")
+                query_words = set(tokenized_query)
+                matches = [m.start() for m in re.finditer(r'\w+', content) if m.group().lower() in query_words]
+                
+                if matches:
+                    start = max(0, matches[0] - 100)
+                    end = min(len(content), start + 200)
+                    snippet = content[start:end].replace("\n", " ").strip()
+                    if start > 0: snippet = "..." + snippet
+                    if end < len(content): snippet = snippet + "..."
+                else:
+                    snippet = content[:200].replace("\n", " ").strip() + "..."
+
+                results.append({
+                    "path": path,
+                    "score": float(score),
+                    "snippet": snippet
+                })
+
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results[:top_n]
+
     # ------------------------------------------------------------------
     # Graph queries
     # ------------------------------------------------------------------
@@ -212,4 +279,8 @@ class SemanticEngine:
     def read_file_at_commit(self, file_path: str, commit_id: str) -> bytes:
         """Read a tracked file as it was at a specific commit."""
         return self._workspace.read_file_at_commit(file_path, commit_id)
+    
+    def migrate_index(self) -> None:
+        """Explicitly migrate JSON commits to SQLite index."""
+        self._workspace.migrate_index()
 

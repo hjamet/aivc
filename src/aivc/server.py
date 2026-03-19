@@ -71,8 +71,9 @@ To retrieve memory, follow this two-step funnel:
 3. **`consult_commit`** — to read the full note of a specific commit.
    → Call this AFTER identifying a relevant commit via `search_memory` or `get_recent_commits`.
 
-Do NOT call `consult_commit` blindly on many commits. Use `search_memory` first to
-narrow down, then call `consult_commit` only on the most relevant ID.
+4. **`search_files_bm25`** — for keyword search in the CURRENT state of files.
+   → This is the ONLY tool to search inside file contents. Use it for finding exact functions, variables, or code patterns.
+   → Unlike `search_memory` (semantic search in *past commit notes*), `search_files_bm25` looks at what is *currently* on disk for tracked files.
 
 ## Tool Reference
 
@@ -87,6 +88,7 @@ narrow down, then call `consult_commit` only on the most relevant ID.
 | `get_status` | List tracked files with current size and history weight. |
 | `untrack` | **DESTRUCTIVE** — remove a file from tracking and erase its entire history. |
 | `track` | Add new files to AIVC tracking (file, directory, or glob pattern). |
+| `search_files_bm25` | Lexical search (BM25) over current tracked file contents. |
 
 ## `untrack` Warning
 
@@ -233,6 +235,35 @@ def search_memory(query: str, top_n: int = 5, filter_glob: str = "") -> str:
 
     output += "\n\n💡 Use `consult_commit(commit_id)` to read a full note."
     return output
+
+
+@mcp.tool()
+def search_files_bm25(query: str, top_n: int = 5) -> str:
+    """Search for keywords or exact code patterns in current tracked files.
+
+    Uses BM25 (lexical ranking) on the actual text content of files currently
+    on disk. This is the only tool that searches INSIDE the code/files.
+
+    Args:
+        query: Keywords or code fragment (e.g. "function_name" or "import os").
+        top_n: Number of results to return (default 5).
+
+    Returns:
+        A list of matching files with their relative paths and context snippets.
+    """
+    results = _engine.search_files_bm25(query, top_n=top_n)
+
+    if not results:
+        return f"No matches found for keyword query: '{query}'"
+
+    lines = [f"## Lexical matches for: `{query}`\n"]
+    for i, r in enumerate(results, 1):
+        lines.append(
+            f"{i}. `{r['path']}` (score: {r['score']:.3f})\n"
+            f"   > {r['snippet']}"
+        )
+
+    return "\n".join(lines)
 
 
 @mcp.tool()

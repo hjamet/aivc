@@ -142,3 +142,18 @@ def test_query_clamps_top_k_to_collection_size(indexer) -> None:
     # Asking for top_k=100 when only 1 doc exists must not raise.
     results = indexer.query("test", top_k=100)
     assert len(results) == 1
+
+
+def test_query_handles_commas_in_file_paths(indexer) -> None:
+    """Regression test: commas in filenames must not break parsing."""
+    fp = "Notes, Highlights, and More - readwise.md"
+    commit = _make_commit(
+        commit_id="comma-id",
+        title="Commit with comma file",
+        file_paths=[fp]
+    )
+    indexer.index_commit(commit)
+    results = indexer.query("comma", top_k=5)
+    
+    assert len(results) == 1
+    assert results[0]["file_paths"] == [fp]
