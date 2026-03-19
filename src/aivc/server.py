@@ -86,17 +86,17 @@ To retrieve memory, follow this two-step funnel:
 | `consult_file` | Get the AIVC history of a specific file (which commits touched it). |
 | `read_historical_file` | Read the content of a file as it was at a specific past commit. |
 | `get_status` | List tracked files with current size and history weight. |
-| `untrack` | **DESTRUCTIVE** — remove a file from tracking and erase its entire history. |
-| `track` | Add new files to AIVC tracking (file, directory, or glob pattern). |
-| `watch_directory` | Start real-time surveillance of a directory (automatic tracking of new files). |
-| `get_watched_directories` | List directories currently under AIVC surveillance. |
+| `get_status` | List tracked files with current size and history weight. |
+| `untrack` | **⚠️ VERY DESTRUCTIVE** — STOP surveillance and ERASE full history. |
+| `track` | Add files to AIVC tracking. If a directory, starts continuous surveillance. |
 | `search_files_bm25` | Lexical search (BM25) over current tracked file contents. |
 
 ## `untrack` Warning
 
-`untrack(file_path)` is irreversible. It erases all stored blobs and history
-for that file. Use it only to free storage on files you are certain you no
-longer need to track.
+`untrack(path)` is HIGHLY DESTRUCTIVE. Do NOT use it blindly.
+- If called on a file, it erases the file's entire history and blobs.
+- If called on a directory, it STOPS tracking it, AND PERMANENTLY ERASES THE HISTORY OF ALL FILES INSIDE IT.
+Do NOT use `untrack` without exploring `consult_file` or `search_memory` first to guarantee the files are truly useless.
 """
 
 # ---------------------------------------------------------------------------
@@ -118,6 +118,7 @@ _engine = SemanticEngine(_storage_root)
 # ---------------------------------------------------------------------------
 
 mcp = FastMCP(name="aivc", instructions=_SYSTEM_PROMPT)
+_observer = None
 
 # ---------------------------------------------------------------------------
 # Helper formatting functions
@@ -472,44 +473,48 @@ def get_status() -> str:
 
 
 @mcp.tool()
-def untrack(file_path: str) -> str:
-    """⚠️ DESTRUCTIVE — Remove a file from AIVC tracking and erase its full history.
+def untrack(path_or_glob: str) -> str:
+    """⚠️ DESTRUCTIVE — Remove a file or directory from AIVC tracking and erase its full history.
 
     This operation:
-    1. Removes the file from the tracked files list.
-    2. Decrements blob reference counts for every historical version of the file.
+    1. Stops real-time surveillance (if directory).
+    2. Removes matching files from the tracked list.
     3. Physically deletes blobs whose reference count drops to zero (Garbage Collection).
-    4. Strips the file's `FileChange` entries from all existing commits.
+    4. Strips the files' `FileChange` entries from all existing commits.
 
-    This action is IRREVERSIBLE. All stored history for this file will be lost.
-    Use this only to free storage when you are certain you no longer need the
-    history for a given file.
+    This action is IRREVERSIBLE. All stored history for these files will be lost.
+    WARNING: Do NOT use this tool on a directory unless you are absolutely certain
+    you want to destroy the history of ALL files inside it. NEVER use it without
+    prior exploration of the file's usage (`consult_file` or `search_memory`).
 
     Args:
-        file_path: The exact path of the file to untrack (as shown in `get_status`).
+        path_or_glob: The exact path of the file to untrack, or a directory/glob.
 
     Returns:
         Confirmation message.
 
     Raises:
-        KeyError: If the file is not currently tracked.
+        KeyError: If no matching files or watched directories are found.
     """
-    _engine.untrack(file_path)
+    _engine.untrack(path_or_glob)
     return (
-        f"🗑️  File untracked and history erased: {file_path}\n"
+        f"🗑️  Untracked and history erased for: {path_or_glob}\n"
         "All associated blobs have been garbage-collected."
     )
 
 
 @mcp.tool()
-def track(path: str) -> str:
+def track(path: str, ignores: list[str] = []) -> str:
     """Add files to AIVC tracking.
 
     Accepts a file path, directory path, or glob pattern.
-    Paths are resolved to absolute paths relative to the current working directory.
+    If a directory path is provided, it automatically starts real-time surveillance
+    of that directory (any new files created inside will be tracked automatically).
+    Hidden files/folders (starting with '.') are always ignored by default.
 
     Args:
         path: File, directory, or glob pattern to track.
+        ignores: Optional list of glob patterns to ignore (only applicable if watching a dir).
 
     Returns:
         Confirmation with the list of newly tracked files.
@@ -517,17 +522,26 @@ def track(path: str) -> str:
     Raises:
         ValueError: If no files match the given path/pattern.
     """
-    result = _engine.track(path)
+    result = _engine.track(path, ignores)
     newly_tracked = result["newly_tracked"]
     hidden_skipped = result["hidden_skipped"]
+
+    lines = []
+    
+    global _observer
+    if _WATCHDOG_AVAILABLE and _observer is not None and Path(path).is_dir():
+        handler = AIVCWatcherHandler(_engine, path)
+        _observer.schedule(handler, path, recursive=True)
+        lines.append(f"🔭 Started continuous surveillance for directory: {path}\n")
 
     if not newly_tracked:
         msg = "No new files to track (already tracked or no match)."
         if hidden_skipped > 0:
             msg += f" ({hidden_skipped} hidden files were ignored)."
-        return msg
+        lines.append(msg)
+        return "\n".join(lines)
 
-    lines = [f"✅ Tracked {len(newly_tracked)} new file(s):"]
+    lines.append(f"✅ Tracked {len(newly_tracked)} new file(s):")
     for f in newly_tracked:
         lines.append(f"  + {f}")
 
@@ -535,49 +549,6 @@ def track(path: str) -> str:
         lines.append(f"\n💡 {hidden_skipped} hidden files/folders were ignored.")
     
     lines.append("\n💡 PRO-TIP: Use `untrack` on any useless files (build artifacts, etc.) to keep your memory relevant.")
-
-    return "\n".join(lines)
-
-
-@mcp.tool()
-def watch_directory(path: str, ignores: list[str] = []) -> str:
-    """Start real-time surveillance of a directory.
-
-    Any new file created in this directory (or its subdirectories) will be
-    automatically added to AIVC tracking. Hidden files/folders are ignored.
-    This also performs an immediate initial scan and tracking of existing files.
-
-    Args:
-        path: Absolute path to the directory to watch.
-        ignores: Optional list of glob patterns to ignore.
-    """
-    result = _engine.watch(path, ignores=ignores)
-    newly_tracked = result["newly_tracked"]
-    hidden_skipped = result["hidden_skipped"]
-
-    lines = [f"🔭 Surveillance started for: {path}"]
-    if newly_tracked:
-        lines.append(f"✅ Tracked {len(newly_tracked)} existing file(s).")
-    else:
-        lines.append("No new files found in initial scan.")
-
-    if hidden_skipped > 0:
-        lines.append(f"💡 {hidden_skipped} hidden files were ignored.")
-
-    return "\n".join(lines)
-
-
-@mcp.tool()
-def get_watched_directories() -> str:
-    """List all directories currently under real-time surveillance."""
-    watched = _engine.get_watched_dirs()
-    if not watched:
-        return "No directories are currently under real-time surveillance."
-
-    lines = ["## Watched Directories\n"]
-    for path, cfg in watched.items():
-        ignores = cfg.get("ignores", [])
-        lines.append(f"- `{path}`" + (f" (ignores: {', '.join(ignores)})" if ignores else ""))
 
     return "\n".join(lines)
 
@@ -603,6 +574,12 @@ class AIVCWatcherHandler(FileSystemEventHandler):
     def on_created(self, event):
         if event.is_directory:
             return
+            
+        # Dynamically check if this directory is still watched
+        watched_dirs = self.engine.get_watched_dirs()
+        abs_watched_path = str(self.watched_path.resolve())
+        if abs_watched_path not in watched_dirs:
+            return
         
         path = Path(event.src_path)
         # Check if hidden
@@ -624,15 +601,16 @@ class AIVCWatcherHandler(FileSystemEventHandler):
 
 def start_background_watchers():
     """Initialise and start background threads for watched directories."""
+    global _observer
     if not _WATCHDOG_AVAILABLE:
         print("⚠️  'watchdog' library not found. Real-time surveillance disabled.", file=sys.stderr)
-        return None
+        return
 
     watched_dirs = _engine.get_watched_dirs()
     if not watched_dirs:
-        return None
+        return
 
-    observer = Observer()
+    _observer = Observer()
     count = 0
     for path in watched_dirs:
         if os.path.isdir(path):
@@ -644,15 +622,13 @@ def start_background_watchers():
 
             # 2. Schedule watcher
             handler = AIVCWatcherHandler(_engine, path)
-            observer.schedule(handler, path, recursive=True)
+            _observer.schedule(handler, path, recursive=True)
             count += 1
     
     if count > 0:
-        observer.daemon = True
-        observer.start()
+        _observer.daemon = True
+        _observer.start()
         print(f"🔭 Started background surveillance on {count} directory/ies.", file=sys.stderr)
-        return observer
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -661,7 +637,7 @@ def start_background_watchers():
 
 if __name__ == "__main__":
     # Start background tasks
-    _observer = start_background_watchers()
+    start_background_watchers()
     
     # Run MCP server
     mcp.run(transport="stdio")

@@ -50,16 +50,16 @@ def test_cli_search(mock_engine, capsys):
 
 
 def test_cli_track_single_file(mock_engine, capsys):
-    mock_engine.track.return_value = ["/home/user/project/src/app.py"]
+    mock_engine.track.return_value = {"newly_tracked": ["/home/user/project/src/app.py"], "hidden_skipped": 0}
     with patch("sys.argv", ["aivc", "track", "src/app.py"]):
         main()
     captured = capsys.readouterr()
     assert "Tracked 1 new file(s)" in captured.out
-    mock_engine.track.assert_called_once_with("src/app.py")
+    mock_engine.track.assert_called_once_with("src/app.py", ignores=[])
 
 
 def test_cli_track_already_tracked(mock_engine, capsys):
-    mock_engine.track.return_value = []
+    mock_engine.track.return_value = {"newly_tracked": [], "hidden_skipped": 0}
     with patch("sys.argv", ["aivc", "track", "src/app.py"]):
         main()
     captured = capsys.readouterr()

@@ -18,14 +18,14 @@ Le Watcher ne doit réagir qu'aux ajouts. Le moteur de diff (`compute_diff`) d'A
 ## 2. Fichiers Concernés
 
 - `pyproject.toml` (Ajout de la dépendance `watchdog`)
-- `src/aivc/core/workspace.py` (Stockage de l'intention `watched_dirs`)
-- `src/aivc/cli.py` (Commandes d'administration, ex: `aivc watch <dir>`)
-- `src/aivc/server.py` (Implémentation du thread Watcher et du scan de démarrage)
+- `src/aivc/core/workspace.py` (Mise à jour de `track`/`untrack` pour gérer le `watched_dirs`)
+- `src/aivc/cli.py` (Pas de nouvelles commandes, `track` et `untrack` gèrent dynamiquement la surveillance)
+- `src/aivc/server.py` (Implémentation du thread Watcher et du scan de démarrage, suppression des outils `watch_directory`)
 
 ## 3. Objectifs (Definition of Done)
 
-* **Mémoire d'intention** : Le `workspace.json` maintient une liste `watched_dirs`.
-* **Commande explicite** : Une commande CLI/MCP `watch` permet d'ajouter un dossier à la surveillance.
-* **Scan au Démarrage (Sync)** : La fonction `serve()` de `server.py` effectue un scan rapide (ignorant les exclusions standards gitignore) sur les `watched_dirs` pour `track()` silencieusement les fichiers existants non indexés.
-* **Watcher Réactif** : Un thread `watchdog` tourne dans le serveur MCP. À chaque `FileCreatedEvent`, il appelle `Workspace.track(path)`.
-* **Protection de l'Historique** : Le Watcher ignore volontairement les `FileDeletedEvent` pour permettre au `compute_diff` d'enregistrer la suppression du fichier lors du prochain commit.
+* **Surveillance automatique** : Si `aivc track <dir>` est appelé avec un dossier, il est automatiquement rajouté aux `watched_dirs`.
+* **Arrêt de surveillance** : Si `aivc untrack <dir>` est appelé avec un dossier, il supprime la surveillance ET détruit l'historique de tous les fichiers à l'intérieur.
+* **Scan au Démarrage (Sync)** : La fonction `serve()` effectue le scan JIT habituel.
+* **Watcher Réactif** : Un thread `watchdog` appelle `track(path)` sur les nouveaux fichiers créés dans ces dossiers.
+* **Protection de l'Historique** : Le Watcher ignore volontairement les `FileDeletedEvent`.

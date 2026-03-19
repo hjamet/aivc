@@ -9,6 +9,7 @@ from aivc.server import AIVCWatcherHandler, start_background_watchers, _engine
 
 def test_watcher_handler_ignores_hidden_files():
     mock_engine = MagicMock()
+    mock_engine.get_watched_dirs.return_value = {"/home/user/project": {"ignores": []}}
     watched_path = "/home/user/project"
     handler = AIVCWatcherHandler(mock_engine, watched_path)
     

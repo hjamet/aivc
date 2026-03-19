@@ -261,25 +261,17 @@ class SemanticEngine:
     # Workspace pass-throughs
     # ------------------------------------------------------------------
 
-    def track(self, path: str) -> dict[str, Any]:
+    def track(self, path: str, ignores: list[str] | None = None) -> dict[str, Any]:
         """Track a file, directory, or glob. See :meth:`Workspace.track`."""
-        return self._workspace.track(path)
-
-    def watch(self, dir_path: str, ignores: list[str] | None = None) -> dict[str, Any]:
-        """Watch a directory for changes. See :meth:`Workspace.watch`."""
-        return self._workspace.watch(dir_path, ignores=ignores)
-
-    def unwatch(self, dir_path: str) -> None:
-        """Unwatch a directory. See :meth:`Workspace.unwatch`."""
-        self._workspace.unwatch(dir_path)
+        return self._workspace.track(path, ignores)
 
     def get_watched_dirs(self) -> dict[str, dict[str, Any]]:
-        """Get all watched directories. See :meth:`Workspace.get_watched_dirs`."""
+        """Return exactly the watched directories state from workspace."""
         return self._workspace.get_watched_dirs()
 
-    def untrack(self, file_path: str) -> None:
-        """Untrack a file and GC its blobs. See :meth:`Workspace.untrack`."""
-        self._workspace.untrack(file_path)
+    def untrack(self, path_or_glob: str) -> None:
+        """Remove a file/dir from tracking. See :meth:`Workspace.untrack`."""
+        self._workspace.untrack(path_or_glob)
 
     def get_status(self) -> list[FileStatus]:
         """Return status of all tracked files. See :meth:`Workspace.get_status`."""

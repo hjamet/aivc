@@ -69,8 +69,8 @@ track(path/glob/dir) --> workspace.json
 | `consult_commit`| Lecture | Contenu complet (note Markdown + FileChange) d'un commit spécifique. |
 | `consult_file` | Lecture | Historique AIVC d'un fichier : liste des commits qui l'ont touché. |
 | `get_status` | Lecture | Fichiers suivis avec taille courante et poids de l'historique. |
-| `untrack` | Gestion | ⚠️ DESTRUCTIF — Retire un fichier et supprime son historique (GC). |
-| `track` | Gestion | Ajouter un fichier, dossier ou glob au suivi AIVC. |
+| `untrack` | Gestion | ⚠️ DESTRUCTIF — Retire un fichier/dossier et purge son historique (GC). |
+| `track` | Gestion | Ajouter un fichier, glob, ou dossier (active la surveillance automatique) au suivi AIVC. |
 | `read_historical_file` | Lecture | Contenu d'un fichier tel qu'il était lors d'un commit passé. |
 | `search_files_bm25` | Lecture | Recherche lexicale (BM25) dans le contenu actuel des fichiers traqués. |
 

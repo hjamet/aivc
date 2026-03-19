@@ -352,16 +352,16 @@ class TestTrack(unittest.TestCase):
         _mock_engine.reset_mock()
 
     def test_delegates_and_lists_new_files(self):
-        _mock_engine.track.return_value = ["/abs/path/foo.py"]
+        _mock_engine.track.return_value = {"newly_tracked": ["/abs/path/foo.py"], "hidden_skipped": 0}
         result = _track("src/*.py")
-        _mock_engine.track.assert_called_once_with("src/*.py")
+        _mock_engine.track.assert_called_once_with("src/*.py", [])
         self.assertIn("✅ Tracked 1 new file(s)", result)
         self.assertIn("/abs/path/foo.py", result)
 
     def test_already_tracked_returns_message(self):
-        _mock_engine.track.return_value = []
+        _mock_engine.track.return_value = {"newly_tracked": [], "hidden_skipped": 0}
         result = _track("src/stable.py")
-        self.assertIn("No new files to track", result)
+        self.assertIn("No new files", result)
 
     def test_value_error_propagates(self):
         _mock_engine.track.side_effect = ValueError("No files found")

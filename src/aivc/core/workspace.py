@@ -7,8 +7,10 @@ the untrack + GC lifecycle.
 
 from __future__ import annotations
 
+import fnmatch
 import glob as _glob
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -185,11 +187,15 @@ class Workspace:
     # Public API
     # ------------------------------------------------------------------
 
-    def track(self, path: str) -> dict[str, Any]:
+    def track(self, path: str, ignores: list[str] | None = None) -> dict[str, Any]:
         """Add a file, directory, or glob pattern to tracking.
+
+        If the path is a directory, it is automatically added to the continuous
+        surveillance list (watched_dirs).
 
         Args:
             path: A file path, directory path, or glob pattern.
+            ignores: Optional list of globs to ignore (only applicable if watching a dir).
 
         Returns:
             A dict with:
@@ -199,6 +205,14 @@ class Workspace:
         Raises:
             ValueError: if no matching files are found.
         """
+        p = Path(path).resolve()
+        abs_p = str(p)
+
+        # 1. Register for surveillance if it's a directory
+        if p.is_dir():
+            self._state["watched_dirs"][abs_p] = {"ignores": ignores or []}
+
+        # 2. Expand and track existing files
         files, hidden_count = self._expand_path(path)
         newly_tracked = []
         for f in files:
@@ -212,66 +226,63 @@ class Workspace:
             "hidden_skipped": hidden_count
         }
 
-    def watch(self, dir_path: str, ignores: list[str] | None = None) -> dict[str, Any]:
-        """Add a directory to monitored 'watched_dirs'.
-        
-        Perform an immediate track() on the directory.
-        """
-        p = Path(dir_path).resolve()
-        if not p.is_dir():
-            raise ValueError(f"Path {dir_path!r} is not a directory.")
-        
-        abs_p = str(p)
-        self._state["watched_dirs"][abs_p] = {"ignores": ignores or []}
-        self._save_state()
-        
-        # Immediate sync
-        return self.track(abs_p)
-
-    def unwatch(self, dir_path: str) -> None:
-        """Remove a directory from watched list."""
-        abs_p = str(Path(dir_path).resolve())
-        if abs_p in self._state["watched_dirs"]:
-            del self._state["watched_dirs"][abs_p]
-            self._save_state()
-
     def get_watched_dirs(self) -> dict[str, dict[str, Any]]:
         """Return the dictionary of watched directories."""
         return self._state.get("watched_dirs", {})
 
-    def untrack(self, file_path: str) -> None:
-        """Remove a file from tracking and garbage-collect its history.
+    def untrack(self, path_or_glob: str) -> None:
+        """Remove a file, directory, or glob from tracking and garbage-collect history.
 
-        For every commit that references this file, the associated blob's
-        refcount is decremented. Blobs reaching refcount=0 are deleted from disk.
+        WARNING: This is a highly destructive operation. If a directory or glob
+        is provided, ALL matching files currently tracked will have their history
+        permanently erased from AIVC.
+        This also removes the path from continuous surveillance if applicable.
 
         Raises:
-            KeyError: if the file is not tracked.
+            KeyError: if no matching files or watched directories are found.
         """
-        if file_path not in self._state["tracked_files"]:
-            raise KeyError(f"File {file_path!r} is not tracked.")
+        abs_p = str(Path(path_or_glob).resolve())
+        removed_watch = False
 
-        # Collect commits referencing this file via the index (fast).
-        affected_commit_ids = self._index.get_commits_touching_file(file_path)
-        for cid in affected_commit_ids:
-            commit = self._load_commit(cid)
-            updated_changes = []
-            for change in commit.changes:
-                if change.path == file_path:
-                    if change.blob_hash is not None:
-                        self._blob_store.decrement_ref(change.blob_hash)
-                    # Drop this FileChange from the commit.
-                else:
-                    updated_changes.append(change)
+        if abs_p in self._state.get("watched_dirs", {}):
+            del self._state["watched_dirs"][abs_p]
+            removed_watch = True
+
+        to_untrack = set()
+        p_is_dir = Path(abs_p).is_dir()
+        
+        for tracked_file in self._state["tracked_files"]:
+            if tracked_file == abs_p:
+                to_untrack.add(tracked_file)
+            elif p_is_dir and tracked_file.startswith(abs_p + os.sep):
+                to_untrack.add(tracked_file)
+            elif fnmatch.fnmatch(tracked_file, abs_p):
+                to_untrack.add(tracked_file)
+
+        if not to_untrack and not removed_watch:
+            raise KeyError(f"Path {path_or_glob!r} is not tracked or watched.")
+
+        for file_path in to_untrack:
+            # Collect commits referencing this file via the index (fast).
+            affected_commit_ids = self._index.get_commits_touching_file(file_path)
+            for cid in affected_commit_ids:
+                commit = self._load_commit(cid)
+                updated_changes = []
+                for change in commit.changes:
+                    if change.path == file_path:
+                        if change.blob_hash is not None:
+                            self._blob_store.decrement_ref(change.blob_hash)
+                    else:
+                        updated_changes.append(change)
+                
+                if len(updated_changes) != len(commit.changes):
+                    commit.changes = updated_changes
+                    self._save_commit(commit)
+
+            # Cleanup the index for this file.
+            self._index.remove_file_changes(file_path)
+            del self._state["tracked_files"][file_path]
             
-            if len(updated_changes) != len(commit.changes):
-                commit.changes = updated_changes
-                self._save_commit(commit)
-
-        # Cleanup the index for this file.
-        self._index.remove_file_changes(file_path)
-
-        del self._state["tracked_files"][file_path]
         self._save_state()
 
     def create_commit(

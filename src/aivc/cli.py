@@ -130,7 +130,7 @@ def cmd_search_files(args: argparse.Namespace) -> None:
 def cmd_track(args: argparse.Namespace) -> None:
     """Track a file, directory, or glob pattern."""
     engine = _get_engine()
-    result = engine.track(args.path)
+    result = engine.track(args.path, ignores=args.ignore)
     newly_tracked = result["newly_tracked"]
     hidden_skipped = result["hidden_skipped"]
 
@@ -147,28 +147,6 @@ def cmd_track(args: argparse.Namespace) -> None:
     
     if hidden_skipped > 0:
         print(f"{DIM}Note: {hidden_skipped} hidden files/folders were ignored.{RESET}")
-
-
-def cmd_watch(args: argparse.Namespace) -> None:
-    """Add a directory to surveillance."""
-    engine = _get_engine()
-    print(f"{DIM}Setting up surveillance for: {args.path}...{RESET}")
-    result = engine.watch(args.path, ignores=args.ignore)
-    newly_tracked = result["newly_tracked"]
-    
-    print(f"{GREEN}Surveillance active for {args.path}.{RESET}")
-    if newly_tracked:
-        print(f"{DIM}Tracked {len(newly_tracked)} existing file(s).{RESET}")
-    
-    if result["hidden_skipped"] > 0:
-        print(f"{DIM}({result['hidden_skipped']} hidden files ignored){RESET}")
-
-
-def cmd_unwatch(args: argparse.Namespace) -> None:
-    """Stop surveillance for a directory."""
-    engine = _get_engine()
-    engine.unwatch(args.path)
-    print(f"{YELLOW}Surveillance stopped for {args.path}.{RESET}")
 
 
 def cmd_migrate(args: argparse.Namespace) -> None:
@@ -214,6 +192,10 @@ def main() -> None:
     parser_track.add_argument(
         "path", type=str,
         help="File path, directory, or glob pattern to track"
+    )
+    parser_track.add_argument(
+        "--ignore", type=str, nargs="+", default=[],
+        help="Optional glob patterns to ignore (only when tracking a directory)"
     )
 
     # log
@@ -268,30 +250,6 @@ def main() -> None:
         help="Port to serve the dashboard on (default: 8765)"
     )
 
-    # watch
-    parser_watch = subparsers.add_parser(
-        "watch",
-        help="Watch a directory for new files"
-    )
-    parser_watch.add_argument(
-        "path", type=str,
-        help="Directory to watch"
-    )
-    parser_watch.add_argument(
-        "--ignore", type=str, action="append",
-        help="Glob pattern to ignore (optional, can be used multiple times)"
-    )
-
-    # unwatch
-    parser_unwatch = subparsers.add_parser(
-        "unwatch",
-        help="Stop watching a directory"
-    )
-    parser_unwatch.add_argument(
-        "path", type=str,
-        help="Directory to unwatch"
-    )
-
     args = parser.parse_args()
 
     if args.command == "status":
@@ -308,12 +266,7 @@ def main() -> None:
         cmd_search_files(args)
     elif args.command == "web":
         cmd_web(args)
-    elif args.command == "watch":
-        cmd_watch(args)
-    elif args.command == "unwatch":
-        cmd_unwatch(args)
 
 
 if __name__ == "__main__":
     main()
-

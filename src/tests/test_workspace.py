@@ -84,35 +84,29 @@ def test_track_ignores_hidden_directories(tmp_path: Path, ws: Workspace) -> None
 
 
 # ---------------------------------------------------------------------------
-# watch() / unwatch()
+# Surveillance dynamically added on directory track
 # ---------------------------------------------------------------------------
 
-def test_watch_adds_to_state_and_tracks(tmp_path: Path, ws: Workspace) -> None:
+def test_track_adds_directory_to_surveillance(tmp_path: Path, ws: Workspace) -> None:
     d = tmp_path / "observed"
     d.mkdir()
     _write(d / "init.py", b"init")
     
-    result = ws.watch(str(d))
+    result = ws.track(str(d), ignores=["*.tmp"])
     assert str(d) in ws.get_watched_dirs()
+    assert ws.get_watched_dirs()[str(d)]["ignores"] == ["*.tmp"]
     assert len(result["newly_tracked"]) == 1
     assert str(d / "init.py") in result["newly_tracked"]
 
 
-def test_unwatch_removes_from_state(tmp_path: Path, ws: Workspace) -> None:
+def test_untrack_removes_directory_from_surveillance(tmp_path: Path, ws: Workspace) -> None:
     d = tmp_path / "observed"
     d.mkdir()
-    ws.watch(str(d))
+    ws.track(str(d))
     assert str(d) in ws.get_watched_dirs()
     
-    ws.unwatch(str(d))
+    ws.untrack(str(d))
     assert str(d) not in ws.get_watched_dirs()
-
-
-def test_watch_with_ignores(tmp_path: Path, ws: Workspace) -> None:
-    d = tmp_path / "observed"
-    d.mkdir()
-    ws.watch(str(d), ignores=["*.tmp"])
-    assert ws.get_watched_dirs()[str(d)]["ignores"] == ["*.tmp"]
 
 
 # ---------------------------------------------------------------------------
