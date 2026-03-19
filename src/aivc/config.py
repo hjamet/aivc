@@ -34,11 +34,10 @@ def get_storage_root(allow_fallback: bool = False) -> Path:
             return path
         else:
             # For CLI and Server, we want a hard exit with a clear message.
-            print(
+            msg = (
                 f"\033[31m[aivc] ERROR:\033[0m Environment variable {_STORAGE_ROOT_ENV!r} is not set.\n"
-                "Cannot proceed. Please run install.sh or export the variable.",
-                file=sys.stderr
+                "Cannot proceed. Please run install.sh or export the variable."
             )
-            sys.exit(1)
+            sys.exit(msg)
             
     return Path(path_str)

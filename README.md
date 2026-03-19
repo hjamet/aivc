@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟢 Phase 12 terminée — Fichiers Consultés + Centralisation Config.
+> **État** : 🟢 Phase 13 terminée — Recherche BM25 + Optimisation CoreIndex.
 
 ### Concept
 
@@ -72,6 +72,7 @@ track(path/glob/dir) --> workspace.json
 | `untrack` | Gestion | ⚠️ DESTRUCTIF — Retire un fichier et supprime son historique (GC). |
 | `track` | Gestion | Ajouter un fichier, dossier ou glob au suivi AIVC. |
 | `read_historical_file` | Lecture | Contenu d'un fichier tel qu'il était lors d'un commit passé. |
+| `search_files_bm25` | Lecture | Recherche lexicale (BM25) dans le contenu actuel des fichiers traqués. |
 
 ---
 
@@ -111,7 +112,8 @@ aivc/
 │   │   │   ├── commit.py        # Dataclasses Commit + FileChange
 │   │   │   ├── diff.py          # Détection des changements
 │   │   │   ├── index.py         # SQLite CoreIndex (fast I/O)
-│   │   └── workspace.py     # Orchestrateur Phase 1
+│   │   │   └── workspace.py     # Orchestrateur Phase 1
+│   │   ├── config.py             # Configuration centrale (ML, storage)
 │   │   ├── semantic/
 │   │   │   ├── __init__.py
 │   │   │   ├── indexer.py       # ChromaDB + SentenceTransformer
@@ -150,7 +152,9 @@ aivc/
 | `aivc track <path>` | Ajouter un fichier/dossier/glob au tracking |
 | `aivc log [-n N]` | Afficher l'historique des commits |
 | `aivc search <query> [-g GLOB]` | Recherche sémantique dans la mémoire, avec filtre optionnel |
+| `aivc search-files <query>` | Recherche lexicale (BM25) dans les fichiers actuels |
 | `aivc web [-p PORT]` | Lancer le Web Dashboard interactif |
+| `aivc migrate` | Forcer la migration des commits JSON vers SQLite |
 | `python -m pytest src/tests/ -v` | Lancer la suite de tests complète |
 | `uv pip install -e ".[dev]"` | Installer uniquement le core (stdlib) |
 | `uv pip install -e ".[semantic]"` | Installer avec les dépendances IA (Phase 2) |
@@ -182,7 +186,7 @@ aivc/
 | **10** | [Search Result Snippets](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats `search_memory` | 🟢 Terminé |
 | **11** | [Track MCP Tool](docs/tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP | 🟢 Terminé |
 | **12** | [Fichiers Consultés](docs/tasks/phase12_consulted_files.md) | Action `consulted` dans les commits, enrichissement graphe | 🟢 Terminé |
-| **13** | [Recherche BM25 & Optimisation CoreIndex](docs/tasks/phase13_bm25_and_optimisations.md) | Recherche lexicale + Centralisation config ML + Fix perf start | 🟡 À faire |
+| **13** | [Recherche BM25 & Optimisation CoreIndex](docs/tasks/phase13_bm25_and_optimisations.md) | Recherche lexicale + Centralisation config ML + Fix perf start | 🟢 Terminé |
 | **14** | [Contexte de Commit](docs/tasks/phase14_commit_context.md) | Affichage du commit Parent/Enfant dans `consult_commit` | 🟢 Terminé |
 | **15** | [Refactoring Performance I/O (CoreIndex)](docs/tasks/phase15_io_refactoring.md) | CoreIndex SQLite autonome, élimination `_all_commits()` | 🟢 Terminé |
 

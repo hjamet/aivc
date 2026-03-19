@@ -215,7 +215,7 @@ echo "  MCP config   : ${MCP_CONFIG}"
 
 # 8. Run migration
 info "Running CoreIndex migration..."
-"${VENV_DIR}/bin/aivc" migrate || info "Migration skipped (or not needed)."
+AIVC_STORAGE_ROOT="${AIVC_HOME}/storage" "${VENV_DIR}/bin/aivc" migrate || info "Migration skipped (or not needed)."
 
 echo "  Agent rules  : ${GEMINI_MD}"
 echo ""
