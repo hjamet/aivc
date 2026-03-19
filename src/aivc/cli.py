@@ -36,7 +36,7 @@ def _format_bytes(n: int | None) -> str:
 def _get_engine() -> "SemanticEngine":
     """Instantiate the SemanticEngine from AIVC_STORAGE_ROOT."""
     from aivc.config import get_storage_root
-    storage_root = get_storage_root()
+    storage_root = get_storage_root(allow_fallback=True)
 
     from aivc.semantic.engine import SemanticEngine
     return SemanticEngine(storage_root)

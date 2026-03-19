@@ -66,16 +66,15 @@ def test_cli_track_already_tracked(mock_engine, capsys):
     assert "No new files to track" in captured.out
 
 
-def test_cli_no_env_var(capsys):
-    # Tests that omitting AIVC_STORAGE_ROOT exits with error
+def test_cli_no_env_var(mock_engine, capsys):
+    # Tests that omitting AIVC_STORAGE_ROOT now falls back gracefully
+    mock_engine.get_status.return_value = []
     with patch.dict(os.environ, clear=True):
         if "AIVC_STORAGE_ROOT" in os.environ:
             del os.environ["AIVC_STORAGE_ROOT"]
             
         with patch("sys.argv", ["aivc", "status"]):
-            with pytest.raises(SystemExit) as exc_info:
-                main()
+            main()
     
-    # sys.exit prints to standard error if it's passed a string,
-    # but when caught by pytest.raises, the string is in the exception value.
-    assert "Environment variable 'AIVC_STORAGE_ROOT' is not set" in str(exc_info.value)
+    captured = capsys.readouterr()
+    assert "No files are currently tracked" in captured.out

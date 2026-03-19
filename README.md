@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟢 Phase 13 terminée — Recherche BM25 + Optimisation CoreIndex.
+> **État** : 🟢 Phase 16 terminée — Fiabilisation BM25 & UX CLI.
 
 ### Concept
 
@@ -113,6 +113,9 @@ aivc/
 │   │   │   ├── diff.py          # Détection des changements
 │   │   │   ├── index.py         # SQLite CoreIndex (fast I/O)
 │   │   │   └── workspace.py     # Orchestrateur Phase 1
+│   │   ├── search/
+│   │   │   ├── __init__.py
+│   │   │   └── bm25_cache.py    # Cache SQLite pour tokenisation BM25
 │   │   ├── config.py             # Configuration centrale (ML, storage)
 │   │   ├── semantic/
 │   │   │   ├── __init__.py
@@ -203,3 +206,4 @@ aivc/
 | [Spec Phase 13](docs/tasks/phase13_bm25_and_optimisations.md) | Recherche lexicale BM25 et optimisations. |
 | [Spec Phase 14](docs/tasks/phase14_commit_context.md) | Graphe chronologique de commits. |
 | [Spec Phase 15](docs/tasks/phase15_io_refactoring.md) | Refactoring performance I/O. |
+| [Spec Phase 16](docs/tasks/phase16_fiabilisation_bm25_ux_cli.md) | Fiabilisation BM25 et UX CLI. |

@@ -17,3 +17,4 @@
 | [Phase 13 : Recherche BM25 Fichiers](tasks/phase13_bm25_file_search.md) | Recherche lexicale BM25 sur le contenu des fichiers traqués | 2026-03-19 | `Up to date` |
 | [Phase 14 : Contexte de Commit](tasks/phase14_commit_context.md) | Titre et ID Prev/Next dans le retour de `consult_commit` | 2026-03-19 | `Up to date` |
 | [Phase 15 : Refactoring Performance I/O (CoreIndex)](tasks/phase15_io_refactoring.md) | CoreIndex SQLite autonome dans `core/`, élimination de `_all_commits()` | 2026-03-19 | `Up to date` |
+| [Phase 16 : Fiabilisation BM25 & UX CLI](tasks/phase16_fiabilisation_bm25_ux_cli.md) | Cache SQLite BM25, Fallback Storage CLI | 2026-03-19 | `Up to date` |

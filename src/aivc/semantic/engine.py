@@ -51,6 +51,7 @@ class SemanticEngine:
         # Lazy — will be initialised on first access.
         self.__indexer = None
         self.__searcher = None
+        self.__bm25_cache = None
 
     # ------------------------------------------------------------------
     # Lazy properties for heavy ML components
@@ -71,6 +72,14 @@ class SemanticEngine:
             from aivc.semantic.searcher import Searcher
             self.__searcher = Searcher(self._indexer)
         return self.__searcher
+
+    @property
+    def _bm25_cache(self):
+        """Lazy-loaded BM25Cache (SQLite-backed tokenization cache)."""
+        if self.__bm25_cache is None:
+            from aivc.search.bm25_cache import BM25Cache
+            self.__bm25_cache = BM25Cache(self._storage_root)
+        return self.__bm25_cache
 
     # ------------------------------------------------------------------
     # Commit lifecycle
@@ -157,39 +166,38 @@ class SemanticEngine:
         if not tracked_files:
             return []
 
-        import re
         from rank_bm25 import BM25Okapi
-
-        def tokenize(text: str) -> list[str]:
-            return re.findall(r'\w+', text.lower())
-
-        corpus = []
-        paths = []
-        for s in tracked_files:
-            p = Path(s.path)
-            if p.exists() and p.is_file():
-                try:
-                    content = p.read_text(encoding="utf-8", errors="ignore")
-                    corpus.append(tokenize(content))
-                    paths.append(s.path)
-                except Exception:
-                    continue
+        
+        # 1. Get tokenized corpus from cache (handles I/O + regex caching)
+        tracked_paths = [s.path for s in tracked_files]
+        corpus, valid_paths = self._bm25_cache.get_corpus(tracked_paths)
 
         if not corpus:
             return []
 
+        # 2. Memory-based BM25 score calculation
         bm25 = BM25Okapi(corpus)
-        tokenized_query = tokenize(query)
+        tokenized_query = self._bm25_cache.tokenize(query)
         scores = bm25.get_scores(tokenized_query)
         
-        # Rank and filter scores > 0
-        results = []
-        for path, score, tokens in zip(paths, scores, corpus):
+        # 3. Identify top N candidates based on score
+        candidates = []
+        for path, score in zip(valid_paths, scores):
             if score > 0:
-                # Build a snippet around the first matched keyword
-                snippet = ""
+                candidates.append((path, float(score)))
+
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        top_candidates = candidates[:top_n]
+        
+        # 4. Build snippets ONLY for the top candidates (lazy I/O)
+        import re
+        query_words = set(tokenized_query)
+        results = []
+
+        for path, score in top_candidates:
+            snippet = ""
+            try:
                 content = Path(path).read_text(encoding="utf-8", errors="ignore")
-                query_words = set(tokenized_query)
                 matches = [m.start() for m in re.finditer(r'\w+', content) if m.group().lower() in query_words]
                 
                 if matches:
@@ -200,15 +208,16 @@ class SemanticEngine:
                     if end < len(content): snippet = snippet + "..."
                 else:
                     snippet = content[:200].replace("\n", " ").strip() + "..."
+            except Exception:
+                snippet = "[Error reading file]"
 
-                results.append({
-                    "path": path,
-                    "score": float(score),
-                    "snippet": snippet
-                })
+            results.append({
+                "path": path,
+                "score": score,
+                "snippet": snippet
+            })
 
-        results.sort(key=lambda x: x["score"], reverse=True)
-        return results[:top_n]
+        return results
 
     # ------------------------------------------------------------------
     # Graph queries
