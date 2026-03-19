@@ -62,7 +62,7 @@ class Workspace:
             # Migration: convert stored relative paths to absolute
             migrated = False
             new_tracked = {}
-            for path_str, hash_val in self._state["tracked_files"].items():
+            for path_str, hash_val in self._state.get("tracked_files", {}).items():
                 p = Path(path_str)
                 if not p.is_absolute():
                     migrated = True
@@ -72,11 +72,23 @@ class Workspace:
             
             if migrated:
                 self._state["tracked_files"] = new_tracked
+
+            # Ensure watched_dirs exists and is a dict (Phase 17)
+            if "watched_dirs" not in self._state:
+                self._state["watched_dirs"] = {}
+                migrated = True
+            elif isinstance(self._state["watched_dirs"], list):
+                # Migration from previous draft if any
+                self._state["watched_dirs"] = {d: {"ignores": []} for d in self._state["watched_dirs"]}
+                migrated = True
+            
+            if migrated:
                 self._save_state()
         else:
             self._state: dict[str, Any] = {
                 "tracked_files": {},
                 "head_commit_id": None,
+                "watched_dirs": {},
             }
             self._save_state()
 
@@ -112,26 +124,55 @@ class Workspace:
             raise KeyError(f"Commit {commit_id!r} not found.")
         return commit_from_dict(json.loads(path.read_text(encoding="utf-8")))
 
-    def _expand_path(self, path_or_glob: str) -> list[str]:
+    def _is_hidden(self, path: Path) -> bool:
+        """Check if any component of the path starts with a dot."""
+        return any(part.startswith(".") for part in path.parts)
+
+    def _expand_path(self, path_or_glob: str) -> tuple[list[str], int]:
         """Expand a path, directory, or glob pattern to a list of relative file paths.
+        
+        Ignores hidden files and directories (starting with '.').
+
+        Returns:
+            A tuple (list of paths, count of hidden files skipped).
 
         Raises:
             ValueError: if no files match.
         """
         p = Path(path_or_glob)
+        hidden_count = 0
+        all_files = []
 
         if p.is_dir():
-            files = [str(f) for f in p.rglob("*") if f.is_file()]
+            for f in p.rglob("*"):
+                if f.is_file():
+                    # Exclude the AIVC storage directory itself
+                    if str(f).startswith(str(self._root)):
+                        continue
+                    # Check if hidden relative to the watched root or any parent segment
+                    if self._is_hidden(f):
+                        hidden_count += 1
+                    else:
+                        all_files.append(str(f))
         else:
-            files = [str(Path(f)) for f in _glob.glob(path_or_glob, recursive=True)
-                     if Path(f).is_file()]
+            # For glob patterns, we rely on glob module but filter results
+            # The `Path(m)` conversion is important to handle paths correctly across OS
+            # and to use `_is_hidden` which expects a Path object.
+            matches = _glob.glob(path_or_glob, recursive=True)
+            for m in matches:
+                mp = Path(m)
+                if mp.is_file():
+                    if self._is_hidden(mp):
+                        hidden_count += 1
+                    else:
+                        all_files.append(str(mp))
 
-        if not files:
+        if not all_files and hidden_count == 0 and not p.is_dir():
             raise ValueError(
                 f"No files found matching {path_or_glob!r}. "
                 "Did you mean a file, directory, or glob pattern?"
             )
-        return files
+        return all_files, hidden_count
     
     def migrate_index(self) -> None:
         """Ensure all existing JSON commits are in the SQLite index.
@@ -144,19 +185,21 @@ class Workspace:
     # Public API
     # ------------------------------------------------------------------
 
-    def track(self, path: str) -> list[str]:
+    def track(self, path: str) -> dict[str, Any]:
         """Add a file, directory, or glob pattern to tracking.
 
         Args:
             path: A file path, directory path, or glob pattern.
 
         Returns:
-            The list of file paths that were newly added to tracking.
+            A dict with:
+            - "newly_tracked": list of file paths newly added.
+            - "hidden_skipped": count of hidden files ignored.
 
         Raises:
             ValueError: if no matching files are found.
         """
-        files = self._expand_path(path)
+        files, hidden_count = self._expand_path(path)
         newly_tracked = []
         for f in files:
             abs_f = str(Path(f).resolve())
@@ -164,7 +207,37 @@ class Workspace:
                 self._state["tracked_files"][abs_f] = None  # never committed yet
                 newly_tracked.append(abs_f)
         self._save_state()
-        return newly_tracked
+        return {
+            "newly_tracked": newly_tracked,
+            "hidden_skipped": hidden_count
+        }
+
+    def watch(self, dir_path: str, ignores: list[str] | None = None) -> dict[str, Any]:
+        """Add a directory to monitored 'watched_dirs'.
+        
+        Perform an immediate track() on the directory.
+        """
+        p = Path(dir_path).resolve()
+        if not p.is_dir():
+            raise ValueError(f"Path {dir_path!r} is not a directory.")
+        
+        abs_p = str(p)
+        self._state["watched_dirs"][abs_p] = {"ignores": ignores or []}
+        self._save_state()
+        
+        # Immediate sync
+        return self.track(abs_p)
+
+    def unwatch(self, dir_path: str) -> None:
+        """Remove a directory from watched list."""
+        abs_p = str(Path(dir_path).resolve())
+        if abs_p in self._state["watched_dirs"]:
+            del self._state["watched_dirs"][abs_p]
+            self._save_state()
+
+    def get_watched_dirs(self) -> dict[str, dict[str, Any]]:
+        """Return the dictionary of watched directories."""
+        return self._state.get("watched_dirs", {})
 
     def untrack(self, file_path: str) -> None:
         """Remove a file from tracking and garbage-collect its history.

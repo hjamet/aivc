@@ -10,3 +10,5 @@
 | [Phase 2 — Searcher Bi/Cross-Encoder](../src/aivc/semantic/searcher.py) | Pipeline Bi-Encoder → Cross-Encoder, SearchResult | 2026-03-18 | `Up to date` |
 | [Phase 2 — CooccurrenceGraph](../src/aivc/semantic/graph.py) | Graphe bipartite fichiers↔commits, export vis | 2026-03-18 | `Up to date` |
 | [Phase 2 — SemanticEngine](../src/aivc/semantic/engine.py) | Façade orchestrant Workspace + Indexer + Graph + Searcher | 2026-03-18 | `Up to date` |
+| [Phase 17 — Watchdog Daemon](../src/aivc/server.py) | Surveillance temps réel + Sync au démarrage | 2026-03-19 | `Up to date` |
+| [Phase 17 — Watched Dirs Management](../src/aivc/core/workspace.py) | Gestion de l'état `watched_dirs` et filtrage des fichiers cachés | 2026-03-19 | `Up to date` |

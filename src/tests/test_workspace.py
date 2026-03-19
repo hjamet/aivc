@@ -22,26 +22,29 @@ def _write(path: Path, content: bytes) -> Path:
 
 def test_track_single_file(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "src" / "main.py", b"main")
-    newly = ws.track(str(f))
-    assert str(f) in newly
+    result = ws.track(str(f))
+    assert str(f) in result["newly_tracked"]
+    assert result["hidden_skipped"] == 0
 
 
 def test_track_directory_expands_recursively(tmp_path: Path, ws: Workspace) -> None:
     _write(tmp_path / "pkg" / "a.py", b"a")
     _write(tmp_path / "pkg" / "sub" / "b.py", b"b")
-    newly = ws.track(str(tmp_path / "pkg"))
-    assert len(newly) == 2
+    result = ws.track(str(tmp_path / "pkg"))
+    assert len(result["newly_tracked"]) == 2
+    assert result["hidden_skipped"] == 0
 
 
 def test_track_glob_pattern(tmp_path: Path, ws: Workspace) -> None:
     _write(tmp_path / "x.py", b"x")
     _write(tmp_path / "y.py", b"y")
     _write(tmp_path / "z.txt", b"z")
-    newly = ws.track(str(tmp_path / "*.py"))
-    paths = [Path(p).name for p in newly]
+    result = ws.track(str(tmp_path / "*.py"))
+    paths = [Path(p).name for p in result["newly_tracked"]]
     assert "x.py" in paths
     assert "y.py" in paths
     assert "z.txt" not in paths
+    assert result["hidden_skipped"] == 0
 
 
 def test_track_no_match_crashes(tmp_path: Path, ws: Workspace) -> None:
@@ -52,11 +55,64 @@ def test_track_no_match_crashes(tmp_path: Path, ws: Workspace) -> None:
 def test_track_same_file_twice_not_duplicated(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "dup.py", b"content")
     ws.track(str(f))
-    newly_second = ws.track(str(f))
-    assert newly_second == []
+    result_second = ws.track(str(f))
+    assert result_second["newly_tracked"] == []
     # Only one entry in state
     status = ws.get_status()
     assert sum(1 for s in status if s.path == str(f)) == 1
+
+
+def test_track_ignores_hidden_files(tmp_path: Path, ws: Workspace) -> None:
+    _write(tmp_path / "visible.py", b"visible")
+    _write(tmp_path / ".hidden.py", b"hidden")
+    _write(tmp_path / "sub" / ".config", b"hidden_sub")
+    
+    result = ws.track(str(tmp_path))
+    assert len(result["newly_tracked"]) == 1
+    assert Path(result["newly_tracked"][0]).name == "visible.py"
+    assert result["hidden_skipped"] == 2
+
+
+def test_track_ignores_hidden_directories(tmp_path: Path, ws: Workspace) -> None:
+    _write(tmp_path / "app.py", b"app")
+    _write(tmp_path / ".git" / "config", b"git")
+    
+    result = ws.track(str(tmp_path))
+    assert len(result["newly_tracked"]) == 1
+    assert Path(result["newly_tracked"][0]).name == "app.py"
+    assert result["hidden_skipped"] == 1
+
+
+# ---------------------------------------------------------------------------
+# watch() / unwatch()
+# ---------------------------------------------------------------------------
+
+def test_watch_adds_to_state_and_tracks(tmp_path: Path, ws: Workspace) -> None:
+    d = tmp_path / "observed"
+    d.mkdir()
+    _write(d / "init.py", b"init")
+    
+    result = ws.watch(str(d))
+    assert str(d) in ws.get_watched_dirs()
+    assert len(result["newly_tracked"]) == 1
+    assert str(d / "init.py") in result["newly_tracked"]
+
+
+def test_unwatch_removes_from_state(tmp_path: Path, ws: Workspace) -> None:
+    d = tmp_path / "observed"
+    d.mkdir()
+    ws.watch(str(d))
+    assert str(d) in ws.get_watched_dirs()
+    
+    ws.unwatch(str(d))
+    assert str(d) not in ws.get_watched_dirs()
+
+
+def test_watch_with_ignores(tmp_path: Path, ws: Workspace) -> None:
+    d = tmp_path / "observed"
+    d.mkdir()
+    ws.watch(str(d), ignores=["*.tmp"])
+    assert ws.get_watched_dirs()[str(d)]["ignores"] == ["*.tmp"]
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟢 Phase 16 terminée — Fiabilisation BM25 & UX CLI.
+> **État** : 🟢 Phase 17 terminée — Dossiers Surveillés & JIT Watcher.
 
 ### Concept
 
@@ -192,12 +192,15 @@ aivc/
 | **13** | [Recherche BM25 & Optimisation CoreIndex](docs/tasks/phase13_bm25_and_optimisations.md) | Recherche lexicale + Centralisation config ML + Fix perf start | 🟢 Terminé |
 | **14** | [Contexte de Commit](docs/tasks/phase14_commit_context.md) | Affichage du commit Parent/Enfant dans `consult_commit` | 🟢 Terminé |
 | **15** | [Refactoring Performance I/O (CoreIndex)](docs/tasks/phase15_io_refactoring.md) | CoreIndex SQLite autonome, élimination `_all_commits()` | 🟢 Terminé |
+| **16** | [Fiabilisation BM25 & UX CLI](docs/tasks/phase16_fiabilisation_bm25_ux_cli.md) | Cache SQLite BM25, Optimisation extraits, Fallback Storage CLI | 🟢 Terminé |
+| **17** | [Dossiers Surveillés (JIT Watcher)](docs/tasks/phase17_watched_directories.md) | Auto-tracking transparent des nouveaux fichiers dans les dossiers surveillés via JIT. | 🟢 Terminé |
 
 ### Documentation Index
 | Titre (Lien) | Description |
 |--------------|-------------|
 | [Spec Phase 6](docs/tasks/phase6_absolute_paths_fix.md) | Spécification technique pour finaliser l'absolu. |
 | [Spec Phase 7](docs/tasks/phase7_scoped_search.md) | Filtrage sémantique par glob. |
+| [Spec Phase 17](docs/tasks/phase17_watched_directories.md) | Dossiers Surveillés et auto-tracking JIT. |
 | [Spec Phase 8](docs/tasks/phase8_gemini_injection.md) | Injection bonnes pratiques agent dans GEMINI.md. |
 | [Spec Phase 9](docs/tasks/phase9_cli_exposure.md) | Création d'un lien symbolique pour l'accès global à la commande CLI. |
 | [Spec Phase 10](docs/tasks/phase10_search_snippets.md) | Extraits contextuels dans les résultats de recherche sémantique. |
@@ -207,3 +210,4 @@ aivc/
 | [Spec Phase 14](docs/tasks/phase14_commit_context.md) | Graphe chronologique de commits. |
 | [Spec Phase 15](docs/tasks/phase15_io_refactoring.md) | Refactoring performance I/O. |
 | [Spec Phase 16](docs/tasks/phase16_fiabilisation_bm25_ux_cli.md) | Fiabilisation BM25 et UX CLI. |
+| [Spec Phase 17](docs/tasks/phase17_watched_directories.md) | Dossiers Surveillés et auto-tracking JIT. |

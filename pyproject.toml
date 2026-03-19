@@ -19,6 +19,7 @@ semantic = [
     "sentence-transformers>=3.0",
     "mcp>=1.0",
     "rank-bm25>=0.2.0",
+    "watchdog>=4.0.0",
 ]
 all = [
     "pytest>=8.0",
@@ -26,6 +27,7 @@ all = [
     "sentence-transformers>=3.0",
     "mcp>=1.0",
     "rank-bm25>=0.2.0",
+    "watchdog>=4.0.0",
 ]
 
 [tool.setuptools.packages.find]

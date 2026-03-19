@@ -261,9 +261,21 @@ class SemanticEngine:
     # Workspace pass-throughs
     # ------------------------------------------------------------------
 
-    def track(self, path: str) -> list[str]:
+    def track(self, path: str) -> dict[str, Any]:
         """Track a file, directory, or glob. See :meth:`Workspace.track`."""
         return self._workspace.track(path)
+
+    def watch(self, dir_path: str, ignores: list[str] | None = None) -> dict[str, Any]:
+        """Watch a directory for changes. See :meth:`Workspace.watch`."""
+        return self._workspace.watch(dir_path, ignores=ignores)
+
+    def unwatch(self, dir_path: str) -> None:
+        """Unwatch a directory. See :meth:`Workspace.unwatch`."""
+        self._workspace.unwatch(dir_path)
+
+    def get_watched_dirs(self) -> dict[str, dict[str, Any]]:
+        """Get all watched directories. See :meth:`Workspace.get_watched_dirs`."""
+        return self._workspace.get_watched_dirs()
 
     def untrack(self, file_path: str) -> None:
         """Untrack a file and GC its blobs. See :meth:`Workspace.untrack`."""
