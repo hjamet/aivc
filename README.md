@@ -2,7 +2,7 @@
 
 **Serveur MCP de mémoire à long terme pour agents LLM**, inspiré du fonctionnement de la mémoire humaine et de Git.
 
-> **État** : 🟢 Phase 17 terminée — Dossiers Surveillés & JIT Watcher.
+> **État** : 🟢 Phase 18 — Auto-track consulted files + batch track/untrack.
 
 ### Concept
 
@@ -71,8 +71,8 @@ track(path/glob/dir) --> workspace.json
 | `consult_commit`| Lecture | Contenu complet (note Markdown + FileChange) d'un commit spécifique. |
 | `consult_file` | Lecture | Historique AIVC d'un fichier : liste des commits qui l'ont touché. |
 | `get_status` | Lecture | Fichiers suivis avec taille courante et poids de l'historique. |
-| `untrack` | Gestion | ⚠️ DESTRUCTIF — Retire un fichier/dossier et purge son historique (GC). |
-| `track` | Gestion | Ajouter un fichier, glob, ou dossier (active la surveillance automatique) au suivi AIVC. |
+| `untrack` | Gestion | ⚠️ DESTRUCTIF — Retire une **liste** de fichiers/dossiers/globs et purge leur historique (GC). |
+| `track` | Gestion | Ajouter une **liste** de fichiers, globs ou dossiers (active la surveillance automatique) au suivi AIVC. |
 | `read_historical_file` | Lecture | Contenu d'un fichier tel qu'il était lors d'un commit passé. |
 | `search_files_bm25` | Lecture | Recherche lexicale (BM25) dans le contenu actuel des fichiers traqués. |
 
@@ -106,7 +106,7 @@ aivc/
 ├── src/
 │   ├── aivc/
 │   │   ├── __init__.py
-│   │   ├── server.py             # Serveur MCP (Phase 3) — 9 outils FastMCP
+│   │   ├── server.py             # Serveur MCP (Phase 3) — 10 outils FastMCP
 │   │   ├── cli.py                # CLI (aivc status/track/log/search/web)
 │   │   ├── core/
 │   │   │   ├── __init__.py
@@ -154,8 +154,8 @@ aivc/
 | Commande | Description |
 |----------|-------------|
 | `aivc status` | Afficher les fichiers suivis et leur poids |
-| `aivc track <path>` | Ajouter un fichier/dossier/glob au tracking |
-| `aivc untrack <path>` | Retirer un fichier/dossier/glob du tracking (DESTRUCTIF) |
+| `aivc track <path...>` | Ajouter un ou plusieurs fichiers/dossiers/globs au tracking |
+| `aivc untrack <path...>` | Retirer un ou plusieurs fichiers/dossiers/globs du tracking (DESTRUCTIF) |
 | `aivc log [-n N]` | Afficher l'historique des commits |
 | `aivc search <query> [-g GLOB]` | Recherche sémantique dans la mémoire, avec filtre optionnel |
 | `aivc search-files <query>` | Recherche lexicale (BM25) dans les fichiers actuels |

@@ -337,14 +337,21 @@ class TestUntrack(unittest.TestCase):
 
     def test_delegates_and_confirms(self):
         _mock_engine.untrack.return_value = None
-        result = _untrack("src/foo.py")
+        result = _untrack(["src/foo.py"])
         _mock_engine.untrack.assert_called_once_with("src/foo.py")
         self.assertIn("src/foo.py", result)
 
-    def test_key_error_propagates(self):
-        _mock_engine.untrack.side_effect = KeyError("Not tracked")
-        with self.assertRaises(KeyError):
-            _untrack("src/unknown.py")
+    def test_multiple_paths(self):
+        _mock_engine.untrack.return_value = None
+        result = _untrack(["src/a.py", "src/b.py"])
+        self.assertEqual(_mock_engine.untrack.call_count, 2)
+        self.assertIn("2 path(s)", result)
+
+    def test_partial_failure(self):
+        _mock_engine.untrack.side_effect = [None, KeyError("Not tracked")]
+        result = _untrack(["src/ok.py", "src/unknown.py"])
+        self.assertIn("1 path(s)", result)  # 1 success
+        self.assertIn("could not be untracked", result)
 
 
 class TestTrack(unittest.TestCase):
@@ -353,20 +360,27 @@ class TestTrack(unittest.TestCase):
 
     def test_delegates_and_lists_new_files(self):
         _mock_engine.track.return_value = {"newly_tracked": ["/abs/path/foo.py"], "hidden_skipped": 0}
-        result = _track("src/*.py")
+        result = _track(["src/*.py"])
         _mock_engine.track.assert_called_once_with("src/*.py", [])
         self.assertIn("✅ Tracked 1 new file(s)", result)
         self.assertIn("/abs/path/foo.py", result)
 
+    def test_multiple_paths(self):
+        _mock_engine.track.return_value = {"newly_tracked": ["/abs/a.py"], "hidden_skipped": 0}
+        result = _track(["src/a.py", "src/b.py"])
+        self.assertEqual(_mock_engine.track.call_count, 2)
+        self.assertIn("2 new file(s)", result)
+
     def test_already_tracked_returns_message(self):
         _mock_engine.track.return_value = {"newly_tracked": [], "hidden_skipped": 0}
-        result = _track("src/stable.py")
+        result = _track(["src/stable.py"])
         self.assertIn("No new files", result)
 
-    def test_value_error_propagates(self):
-        _mock_engine.track.side_effect = ValueError("No files found")
-        with self.assertRaises(ValueError):
-            _track("nonexistent/*")
+    def test_partial_failure(self):
+        _mock_engine.track.side_effect = [ValueError("No files found"), {"newly_tracked": ["/ok.py"], "hidden_skipped": 0}]
+        result = _track(["nonexistent/*", "real.py"])
+        self.assertIn("1 new file(s)", result)
+        self.assertIn("had issues", result)
 
 
 if __name__ == "__main__":

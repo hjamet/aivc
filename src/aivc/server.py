@@ -54,7 +54,8 @@ and the solutions found. Think of it as a handover memo to your future self.
 Lorsque vous créez un commit, vous pouvez spécifier une liste de `consulted_files`.
 Ce sont des fichiers que vous avez lus et qui vous ont été **véritablement utiles** pour
 accomplir votre tâche (ex: référence technique, exemple de code, documentation interne),
-mais que vous n'avez pas modifiés.
+mais que vous n'avez pas modifiés. Les fichiers non trackés seront auto-trackés s'ils
+existent sur disque ; les fichiers inexistants sont ignorés silencieusement.
 
 **RÈGLE D'OR** : Ne mentionnez QUE les documents contenant des informations que vous ne
 connaissiez pas avant de les avoir lus. N'ajoutez pas de fichiers par "politesse" ou 
@@ -86,14 +87,13 @@ To retrieve memory, follow this two-step funnel:
 | `consult_file` | Get the AIVC history of a specific file (which commits touched it). |
 | `read_historical_file` | Read the content of a file as it was at a specific past commit. |
 | `get_status` | List tracked files with current size and history weight. |
-| `get_status` | List tracked files with current size and history weight. |
-| `untrack` | **⚠️ VERY DESTRUCTIVE** — STOP surveillance and ERASE full history. |
-| `track` | Add files to AIVC tracking. If a directory, starts continuous surveillance. |
+| `untrack` | **⚠️ VERY DESTRUCTIVE** — Accepts a **list** of paths/globs. STOPS surveillance and ERASES full history. |
+| `track` | Accepts a **list** of file paths, directory paths, or glob patterns. Directories start continuous surveillance. |
 | `search_files_bm25` | Lexical search (BM25) over current tracked file contents. |
 
 ## `untrack` Warning
 
-`untrack(path)` is HIGHLY DESTRUCTIVE. Do NOT use it blindly.
+`untrack([paths])` is HIGHLY DESTRUCTIVE. Do NOT use it blindly.
 - If called on a file, it erases the file's entire history and blobs.
 - If called on a directory, it STOPS tracking it, AND PERMANENTLY ERASES THE HISTORY OF ALL FILES INSIDE IT.
 Do NOT use `untrack` without exploring `consult_file` or `search_memory` first to guarantee the files are truly useless.
@@ -474,8 +474,8 @@ def get_status() -> str:
 
 
 @mcp.tool()
-def untrack(path_or_glob: str) -> str:
-    """⚠️ DESTRUCTIVE — Remove a file or directory from AIVC tracking and erase its full history.
+def untrack(path_or_glob: list[str]) -> str:
+    """⚠️ DESTRUCTIVE — Remove files or directories from AIVC tracking and erase their full history.
 
     This operation:
     1. Stops real-time surveillance (if directory).
@@ -489,7 +489,7 @@ def untrack(path_or_glob: str) -> str:
     prior exploration of the file's usage (`consult_file` or `search_memory`).
 
     Args:
-        path_or_glob: The exact path of the file to untrack, or a directory/glob.
+        path_or_glob: A list of exact paths, directories, or glob patterns to untrack.
 
     Returns:
         Confirmation message.
@@ -497,24 +497,40 @@ def untrack(path_or_glob: str) -> str:
     Raises:
         KeyError: If no matching files or watched directories are found.
     """
-    _engine.untrack(path_or_glob)
-    return (
-        f"🗑️  Untracked and history erased for: {path_or_glob}\n"
-        "All associated blobs have been garbage-collected."
-    )
+    errors = []
+    successes = []
+    for p in path_or_glob:
+        try:
+            _engine.untrack(p)
+            successes.append(p)
+        except KeyError as e:
+            errors.append(f"  ⚠️ {p}: {e}")
+
+    lines = []
+    if successes:
+        lines.append(f"🗑️  Untracked and history erased for {len(successes)} path(s):")
+        for s in successes:
+            lines.append(f"  - {s}")
+        lines.append("All associated blobs have been garbage-collected.")
+    if errors:
+        lines.append(f"\n⚠️ {len(errors)} path(s) could not be untracked:")
+        lines.extend(errors)
+    if not successes and not errors:
+        lines.append("Nothing to untrack.")
+    return "\n".join(lines)
 
 
 @mcp.tool()
-def track(path: str, ignores: list[str] = []) -> str:
+def track(path: list[str], ignores: list[str] = []) -> str:
     """Add files to AIVC tracking.
 
-    Accepts a file path, directory path, or glob pattern.
+    Accepts a list of file paths, directory paths, or glob patterns.
     If a directory path is provided, it automatically starts real-time surveillance
     of that directory (any new files created inside will be tracked automatically).
     Hidden files/folders (starting with '.') are always ignored by default.
 
     Args:
-        path: File, directory, or glob pattern to track.
+        path: A list of file paths, directory paths, or glob patterns to track.
         ignores: Optional list of glob patterns to ignore (only applicable if watching a dir).
 
     Returns:
@@ -523,32 +539,44 @@ def track(path: str, ignores: list[str] = []) -> str:
     Raises:
         ValueError: If no files match the given path/pattern.
     """
-    result = _engine.track(path, ignores)
-    newly_tracked = result["newly_tracked"]
-    hidden_skipped = result["hidden_skipped"]
+    all_newly_tracked = []
+    total_hidden_skipped = 0
+    errors = []
+
+    for p in path:
+        try:
+            result = _engine.track(p, ignores)
+            all_newly_tracked.extend(result["newly_tracked"])
+            total_hidden_skipped += result["hidden_skipped"]
+
+            global _observer
+            if _WATCHDOG_AVAILABLE and _observer is not None and Path(p).is_dir():
+                handler = AIVCWatcherHandler(_engine, p)
+                _observer.schedule(handler, p, recursive=True)
+        except ValueError as e:
+            errors.append(f"  ⚠️ {p}: {e}")
 
     lines = []
-    
-    global _observer
-    if _WATCHDOG_AVAILABLE and _observer is not None and Path(path).is_dir():
-        handler = AIVCWatcherHandler(_engine, path)
-        _observer.schedule(handler, path, recursive=True)
-        lines.append(f"🔭 Started continuous surveillance for directory: {path}\n")
 
-    if not newly_tracked:
+    if not all_newly_tracked and not errors:
         msg = "No new files to track (already tracked or no match)."
-        if hidden_skipped > 0:
-            msg += f" ({hidden_skipped} hidden files were ignored)."
+        if total_hidden_skipped > 0:
+            msg += f" ({total_hidden_skipped} hidden files were ignored)."
         lines.append(msg)
         return "\n".join(lines)
 
-    lines.append(f"✅ Tracked {len(newly_tracked)} new file(s):")
-    for f in newly_tracked:
-        lines.append(f"  + {f}")
+    if all_newly_tracked:
+        lines.append(f"✅ Tracked {len(all_newly_tracked)} new file(s):")
+        for f in all_newly_tracked:
+            lines.append(f"  + {f}")
 
-    if hidden_skipped > 0:
-        lines.append(f"\n💡 {hidden_skipped} hidden files/folders were ignored.")
-    
+    if total_hidden_skipped > 0:
+        lines.append(f"\n💡 {total_hidden_skipped} hidden files/folders were ignored.")
+
+    if errors:
+        lines.append(f"\n⚠️ {len(errors)} path(s) had issues:")
+        lines.extend(errors)
+
     lines.append("\n💡 PRO-TIP: Use `untrack` on any useless files (build artifacts, etc.) to keep your memory relevant.")
 
     return "\n".join(lines)
