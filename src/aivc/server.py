@@ -153,8 +153,9 @@ def create_commit(title: str, note: str, consulted_files: list[str] = []) -> str
         title: Short, descriptive title (e.g. "Implemented user auth module").
         note: Detailed Markdown note documenting what was done, why, how, and any
               important context. The more detail, the better the future recall.
-        consulted_files: Optional list of tracked files that were consulted and
+        consulted_files: Optional list of files that were consulted and
                          provided CRUCIAL context for this task, but not modified.
+                         Files not yet tracked will be auto-tracked if they exist.
 
     Returns:
         Confirmation with the commit ID and the list of files that were snapshotted.

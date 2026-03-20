@@ -91,13 +91,32 @@ def test_workspace_create_commit_mixed(tmp_path):
     assert actions[str(file_b.resolve())] == "consulted"
     assert len(commit.changes) == 2
 
-def test_workspace_create_commit_untracked_consulted(tmp_path):
+def test_workspace_create_commit_autotrack_consulted(tmp_path):
+    """Consulted files that exist on disk but aren't tracked should be auto-tracked."""
     ws = Workspace(tmp_path)
     file_a = tmp_path / "a.txt"
     file_a.write_text("hello")
     
-    with pytest.raises(KeyError, match="is not tracked"):
-        ws.create_commit("Fail", "Note", consulted_files=[str(file_a)])
+    # file_a is NOT tracked — create_commit should auto-track it
+    commit = ws.create_commit("AutoTrack", "Note", consulted_files=[str(file_a)])
+    assert len(commit.changes) == 1
+    assert commit.changes[0].action == "consulted"
+    assert commit.changes[0].path == str(file_a.resolve())
+
+
+def test_workspace_create_commit_nonexistent_consulted(tmp_path):
+    """Consulted files that don't exist on disk should be silently skipped."""
+    ws = Workspace(tmp_path)
+    fake_path = tmp_path / "does_not_exist.txt"
+    
+    # Need at least one real change to avoid RuntimeError
+    real_file = tmp_path / "real.txt"
+    real_file.write_text("data")
+    ws.track(str(real_file))
+    
+    commit = ws.create_commit("Skip", "Note", consulted_files=[str(fake_path)])
+    # Only the real file change should be present, no consulted entry for fake_path
+    assert all(c.path != str(fake_path.resolve()) for c in commit.changes)
 
 def test_semantic_engine_graph_updates(tmp_path):
     engine = SemanticEngine(tmp_path)

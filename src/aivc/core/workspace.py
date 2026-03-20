@@ -318,14 +318,15 @@ class Workspace:
             title: Short title for the commit.
             note: Detailed Markdown note (the LLM's 'memory').
             consulted_files: Optional list of file paths that were consulted
-                             but not modified. Must be already tracked.
+                             but not modified. Files that exist on disk but
+                             aren't tracked will be auto-tracked. Non-existent
+                             files are silently skipped.
 
         Returns:
             The newly created Commit.
 
         Raises:
             RuntimeError: if no changes are detected and no files were consulted.
-            KeyError: if a consulted file is not currently tracked.
         """
         changes = compute_diff(self._state["tracked_files"], self._blob_store)
         
@@ -335,7 +336,12 @@ class Workspace:
             for path in consulted_files:
                 abs_path = str(Path(path).resolve())
                 if abs_path not in self._state["tracked_files"]:
-                    raise KeyError(f"Consulted file {path!r} is not tracked.")
+                    # Auto-track consulted files if they exist on disk
+                    if Path(abs_path).is_file():
+                        self._state["tracked_files"][abs_path] = None
+                    else:
+                        # File doesn't exist — skip silently
+                        continue
                 
                 # Check if it was already modified/added/deleted.
                 # If it's already in 'changes', we don't add it as 'consulted'.

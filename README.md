@@ -20,7 +20,9 @@ AIVC transforme les **commits** en souvenirs pour un agent IA. Le système conto
 ```bash
 # Installation rapide (configure automatiquement le serveur MCP)
 curl -fsSL https://raw.githubusercontent.com/hjamet/aivc/main/install.sh | bash
+```
 
+```bash
 # OU installation locale depuis le repo
 bash install.sh
 
