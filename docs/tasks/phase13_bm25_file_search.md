@@ -1,37 +1,37 @@
-# Phase 13 — Recherche BM25 sur Fichiers Traqués
+# Phase 13 — BM25 Search on Tracked Files
 
-## 1. Contexte & Discussion (Narratif)
+## 1. Context & Discussion (Narrative)
 
-Lors de la session d'architecture du 19 mars 2026, l'utilisateur a proposé d'ajouter une recherche **lexicale/keyword** (style BM25) sur le contenu des fichiers traqués. Actuellement, `search_memory` opère sur les notes de commit (sémantique). Il n'existe aucun moyen de chercher dans le contenu des fichiers eux-mêmes.
+During the architecture session on March 19, 2026, the user proposed adding a **lexical/keyword** search (BM25 style) on the content of tracked files. Currently, `search_memory` operates on commit notes (semantic). There is no way to search within the content of the files themselves.
 
-### Décisions techniques
+### Technical decisions
 
-- **Bibliothèque** : `bm25s` — pure Python, ultra-léger (~50KB), pas de modèle ML.
-- **Scope** : Uniquement la **version courante** des fichiers traqués (pas l'historique).
-- **Indexation incrémentale** : À chaque `create_commit`, seuls les fichiers du commit sont ré-indexés (pas un full rebuild).
-- **Fichiers binaires** : Exclus du contenu indexé, **mais leur titre (nom de fichier) est indexé**.
-- **Glob optionnel** : L'outil accepte un filtre glob facultatif pour restreindre la recherche à des dossiers/extensions spécifiques (ex: `*.py`, `docs/**/*.md`).
+- **Library**: `bm25s` — pure Python, ultra-lightweight (~50KB), no ML model.
+- **Scope**: Only the **current version** of tracked files (not history).
+- **Incremental indexing**: At each `create_commit`, only the files in the commit are re-indexed (not a full rebuild).
+- **Binary files**: Excluded from indexed content, **but their title (filename) is indexed**.
+- **Optional Glob**: The tool accepts an optional glob filter to restrict the search to specific folders/extensions (e.g., `*.py`, `docs/**/*.md`).
 
-### Nom de l'outil
+### Tool name
 
-`search_files(query, glob?)` — clairement distingué de `search_memory` (notes de commit).
+`search_files(query, glob?)` — clearly distinguished from `search_memory` (commit notes).
 
-## 2. Fichiers Concernés
+## 2. Concerned Files
 
-- `src/aivc/search/bm25_index.py` (NOUVEAU) — Moteur BM25 (index, tokenization, recherche)
-- `src/aivc/semantic/engine.py` — Intégration de l'indexeur BM25
-- `src/aivc/server.py` — Nouvel outil MCP `search_files`
-- `src/aivc/server.py` — Mise à jour du `_SYSTEM_PROMPT`
-- `src/aivc/cli.py` — Éventuellement une commande CLI `aivc search-files`
-- `src/tests/test_bm25_index.py` (NOUVEAU) — Tests unitaires
-- `pyproject.toml` — Ajout de la dépendance `bm25s`
+- `src/aivc/search/bm25_index.py` (NEW) — BM25 engine (index, tokenization, search)
+- `src/aivc/semantic/engine.py` — Integration of the BM25 indexer
+- `src/aivc/server.py` — New `search_files` MCP tool
+- `src/aivc/server.py` — Update of `_SYSTEM_PROMPT`
+- `src/aivc/cli.py` — Eventually a CLI command `aivc search-files`
+- `src/tests/test_bm25_index.py` (NEW) — Unit tests
+- `pyproject.toml` — Addition of the `bm25s` dependency
 
-## 3. Objectifs (Definition of Done)
+## 3. Objectives (Definition of Done)
 
-* Un index BM25 est maintenu sur le contenu textuel (UTF-8) des fichiers traqués.
-* L'index est mis à jour incrémentalement à chaque `create_commit` (seuls les fichiers du commit).
-* Les fichiers non-UTF-8 sont exclus du contenu indexé mais leur nom de fichier reste recherchable.
-* L'outil MCP `search_files(query, glob?)` retourne les fichiers les plus pertinents avec un score de relevance.
-* Le filtre glob optionnel permet de restreindre la recherche (dossiers, extensions).
-* La recherche est rapide (O(ms)) et le footprint mémoire est minimal.
-* Le prompt système documente l'outil et sa distinction avec `search_memory`.
+* A BM25 index is maintained on the textual content (UTF-8) of tracked files.
+* The index is updated incrementally at each `create_commit` (only the files in the commit).
+* Non-UTF-8 files are excluded from indexed content but their filename remains searchable.
+* The `search_files(query, glob?)` MCP tool returns the most relevant files with a relevance score.
+* The optional glob filter allows restricting the search (folders, extensions).
+* Search is fast (O(ms)) and memory footprint is minimal.
+* The system prompt documents the tool and its distinction from `search_memory`.

@@ -1,29 +1,29 @@
-# Phase 16 — Fiabilisation BM25 & UX CLI
+# Phase 16 — BM25 Reliability & CLI UX
 
-## 1. Contexte & Discussion (Narratif)
+## 1. Context & Discussion (Narrative)
 
-> *Suite aux retours post-déploiement de la Phase 13.*
+> *Following Phase 13 post-deployment feedback.*
 
-Lors de la revue architecturale de la Phase 13, deux dettes techniques critiques ont été identifiées :
-1. **Performance BM25** : L'implémentation de `search_files_bm25` lit et tokenise tous les fichiers traqués depuis le disque à chaque appel. Sur un grand dépôt, les I/O et la tokenisation répétée ralentissent considérablement la recherche.
-2. **UX CLI** : Lorsqu'un humain utilise le CLI (ex: `aivc status`) sans que la variable `AIVC_STORAGE_ROOT` ne soit définie dans son prompt (contrairement à l'environnement MCP), l'application crash brutalement au lieu d'utiliser le répertoire par défaut.
+During the architectural review of Phase 13, two critical technical debts were identified:
+1. **BM25 Performance**: The implementation of `search_files_bm25` reads and tokenizes every tracked file from disk at each call. On a large repository, the repeated I/O and tokenization considerably slow down the search.
+2. **CLI UX**: When a human uses the CLI (e.g., `aivc status`) without the `AIVC_STORAGE_ROOT` variable defined in their environment (unlike the MCP environment), the application crashes brutally instead of using the default directory.
 
-Cette phase vise à pérenniser l'outil de recherche lexicale pour qu'il soit instantané sur des milliers de fichiers, et à rendre le CLI agréable d'utilisation "out of the box".
+This phase aims to ensure the lexical search tool is instantaneous over thousands of files and to make the CLI pleasant to use "out of the box."
 
-## 2. Fichiers Concernés
+## 2. Concerned Files
 
 - `src/aivc/cli.py`
 - `src/aivc/semantic/engine.py`
-- `src/aivc/search/bm25_index.py` (NOUVEAU)
+- `src/aivc/search/bm25_index.py` (NEW)
 - `src/tests/test_cli.py`
-- `src/tests/test_engine.py` (ou `test_bm25.py`)
+- `src/tests/test_engine.py` (or `test_bm25.py`)
 - `README.md`
-- `docs/index_architecture.md` (ou similaire, à mettre à jour)
+- `docs/index_architecture.md` (or similar, to be updated)
 
-## 3. Objectifs (Definition of Done)
+## 3. Objectives (Definition of Done)
 
-* **UX CLI fluide** : Le CLI utilise le fallback par défaut (`~/.aivc/storage`) si la variable d'environnement `AIVC_STORAGE_ROOT` n'est pas définie. L'utilisateur n'a plus besoin d'éditer son `.bashrc`.
-* **Cache de Tokenisation BM25** : Les opérations lourdes (lecture disque et tokenisation regex) sont mises en cache. Un index SQLite (ex: `bm25_cache.db`) stocke les tokens de chaque fichier avec son `mtime` ou sa taille.
-* **Mise à jour incrémentale** : Lors d'une recherche BM25, seuls les fichiers dont le `mtime` ou la taille a changé depuis la dernière mise en cache sont relus et re-tokenisés.
-* **Performance** : La recherche BM25 `search_files_bm25` répond en moins de 100ms sur un corpus en cache.
-* **Compatibilité** : On conserve la librairie `rank_bm25` actuelle, le gain de performance provenant de l'élimination des I/O inutiles.
+* **Smooth CLI UX**: The CLI uses the default fallback (`~/.aivc/storage`) if the `AIVC_STORAGE_ROOT` environment variable is not defined. The user no longer needs to edit their `.bashrc`.
+* **BM25 Tokenization Cache**: Heavy operations (disk reading and regex tokenization) are cached. A SQLite index (e.g., `bm25_cache.db`) stores the tokens of each file with its `mtime` or size.
+* **Incremental Update**: During a BM25 search, only files whose `mtime` or size has changed since the last caching are reread and re-tokenized.
+* **Performance**: The `search_files_bm25` search responds in less than 100ms on a cached corpus.
+* **Compatibility**: The current `rank_bm25` library is kept, with the performance gain coming from the elimination of unnecessary I/O.

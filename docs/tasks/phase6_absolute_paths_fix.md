@@ -1,18 +1,18 @@
-# Phase 6 : Consolidation des Chemins Absolus & CLI
+# Phase 6: Absolute Paths Consolidation & CLI
 
-## 1. Contexte & Discussion (Narratif)
-Lors du crash test du MVP par l'Architecte, deux problèmes ont été levés : 
-- L'apparition de chemins WSL `/mnt/c/...` bloquants.
-- Les anciens commits (Phases 1-4) stockaient des chemins relatifs, ce qui brise la fonctionnalité `read_historical_file` depuis le passage aux chemins absolus (Phase 5).
+## 1. Context & Discussion (Narrative)
+During the Architect's MVP crash test, two issues were raised: 
+- The appearance of blocking WSL `/mnt/c/...` paths.
+- Early commits (Phases 1-4) stored relative paths, which breaks the `read_historical_file` functionality since the move to absolute paths (Phase 5).
 
-Après discussion, l'utilisateur a confirmé vouloir conserver l'architecture basée sur les **chemins absolus**. L'objectif est donc d'assainir la base de données AIVC pour que l'historique complet soit 100% absolu, et d'ajouter une fonctionnalité manquante (`track`) à la CLI.
+After discussion, the user confirmed wanting to stick with the **absolute paths** architecture. The goal is therefore to sanitize the AIVC database so the entire history is 100% absolute, and to add a missing feature (`track`) to the CLI.
 
-## 2. Fichiers Concernés
+## 2. Concerned Files
 - `.aivc/storage/commits/*.json` (Migration)
-- `src/aivc/cli.py` (Ajout de commande)
+- `src/aivc/cli.py` (Command addition)
 
-## 3. Objectifs (Definition of Done)
-* Rédiger et exécuter un script de migration qui convertit rétroactivement tous les chemins relatifs des vieux commits en chemins absolus (en se basant sur la racine du projet actuel).
-* Nettoyer les traces de `/mnt/c/` restantes si nécessaire.
-* Vérifier que `consult_file` et `read_historical_file` parviennent à relire un fichier du tout premier commit.
-* Implémenter la commande `aivc track <path>` pour que l'utilisateur n'ait pas à passer par du code Python pour indexer un nouveau fichier.
+## 3. Objectives (Definition of Done)
+* Write and execute a migration script that retroactively converts all relative paths from old commits into absolute paths (based on the current project root).
+* Clean up any remaining `/mnt/c/` traces if necessary.
+* Verify that `consult_file` and `read_historical_file` successfully read a file from the very first commit.
+* Implement the `aivc track <path>` command so the user doesn't have to use Python code to index a new file.

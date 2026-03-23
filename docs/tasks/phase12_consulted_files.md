@@ -1,48 +1,48 @@
-# Phase 12 — Fichiers "Consultés" dans les Commits
+# Phase 12 — "Consulted" Files in Commits
 
-## 1. Contexte & Discussion (Narratif)
+## 1. Context & Discussion (Narrative)
 
-Lors de la session d'architecture du 19 mars 2026, l'utilisateur a proposé d'enrichir le modèle de données des commits pour permettre à l'agent d'associer des fichiers **non modifiés** à un commit, en mode "consultation".
+During the architecture session on March 19, 2026, the user proposed enriching the commit data model to allow the agent to associate **unmodified** files with a commit, in "consultation" mode.
 
-L'idée : quand un agent travaille sur une tâche, il consulte souvent des fichiers de référence sans les modifier. Ces fichiers fournissent du contexte crucial mais ne sont pas enregistrés dans le commit. Résultat : le graphe de co-occurrence perd de l'information et les requêtes `get_related_files` sont moins pertinentes.
+The idea: when an agent works on a task, it often consults reference files without modifying them. These files provide crucial context but are not recorded in the commit. As a result, the co-occurrence graph loses information, and `get_related_files` queries become less relevant.
 
-### Insistance de l'utilisateur
+### User emphasis
 
-L'utilisateur a **fortement insisté** sur la qualité de la documentation de ce paramètre dans le prompt système. Le modèle doit comprendre qu'il ne doit mentionner **que les documents qui lui ont été VÉRITABLEMENT utiles** — pas une utilité de surface, mais des documents contenant des informations que l'agent **ne connaissait pas avant de les avoir lus**.
+The user **strongly insisted** on the quality of the documentation for this parameter in the system prompt. The model must understand that it should mention **only those documents that were TRULY useful** — not surface-level utility, but documents containing information that the agent **did not know before reading them**.
 
-### Décisions techniques
+### Technical decisions
 
-- Les fichiers consultés ont l'action `consulted` dans `FileChange`.
-- **Aucun blob** n'est stocké (pas de snapshot du contenu).
-- **Aucun refcount** n'est modifié.
-- Le graphe de co-occurrence enregistre normalement les edges fichier↔commit.
-- Les fichiers consultés **doivent être traqués** pour être mentionnés.
-- Le paramètre `consulted_files` de `create_commit` est optionnel (liste vide par défaut).
+- Consulted files have the `consulted` action in `FileChange`.
+- **No blobs** are stored (no snapshot of the content).
+- **No refcount** is modified.
+- The co-occurrence graph regularly records file↔commit edges.
+- Consulted files **must be tracked** to be mentioned.
+- The `consulted_files` parameter in `create_commit` is optional (empty list by default).
 
-## 2. Fichiers Concernés
+## 2. Concerned Files
 
-- `src/aivc/core/commit.py` — Ajouter `consulted` aux actions valides de `FileChange`
-- `src/aivc/core/workspace.py` — Accepter `consulted_files` dans `create_commit()`
-- `src/aivc/semantic/engine.py` — Pass-through du paramètre
-- `src/aivc/server.py` — Ajouter le paramètre à l'outil MCP `create_commit`
-- `src/aivc/server.py` — Mise à jour du `_SYSTEM_PROMPT` pour documenter le comportement
-- `src/aivc/cli.py` — Centralisation de la configuration (bonus)
-- `src/aivc/web/dashboard.py` — Centralisation de la configuration (bonus)
-- `src/tests/test_commit.py` — Tests de la nouvelle action
-- `src/tests/test_workspace.py` — Tests de `create_commit` avec fichiers consultés
+- `src/aivc/core/commit.py` — Add `consulted` to valid `FileChange` actions
+- `src/aivc/core/workspace.py` — Accept `consulted_files` in `create_commit()`
+- `src/aivc/semantic/engine.py` — Parameter pass-through
+- `src/aivc/server.py` — Add the parameter to the `create_commit` MCP tool
+- `src/aivc/server.py` — Update of `_SYSTEM_PROMPT` to document behavior
+- `src/aivc/cli.py` — Configuration centralization (bonus)
+- `src/aivc/web/dashboard.py` — Configuration centralization (bonus)
+- `src/tests/test_commit.py` — Tests of the new action
+- `src/tests/test_workspace.py` — Tests of `create_commit` with consulted files
 
-## 3. Objectifs (Definition of Done)
+## 3. Objectives (Definition of Done)
 
-* `FileChange` accepte `action="consulted"` avec `blob_hash=None`, `bytes_added=0`, `bytes_removed=0`.
-* `create_commit(title, note, consulted_files=[...])` ajoute les fichiers consultés comme `FileChange(action="consulted")`.
-* Les fichiers consultés apparaissent dans le graphe de co-occurrence (edges fichier↔commit).
-* Aucun blob n'est stocké pour les fichiers consultés.
-* Le prompt système du serveur MCP documente clairement le comportement attendu : ne mentionner QUE les documents véritablement utiles, contenant des informations inconnues avant consultation.
-* Les fichiers consultés s'affichent distinctement dans `consult_commit` (ex: `[consulted]` vs `[modified]`).
-* La sérialisation/désérialisation (`commit_to_dict`/`commit_from_dict`) supporte la nouvelle action.
+* `FileChange` accepts `action="consulted"` with `blob_hash=None`, `bytes_added=0`, `bytes_removed=0`.
+* `create_commit(title, note, consulted_files=[...])` adds consulted files as `FileChange(action="consulted")`.
+* Consulted files appear in the co-occurrence graph (file↔commit edges).
+* No blobs are stored for consulted files.
+* The MCP server's system prompt clearly documents the expected behavior: mention ONLY truly useful documents, containing unknown information before consultation.
+* Consulted files are displayed distinctly in `consult_commit` (e.g., `[consulted]` vs `[modified]`).
+* Serialization/deserialization (`commit_to_dict`/`commit_from_dict`) supports the new action.
 
-### Bonus : Centralisation de la Configuration
+### Bonus: Configuration Centralization
 
-* La variable d'environnement `AIVC_STORAGE_ROOT` est chargée et validée à UN SEUL endroit (nouveau fichier `src/aivc/config.py` ou mécanisme équivalent).
-* `server.py`, `cli.py` et `dashboard.py` utilisent ce point d'entrée unique au lieu de chacun lire `os.environ` indépendamment.
-* Aucune régression sur les tests existants.
+* The `AIVC_STORAGE_ROOT` environment variable is loaded and validated in ONLY ONE place (new `src/aivc/config.py` file or equivalent mechanism).
+* `server.py`, `cli.py`, and `dashboard.py` use this single entry point instead of each reading `os.environ` independently.
+* No regressions on existing tests.

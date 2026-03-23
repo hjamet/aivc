@@ -1,21 +1,21 @@
-# Index Tâches (Roadmap)
+# Tasks Index (Roadmap)
 
-| Titre de la note | Courte Description | Dernière modif | Tag |
+| Note Title | Short Description | Last modified | Tag |
 |------------------|-------------------|----------------|-----|
-| [Phase 1 : Moteur de Versioning](tasks/phase1_versioning_engine.md) | Blobs SHA-256, Commits, Diff, Workspace | 2026-03-18 | `Up to date` |
-| [Phase 2 : Moteur Sémantique](tasks/phase2_semantic_graph.md) | ChromaDB, Indexation commits, Agrégation, Graphe | 2026-03-18 | `Up to date` |
-| [Phase 3 : Interface MCP](tasks/phase3_mcp_interface.md) | Serveur MCP, Outils exposés, Prompts | 2026-03-18 | `Up to date` |
-| [Phase 4 : CLI & Web Dashboard](tasks/phase4_cli_and_dashboard.md) | Outils CLI Humain, Graphe interactif UI, Recherche sémantique visuelle | 2026-03-18 | `Up to date` |
-| [Phase 5 : Stabilisation MVP](tasks/phase5_stabilization.md) | Chemins absolus, autodiscovery port, vendoring Cytoscape | 2026-03-18 | `Up to date` |
-| [Phase 6 : Consolidation Absolue & CLI](tasks/phase6_absolute_paths_fix.md) | Migration historique absolu, ajout `aivc track` | 2026-03-18 | `Up to date` |
-| [Phase 7 : Scoped Semantic Search](tasks/phase7_scoped_search.md) | Filtrage par glob dans `search_memory` | 2026-03-18 | `Up to date` |
-| [Phase 8 : Injection GEMINI.md](tasks/phase8_gemini_injection.md) | Bonnes pratiques agent injectées via `install.sh` | 2026-03-18 | `Up to date` |
-| [Phase 9 : Exposition CLI](tasks/phase9_cli_exposure.md) | Symlink `~/.local/bin/aivc` | 2026-03-18 | `Up to date` |
-| [Phase 10 : Search Result Snippets](tasks/phase10_search_snippets.md) | Extraits contextuels dans `search_memory` | 2026-03-19 | `Up to date` |
-| [Phase 11 : Track MCP Tool](tasks/phase11_track_mcp_tool.md) | Exposition de l'outil `track` dans le serveur MCP | 2026-03-19 | `Up to date` |
-| [Phase 12 : Fichiers Consultés](tasks/phase12_consulted_files.md) | Action `consulted` dans les commits, enrichissement du graphe | 2026-03-19 | `Up to date` |
-| [Phase 13 : Recherche BM25 Fichiers](tasks/phase13_bm25_file_search.md) | Recherche lexicale BM25 sur le contenu des fichiers traqués | 2026-03-19 | `Up to date` |
-| [Phase 14 : Contexte de Commit](tasks/phase14_commit_context.md) | Titre et ID Prev/Next dans le retour de `consult_commit` | 2026-03-19 | `Up to date` |
-| [Phase 15 : Refactoring Performance I/O (CoreIndex)](tasks/phase15_io_refactoring.md) | CoreIndex SQLite autonome dans `core/`, élimination de `_all_commits()` | 2026-03-19 | `Up to date` |
-| [Phase 16 : Fiabilisation BM25 & UX CLI](tasks/phase16_fiabilisation_bm25_ux_cli.md) | Cache SQLite BM25, Fallback Storage CLI | 2026-03-19 | `Up to date` |
-| [Phase 17 : Dossiers Surveillés (JIT Watcher)](tasks/phase17_watched_directories.md) | Auto-discovery et auto-tracking JIT sur les dossiers observés | 2026-03-19 | `Up to date` |
+| [Phase 1: Versioning Engine](tasks/phase1_versioning_engine.md) | SHA-256 Blobs, Commits, Diff, Workspace | 2026-03-18 | `Up to date` |
+| [Phase 2: Semantic Engine](tasks/phase2_semantic_graph.md) | ChromaDB, Commit indexing, Aggregation, Graph | 2026-03-18 | `Up to date` |
+| [Phase 3: MCP Interface](tasks/phase3_mcp_interface.md) | MCP Server, Exposed Tools, Prompts | 2026-03-18 | `Up to date` |
+| [Phase 4: CLI & Web Dashboard](tasks/phase4_cli_and_dashboard.md) | Human CLI Tools, interactive UI Graph, Visual semantic search | 2026-03-18 | `Up to date` |
+| [Phase 5: MVP Stabilization](tasks/phase5_stabilization.md) | Absolute paths, port autodiscovery, Cytoscape vendoring | 2026-03-18 | `Up to date` |
+| [Phase 6: Absolute Consolidation & CLI](tasks/phase6_absolute_paths_fix.md) | Absolute history migration, `aivc track` addition | 2026-03-18 | `Up to date` |
+| [Phase 7: Scoped Semantic Search](tasks/phase7_scoped_search.md) | Glob filtering in `search_memory` | 2026-03-18 | `Up to date` |
+| [Phase 8: GEMINI.md Injection](tasks/phase8_gemini_injection.md) | Agent best practices injected via `install.sh` | 2026-03-18 | `Up to date` |
+| [Phase 9: CLI Exposure](tasks/phase9_cli_exposure.md) | `~/.local/bin/aivc` Symlink | 2026-03-18 | `Up to date` |
+| [Phase 10: Search Result Snippets](tasks/phase10_search_snippets.md) | Contextual snippets in `search_memory` | 2026-03-19 | `Up to date` |
+| [Phase 11: Track MCP Tool](tasks/phase11_track_mcp_tool.md) | `track` tool exposure in the MCP server | 2026-03-19 | `Up to date` |
+| [Phase 12: Consulted Files](tasks/phase12_consulted_files.md) | `consulted` action in commits, graph enrichment | 2026-03-19 | `Up to date` |
+| [Phase 13: BM25 File Search](tasks/phase13_bm25_file_search.md) | BM25 lexical search on tracked files content | 2026-03-19 | `Up to date` |
+| [Phase 14: Commit Context](tasks/phase14_commit_context.md) | Prev/Next Title and ID in `consult_commit` return | 2026-03-19 | `Up to date` |
+| [Phase 15: I/O Performance Refactoring (CoreIndex)](tasks/phase15_io_refactoring.md) | Standalone SQLite CoreIndex in `core/`, `_all_commits()` elimination | 2026-03-19 | `Up to date` |
+| [Phase 16: BM25 Reliability & CLI UX](tasks/phase16_fiabilisation_bm25_ux_cli.md) | SQLite BM25 cache, CLI Storage Fallback | 2026-03-19 | `Up to date` |
+| [Phase 17: Watched Directories (JIT Watcher)](tasks/phase17_watched_directories.md) | JIT auto-discovery and auto-tracking on observed directories | 2026-03-19 | `Up to date` |

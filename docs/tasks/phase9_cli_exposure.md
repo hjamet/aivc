@@ -1,16 +1,16 @@
-# Phase 9 — Exposition globale de la CLI
+# Phase 9 — Global CLI Exposure
 
-## 1. Contexte & Discussion (Narratif)
-> L'utilisateur ne parvenait pas à exécuter la commande `aivc web` après l'installation (`command not found`).
-- L'analyse asynchrone via le rôle Architect a révélé que les scripts `install.sh` et `install_dev.sh` installaient correctement le paquet dans un environnement virtuel isolé via `uv`, mais que le dossier `bin` du venv n'était pas exposé globalement dans le `$PATH` de l'utilisateur.
-- La décision architecturale approuvée a été de rajouter une étape de création de lien symbolique (`symlink`) vers le chemin `~/.local/bin/aivc` en fin d'installation, pour que la CLI redescende sans effort d'incorporation.
+## 1. Context & Discussion (Narrative)
+> The user was unable to run the `aivc web` command after installation (`command not found`).
+- Asynchronous analysis via the Architect role revealed that the `install.sh` and `install_dev.sh` scripts correctly installed the package in an isolated virtual environment via `uv`, but the venv's `bin` folder was not globally exposed in the user's `$PATH`.
+- The approved architectural decision was to add a symbolic link (`symlink`) creation step to the `~/.local/bin/aivc` path at the end of installation, so the CLI is easily accessible without further effort.
 
-## 2. Fichiers Concernés
+## 2. Concerned Files
 - `install.sh`
 - `install_dev.sh`
 - `README.md`
 
-## 3. Objectifs (Definition of Done)
-- À la fin des scripts d'installation, un lien symbolique `~/.local/bin/aivc` doit repointer vers l'exécutable `aivc` natif localisé dans le venv respectif (prod ou dev).
-- Rétro-compatibilité assurée (mkdir -p de `~/.local/bin` si non existant).
-- Le `README.md` est mis à jour (Section Roadmap & Index).
+## 3. Objectives (Definition of Done)
+- At the end of the installation scripts, a `~/.local/bin/aivc` symbolic link must point back to the native `aivc` executable located in the respective venv (prod or dev).
+- Backward compatibility ensured (`mkdir -p` of `~/.local/bin` if non-existent).
+- `README.md` is updated (Roadmap & Index section).

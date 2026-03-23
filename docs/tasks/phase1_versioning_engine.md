@@ -1,37 +1,37 @@
-# Phase 1 : Moteur de Versioning Interne (Core)
+# Phase 1: Internal Versioning Engine (Core)
 
-## 1. Contexte & Discussion (Narratif)
+## 1. Context & Discussion (Narrative)
 
-> Le moteur de versioning interne est la **fondation absolue** du projet AIVC.
+> The internal versioning engine is the **absolute foundation** of the AIVC project.
 >
-> Le stockage est adressable par contenu (SHA-256), à l'image de Git.
-> Les blobs sont immuables, ce qui donne une déduplication native.
-> Un fichier X modifié 10 fois créera au maximum 10 blobs s'il change à chaque fois.
+> Storage is content-addressable (SHA-256), similar to Git.
+> Blobs are immutable, providing native deduplication.
+> A file X modified 10 times will create at most 10 blobs if it changes every time.
 >
-> **La consigne de l'Architecte (Garbage Collection)** :
-> L'utilisateur a demandé que l'action `untrack` supprime également tout l'historique d'un fichier
-> pour libérer de l'espace.
-> Attention danger : Puisque les blobs sont dédupliqués, un fichier `A` et un fichier `B`
-> peuvent partager un même blob. Si on `untrack` A et qu'on supprime bêtement ses blobs, 
-> on corrompt l'historique de B !
-> Il FAUT implémenter un système de **Reference Counting (GC)**. Les blobs ne sont physiquement 
-> supprimés du disque que lorsque plus aucun fichier/commit ne les référence.
+> **Architect's Instruction (Garbage Collection)**:
+> The user requested that the `untrack` action also delete a file's entire history
+> to free up space.
+> Danger warning: Since blobs are deduplicated, a file `A` and a file `B`
+> can share the same blob. If we `untrack` A and blindly delete its blobs, 
+> we corrupt B's history!
+> It is NECESSARY to implement a **Reference Counting (GC)** system. Blobs are only 
+> physically deleted from the disk when no more files/commits reference them.
 
-## 2. Fichiers Concernés
+## 2. Concerned Files
 
-- `src/aivc/core/blob_store.py` — Stockage (SHA-256 blobs) avec Refcounter / GC
-- `src/aivc/core/commit.py` — Données commit (Titre court + Markdown détaillé)
-- `src/aivc/core/diff.py` — Détection des fichiers modifiés
-- `src/aivc/core/workspace.py` — Gestion de l'espace de tracking et des tailles d'historique
+- `src/aivc/core/blob_store.py` — Storage (SHA-256 blobs) with Refcounter / GC
+- `src/aivc/core/commit.py` — Commit data (Short title + Detailed Markdown)
+- `src/aivc/core/diff.py` — Modified file detection
+- `src/aivc/core/workspace.py` — Tracking space and history size management
 - `src/tests/*`
 
-## 3. Objectifs (Definition of Done)
+## 3. Objectives (Definition of Done)
 
-* Le système peut stocker des blobs immuables (SHA-256).
-* Le système crée des commits avec **Titre** et **Note Markdown détaillée**.
-* Implémentation de la logique de **Garbage Collection (Refcount)** : la suppression de l'historique d'un fichier lors d'un `untrack` ne doit corrompre aucun autre fichier.
-* La méthode `get_status` du workspace doit calculer et exposer :
-  - La liste des fichiers surveillés
-  - La taille de chaque fichier sur le disque actuel
-  - **La taille de l'historique (blobs exclusifs + partagés)** consommé par ce fichier.
-* **Aucun fallback** : toute erreur doit crasher proprement avec un message explicite.
+* The system can store immutable blobs (SHA-256).
+* The system creates commits with a **Title** and a **Detailed Markdown Note**.
+* Implementation of **Garbage Collection (Refcount)** logic: deleting a file's history during an `untrack` must not corrupt any other file.
+* The workspace's `get_status` method must compute and expose:
+  - The list of watched files
+  - The size of each file on the current disk
+  - **The history size (exclusive + shared blobs)** consumed by this file.
+* **No fallback**: any error must crash cleanly with an explicit message.

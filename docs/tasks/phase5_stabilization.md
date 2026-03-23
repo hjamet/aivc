@@ -1,18 +1,18 @@
-# Phase 5 : Stabilisation et Résolution de Bugs (MVP)
+# Phase 5: Stabilization and Bug Fixing (MVP)
 
-## 1. Contexte & Discussion (Narratif)
-> Suite aux tests exhaustifs du serveur MCP et du Dashboard Web, nous avons identifié plusieurs bugs critiques qui empêchaient une utilisation fluide, notamment dans des contextes d'agents comme Cursor ou Claude Desktop. L'un des problèmes majeurs était que l'agent perdait la trace des fichiers (affichés comme "missing" par `get_status`) à cause d'un conflit de répertoire courant (CWD). De plus, l'interface web chargeait indéfiniment lorsque les CDN de Cytoscape n'étaient pas joignables. L'objectif de cette phase est de corriger ces défauts de conception pour rendre AIVC robuste, autonome (zéro dépendance CDN externe) et résilient aux environnements de lancement aléatoires.
+## 1. Context & Discussion (Narrative)
+> Following exhaustive tests of the MCP server and the Web Dashboard, we identified several critical bugs preventing smooth usage, particularly in agent contexts like Cursor or Claude Desktop. One major issue was that the agent lost track of files (shown as "missing" by `get_status`) due to current working directory (CWD) conflicts. Furthermore, the web interface loaded indefinitely when Cytoscape CDNs were unreachable. This phase aims to correct these design flaws to make AIVC robust, autonomous (zero external CDN dependencies), and resilient to unpredictable launch environments.
 
-## 2. Fichiers Concernés
+## 2. Concerned Files
 - `src/aivc/core/workspace.py`
 - `src/aivc/cli.py`
 - `src/aivc/web/dashboard.py`
 - `src/aivc/web/static/index.html`
-- `src/aivc/web/static/vendor/` (nouveau dossier)
+- `src/aivc/web/static/vendor/` (new folder)
 
-## 3. Objectifs (Definition of Done)
-- Un fichier nouvellement traqué l'est via son chemin absolu (résolu lors de l'appel à `track()`). La vue status fonctionne indépendamment du répertoire depuis lequel l'agent ou le CLI est lancé.
-- Le Dashboard Web inclut les fichiers `cytoscape.min.js` et `cytoscape-fcose.js` localement dans le dossier `static/vendor`. Il n'y a plus aucun appel réseau externe dans le JS.
-- En cas de conflit réseau (le port 8765 étant souvent utilisé, par ex. par `semcp`), le serveur web itère automatiquement sur les ports suivants (+1) jusqu'à trouver un port disponible.
-- Les appels HTTP `HEAD` sur les endpoints `/api/*` ne retournent plus de `404` mais un statut `200` sans `body`.
-- L'ensemble des tests unitaires passe toujours sans erreur (et les tests existants sur `workspace.py` gèrent correctement la mutation de nom de chemin si nécessaire).
+## 3. Objectives (Definition of Done)
+- Newly tracked files are handled via their absolute path (resolved during `track()` call). The status view works independently of the directory from which the agent or CLI is launched.
+- The Web Dashboard includes `cytoscape.min.js` and `cytoscape-fcose.js` files locally in the `static/vendor` folder. There are no more external network calls in the JS.
+- In case of network conflict (port 8765 often being used, e.g., by `semcp`), the web server automatically iterates through the next ports (+1) until an available port is found.
+- HTTP `HEAD` calls on `/api/*` endpoints no longer return a `404` but a `200` status without a `body`.
+- All unit tests still pass without error (and existing tests on `workspace.py` correctly handle path name mutations if necessary).

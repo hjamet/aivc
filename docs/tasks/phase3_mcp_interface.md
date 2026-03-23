@@ -1,33 +1,33 @@
-# Phase 3 : Interface MCP et Outils Exposés
+# Phase 3: MCP Interface and Exposed Tools
 
-## 1. Contexte & Discussion (Narratif)
+## 1. Context & Discussion (Narrative)
 
-> La Phase 3 gère le goulot d'étranglement de l'attention du LLM : **le Contexte**.
+> Phase 3 manages the LLM's attention bottleneck: **the Context**.
 >
-> Le flux de recall a été redésigné en entonnoir :
-> L'agent ne reçoit **jamais** les messages complets ou le contenu des fichiers lors d'une recherche, 
-> pour éviter de noyer ses tokens. `search_memory` renvoie juste des titres et des listes d'IDs. 
-> L'agent doit explicitement appeler `consult_commit` s'il veut creuser l'historique.
+> The recall flow has been redesigned into a funnel:
+> The agent **never** receives full messages or file content during a search, 
+> to avoid drowning its tokens. `search_memory` returns only titles and lists of IDs. 
+> The agent must explicitly call `consult_commit` if it wants to dig into history.
 >
-> Côté gestion de l'espace, la fonction `prune_history` a été fusionnée dans `untrack`.
-> L'appel à `untrack` est désormais l'outil massif de libération d'espace (destructif).
+> Regarding space management, the `prune_history` function has been merged into `untrack`.
+> The `untrack` call is now the massive space-releasing tool (destructive).
 
-## 2. Fichiers Concernés
+## 2. Concerned Files
 
-- `src/aivc/server.py` — Point d'entrée du serveur MCP
-- `src/aivc/tools/commit_tool.py` — Outil `create_commit`
-- `src/aivc/tools/search_tool.py` — Outils `search_memory` et `consult_commit`
-- `src/aivc/tools/workspace_tool.py` — Outils `get_status` et `untrack`
-- `src/aivc/tools/history_tool.py` — Outils de lecture historique
+- `src/aivc/server.py` — MCP server entry point
+- `src/aivc/tools/commit_tool.py` — `create_commit` tool
+- `src/aivc/tools/search_tool.py` — `search_memory` and `consult_commit` tools
+- `src/aivc/tools/workspace_tool.py` — `get_status` and `untrack` tools
+- `src/aivc/tools/history_tool.py` — Historical reading tools
 
-## 3. Objectifs (Definition of Done)
+## 3. Objectives (Definition of Done)
 
-* Le serveur MCP doit exposer les outils suivants :
-  - **`create_commit(title, detailed_markdown)`** : Consigne explicite pour que l'agent génère un compte-rendu massif de son raisonnement. Les fichiers modifiés sont auto-associés.
-  - **`search_memory(query)`** : Retourne la liste des commits (Titre, Date, ID) et les fichiers associés potentiels. **Interdiction stricte d'inclure le contenu textuel lourd des commits ou des fichiers dans cette réponse**.
-  - **`consult_commit(commit_id)`** : Retourne la note Markdown complète du commit, et les diffs (ou liens de diffs) générés lors de ce commit.
-  - **`get_status()`** : Expose au LLM le bilan de charge (Taille actuelle des fichiers ET poids de leur historique respectif).
-  - **`untrack(file_path)`** : Retrait du tracking ET suppression de l'historique (déclenche le Garbage Collector). Action destructive documentée dans le prompt.
-  - **`consult_file(file_path)`**, **`read_historical_file(file_path, commit_id)`**, **`get_diff(file_path, a, b)`** : Consultations standards.
-* Une **consigne système (prompt)** doit instruire l'agent des flux d'utilisation (Entonnoir de recall, usage de la mémoire).
-* **Aucun fallback** : toute erreur doit crasher proprement.
+* The MCP server must expose the following tools:
+  - **`create_commit(title, detailed_markdown)`**: Explicit instruction for the agent to generate a massive report of its reasoning. Modified files are auto-associated.
+  - **`search_memory(query)`**: Returns the list of commits (Title, Date, ID) and potential associated files. **Strictly forbidden to include heavy text content of commits or files in this response**.
+  - **`consult_commit(commit_id)`**: Returns the full Markdown note of the commit, and the diffs (or diff links) generated during this commit.
+  - **`get_status()`**: Exposes the load assessment to the LLM (Current file size AND their respective history weight).
+  - **`untrack(file_path)`**: Removal from tracking AND history deletion (triggers the Garbage Collector). Destructive action documented in the prompt.
+  - **`consult_file(file_path)`**, **`read_historical_file(file_path, commit_id)`**, **`get_diff(file_path, a, b)`**: Standard consultations.
+* A **system instruction (prompt)** must instruct the agent on usage flows (Recall funnel, memory usage).
+* **No fallback**: any error must crash cleanly.

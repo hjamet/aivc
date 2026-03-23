@@ -49,17 +49,17 @@ The commit note must be **detailed**. Do not write one-liners.
 Document your reasoning, the decisions made, the problems encountered,
 and the solutions found. Think of it as a handover memo to your future self.
 
-### Fichiers Consultés (Consulted Files)
+### Consulted Files
 
-Lorsque vous créez un commit, vous pouvez spécifier une liste de `consulted_files`.
-Ce sont des fichiers que vous avez lus et qui vous ont été **véritablement utiles** pour
-accomplir votre tâche (ex: référence technique, exemple de code, documentation interne),
-mais que vous n'avez pas modifiés. Les fichiers non trackés seront auto-trackés s'ils
-existent sur disque ; les fichiers inexistants sont ignorés silencieusement.
+When you create a commit, you can specify a list of `consulted_files`.
+These are files you have read and that were **truly useful** to you to
+accomplish your task (e.g., technical reference, code example, internal documentation),
+but that you did not modify. Untracked files will be auto-tracked if they
+exist on disk; non-existent files are silently ignored.
 
-**RÈGLE D'OR** : Ne mentionnez QUE les documents contenant des informations que vous ne
-connaissiez pas avant de les avoir lus. N'ajoutez pas de fichiers par "politesse" ou 
-utilité de surface. Cela polluerait votre mémoire à long terme.
+**GOLDEN RULE**: Mention ONLY those documents containing information that you
+did not know before reading them. Do not add files for "politeness" or 
+surface utility. This would pollute your long-term memory.
 
 ## Recall Funnel
 

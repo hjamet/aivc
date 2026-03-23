@@ -1,31 +1,31 @@
-# Phase 15 — Refactoring Performance I/O (CoreIndex)
+# Phase 15 — I/O Performance Refactoring (CoreIndex)
 
-## 1. Contexte & Discussion (Narratif)
-Lors de la revue d'architecture du 19 mars 2026, l'Architecte a identifié un goulet d'étranglement critique dans `Workspace._all_commits()`. Cette fonction charge **tous les fichiers JSON** du dossier `commits/` à chaque appel à `get_status()` ou `untrack()`. Sur un historique de plusieurs centaines de commits, cela génère un nombre prohibitif d'accès disque et de parsing JSON.
+## 1. Context & Discussion (Narrative)
+During the architecture review on March 19, 2026, the Architect identified a critical bottleneck in `Workspace._all_commits()`. This function loads **every JSON file** in the `commits/` folder for each call to `get_status()` or `untrack()`. Over a history of several hundred commits, this generates a prohibitive number of disk accesses and JSON parsings.
 
-Deux options architecturales ont été proposées :
-- **Option A** : Remonter la logique dans `SemanticEngine` (faire de l'engine le chef d'orchestre des requêtes performantes).
-- **Option B** : Créer un `CoreIndex` SQLite autonome dans `core/` pour que `Workspace` devienne ultra-rapide par lui-même, sans dépendance vers la couche sémantique.
+Two architectural options were proposed:
+- **Option A**: Move the logic up to `SemanticEngine` (making the engine the orchestrator for performant queries).
+- **Option B**: Create a standalone SQLite `CoreIndex` in `core/` so that `Workspace` becomes ultra-fast by itself, without dependencies on the semantic layer.
 
-**L'utilisateur a validé l'Option B** le 19 mars 2026. La raison principale : préserver l'isolation stricte entre le moteur de versioning (`core/`) et la couche sémantique (`semantic/`). Le `CoreIndex` est un composant léger, stdlib-compatible (SQLite est dans la stdlib Python), qui stocke de la métadonnée rapide (commit ID, parent_id, chemins de fichiers, hashes de blobs).
+**The user validated Option B** on March 19, 2026. The main reason: to preserve strict isolation between the versioning engine (`core/`) and the semantic layer (`semantic/`). `CoreIndex` is a lightweight, stdlib-compatible component (SQLite is in the Python stdlib) that stores fast metadata (commit ID, parent_id, file paths, blob hashes).
 
-Le `CooccurrenceGraph` existant dans `semantic/graph.py` perdure mais se concentre exclusivement sur la recherche sémantique (co-occurrence fichiers↔commits, requêtes par glob).
+The existing `CooccurrenceGraph` in `semantic/graph.py` remains but focuses exclusively on semantic search (file↔commit co-occurrence, glob queries).
 
-## 2. Fichiers Concernés
-- `src/aivc/core/index.py` — **[NOUVEAU]** CoreIndex SQLite : table `commits` (id, parent_id, timestamp, title), table `file_changes` (commit_id, path, blob_hash, action, bytes_added, bytes_removed)
-- `src/aivc/core/workspace.py` — Intègre le `CoreIndex`, supprime `_all_commits()`, optimise `get_status()`, `untrack()`, `find_child_commit()`
-- `src/aivc/semantic/engine.py` — Aucun changement structurel attendu (les pass-throughs restent identiques)
-- `src/tests/test_index.py` — **[NOUVEAU]** Tests unitaires du CoreIndex
-- `src/tests/test_workspace.py` — Vérification de la non-régression
-- `src/tests/test_server.py` — Vérification que les outils MCP restent fonctionnels
+## 2. Concerned Files
+- `src/aivc/core/index.py` — **[NEW]** SQLite CoreIndex: `commits` table (id, parent_id, timestamp, title), `file_changes` table (commit_id, path, blob_hash, action, bytes_added, bytes_removed)
+- `src/aivc/core/workspace.py` — Integrates `CoreIndex`, removes `_all_commits()`, optimizes `get_status()`, `untrack()`, `find_child_commit()`
+- `src/aivc/semantic/engine.py` — No structural changes expected (pass-throughs remain the same)
+- `src/tests/test_index.py` — **[NEW]** CoreIndex unit tests
+- `src/tests/test_workspace.py` — Non-regression verification
+- `src/tests/test_server.py` — Verification that MCP tools remain functional
 
-## 3. Objectifs (Definition of Done)
-* Un fichier `src/aivc/core/index.py` existe, contenant un `CoreIndex` SQLite avec les tables `commits` et `file_changes`.
-* `Workspace` possède et alimente ce `CoreIndex` à chaque `create_commit()`.
-* Au premier lancement, les commits JSON existants sont migrés automatiquement vers le `CoreIndex`.
-* `Workspace.get_status()` n'appelle plus `_all_commits()` mais requête le `CoreIndex`.
-* `Workspace.untrack()` n'appelle plus `_all_commits()` mais requête le `CoreIndex`.
-* `Workspace.find_child_commit()` utilise le `CoreIndex` pour un lookup O(1) au lieu de traverser toute la chaîne.
-* `_all_commits()` est supprimé ou déprécié.
-* Aucune régression sur les tests existants.
-* Aucune dépendance de `core/` vers `semantic/` n'est introduite.
+## 3. Objectives (Definition of Done)
+* A `src/aivc/core/index.py` file exists, containing a SQLite `CoreIndex` with `commits` and `file_changes` tables.
+* `Workspace` owns and populates this `CoreIndex` at every `create_commit()`.
+* On first run, existing JSON commits are automatically migrated to the `CoreIndex`.
+* `Workspace.get_status()` no longer calls `_all_commits()` but queries the `CoreIndex`.
+* `Workspace.untrack()` no longer calls `_all_commits()` but queries the `CoreIndex`.
+* `Workspace.find_child_commit()` uses the `CoreIndex` for an O(1) lookup instead of traversing the entire chain.
+* `_all_commits()` is removed or deprecated.
+* No regression on existing tests.
+* No dependency from `core/` to `semantic/` is introduced.

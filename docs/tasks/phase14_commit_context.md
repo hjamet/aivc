@@ -1,18 +1,18 @@
-# Phase 14 — Contexte de Commit (Prev/Next)
+# Phase 14 — Commit Context (Prev/Next)
 
-## 1. Contexte & Discussion (Narratif)
-Lors d'une session de planification d'architecture, l'utilisateur a suggéré une amélioration UX pour l'outil MCP `consult_commit` : afficher, lors de la consultation d'un commit, les titres des commits parent (Précédent) et enfant (Suivant). 
+## 1. Context & Discussion (Narrative)
+During an architecture planning session, the user suggested a UX improvement for the `consult_commit` MCP tool: to display, when consulting a commit, the titles of the parent (Previous) and child (Next) commits.
 
-L'objectif est d'offrir un aperçu chronologique ("qu'est-ce qui a suivi ? qu'est-ce qui précédait ?") sans obliger l'agent LLM à appeler répétitivement `get_recent_commits` ou de multiples recherches sémantiques. 
-Cette approche a été retenue et validée par l'Architecte. Elle fluidifie l'exploration de la mémoire et renforce la continuité de contexte pour l'agent.
+The goal is to provide a chronological overview ("what followed? what preceded?") without forcing the LLM agent to repeatedly call `get_recent_commits` or multiple semantic searches. 
+This approach was adopted and validated by the Architect. It streamlines memory exploration and strengthens context continuity for the agent.
 
-## 2. Fichiers Concernés
-- `src/aivc/server.py` (Formatage du rendu de l'outil `consult_commit`)
-- `src/aivc/core/workspace.py` ou `src/aivc/semantic/engine.py` (Ajout d'une logique pour identifier l'enfant direct)
-- `src/tests/test_server.py` (Ajouts des tests d'affichage)
+## 2. Concerned Files
+- `src/aivc/server.py` (Formatting of the `consult_commit` tool output)
+- `src/aivc/core/workspace.py` or `src/aivc/semantic/engine.py` (Adding logic to identify the direct child)
+- `src/tests/test_server.py` (Addition of display tests)
 
-## 3. Objectifs (Definition of Done)
-* Le message de retour de l'outil `consult_commit` inclut visuellement le titre et l'ID du commit Précédent (parent) et Suivant (enfant), s'ils existent.
-* Ne pas alourdir la sortie (ajouter juste 2 lignes concises).
-* L'absence de parent (premier commit) ou d'enfant (HEAD) doit être traitée sans erreur (affichée discrètement ou non affichée).
-* Tests unitaires ajoutés ou mis à jour pour vérifier la présence de ces informations dans la réponse textuelle de l'outil.
+## 3. Objectives (Definition of Done)
+* The return message of the `consult_commit` tool visually includes the title and ID of the Previous (parent) and Next (child) commits, if they exist.
+* Do not clutter the output (add only 2 concise lines).
+* The absence of a parent (first commit) or child (HEAD) must be handled without error (displayed discreetly or not displayed).
+* Unit tests added or updated to verify the presence of this information in the tool's text response.

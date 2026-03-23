@@ -1,33 +1,33 @@
-# Phase 8 — Injection GEMINI.md (Agent Best Practices)
+# Phase 8 — GEMINI.md Injection (Agent Best Practices)
 
-## 1. Contexte & Discussion (Narratif)
+## 1. Context & Discussion (Narrative)
 
-Après la Phase 7, AIVC est un MVP fonctionnel avec recherche sémantique filtrée. Cependant, un problème critique subsiste : **l'agent LLM qui utilise AIVC ne sait pas comment bien l'utiliser**.
+After Phase 7, AIVC is a functional MVP with filtered semantic search. However, a critical issue remains: **the LLM agent using AIVC doesn't know how to use it properly**.
 
-Le script `install.sh` configure le serveur MCP mais ne transmet aucune instruction d'usage à l'agent. Or, la qualité de la mémoire AIVC dépend directement des pratiques de l'agent :
-- Commiter trop rarement = trous de mémoire
-- Messages de commit trop courts = recall dégradé
-- Ne pas explorer sa mémoire au démarrage = redondances, erreurs répétées
+The `install.sh` script configures the MCP server but transmits no usage instructions to the agent. Yet, AIVC's memory quality directly depends on the agent's practices:
+- Committing too rarely = memory gaps
+- Commit messages too short = degraded recall
+- Not exploring memory at startup = redundancies, repeated errors
 
-L'idée est que `install.sh` injecte automatiquement un bloc de bonnes pratiques dans `~/.gemini/GEMINI.md` (fichier de règles globales de l'agent Gemini/Antigravity).
+The idea is for `install.sh` to automatically inject a best practices block into `~/.gemini/GEMINI.md` (the global rules file for the Gemini/Antigravity agent).
 
-### Décisions techniques
-- **Idempotence** : Marqueurs HTML `<!-- AIVC:START -->` / `<!-- AIVC:END -->` pour encadrer le bloc. Si déjà présent, le contenu entre les marqueurs est remplacé.
-- **Non-destructif** : Le reste du fichier GEMINI.md n'est jamais modifié.
-- **Contenu** : Règles prescriptives pour l'agent LLM (commiter souvent, explorer la mémoire, messages détaillés).
+### Technical decisions
+- **Idempotence**: HTML markers `<!-- AIVC:START -->` / `<!-- AIVC:END -->` to frame the block. If already present, the content between the markers is replaced.
+- **Non-destructive**: The rest of the GEMINI.md file is never modified.
+- **Content**: Prescriptive rules for the LLM agent (commit often, explore memory, detailed messages).
 
-## 2. Fichiers Concernés
+## 2. Concerned Files
 
-- `install.sh` — Ajout d'une étape 6 : injection du bloc AIVC dans `~/.gemini/GEMINI.md`
+- `install.sh` — Added step 6: injection of the AIVC block into `~/.gemini/GEMINI.md`
 
-## 3. Objectifs (Definition of Done)
+## 3. Objectives (Definition of Done)
 
-* Après `bash install.sh`, le fichier `~/.gemini/GEMINI.md` contient un bloc AIVC entre marqueurs.
-* Si `install.sh` est relancé, le bloc est **mis à jour** (pas dupliqué).
-* Le bloc contient les recommandations suivantes :
-  - Commiter (via l'outil `create_commit`, pas via git) à la moindre modification
-  - Toujours commencer par `get_recent_commits` + **5 `search_memory` minimum** pour reconstruire le contexte de travail
-  - Consulter l'historique des fichiers (`consult_file`) et l'historique des commits (`consult_commit`) pour comprendre les liens et l'histoire
-  - Ne pas tenter de modifications déjà faites dans le passé
-  - Messages de commit très détaillés : erreurs rencontrées, résolutions, décisions prises, observations, recommandations futures
-* Le contenu existant de `~/.gemini/GEMINI.md` est préservé intégralement.
+* After `bash install.sh`, the `~/.gemini/GEMINI.md` file contains an AIVC block between markers.
+* If `install.sh` is rerun, the block is **updated** (not duplicated).
+* The block contains the following recommendations:
+  - Commit (via the `create_commit` tool, not git) at the slightest modification
+  - Always start with `get_recent_commits` + **5 `search_memory` minimum** to reconstruct the work context
+  - Consult file history (`consult_file`) and commit history (`consult_commit`) to understand links and history
+  - Do not attempt modifications already made in the past
+  - Very detailed commit messages: errors encountered, resolutions, decisions made, observations, future recommendations
+* The existing content of `~/.gemini/GEMINI.md` is fully preserved.

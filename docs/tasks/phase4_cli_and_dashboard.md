@@ -1,34 +1,34 @@
-# Phase 4 : CLI & Web Dashboard (Visualisation de la Mémoire)
+# Phase 4: CLI & Web Dashboard (Memory Visualization)
 
-## 1. Contexte & Discussion (Narratif)
-> *Inspire-toi du style "Handover" : Raconte pourquoi on fait ça.*
+## 1. Context & Discussion (Narrative)
+> *Following the handover style: Tell the story of why we're doing this.*
 
-Suite à la mise en place du serveur MCP (Phase 3), l'agent LLM dispose d'un accès total à sa mémoire à long terme (AIVC). Cependant, l'utilisateur a judicieusement fait remarquer que le développeur humain était "aveugle".
-Il a été décidé de lancer une **Phase 4** double :
-1. **Une CLI (`aivc`)** : Pour interagir rapidement en terminal (`status`, `log`, `search`, `commit`).
-2. **Un Web Dashboard élégant** : Pour visualiser la structure de la mémoire sous forme de graphe interactif.
+After setting up the MCP server (Phase 3), the LLM agent has full access to its long-term memory (AIVC). However, the user wisely pointed out that the human developer was "blind" to it.
+It was decided to launch a dual **Phase 4**:
+1. **A CLI (`aivc`)**: To interact quickly via terminal (`status`, `log`, `search`, `commit`).
+2. **An elegant Web Dashboard**: To visualize memory structure as an interactive graph.
 
-La demande spécifique de l'utilisateur pour le Dashboard :
-- Visualisation sous forme de graphe où les **Noeuds = Fichiers (Documents)**.
-- **Taille du noeud** : Proportionnelle au nombre de commits qui ont touché le fichier.
-- **Couleur du noeud** : Basée sur l'arborescence des dossiers (les fichiers d'un même dossier/proches partagent des couleurs similaires).
-- **Fonction de recherche ("Search")** : Effectue une recherche sémantique parmi les commits, puis **met en surbrillance** sur le graphe les noeuds (fichiers) liés à ces commits, et affiche les messages des commits correspondants.
-Le tout doit être extrêmement propre, simple et visuellement époustouflant.
+The user's specific request for the Dashboard:
+- Visualization as a graph where **Nodes = Files (Documents)**.
+- **Node size**: Proportional to the number of commits that touched the file.
+- **Node color**: Based on the directory tree (files in the same or nearby folders share similar colors).
+- **Search Function**: Performs a semantic search among commits, then **highlights** on the graph the nodes (files) linked to those commits, and displays the corresponding commit messages.
+The whole interface must be extremely clean, simple, and visually stunning.
 
-Liens :
-- Fichier racine : [README.md](../../README.md)
-- Moteur sémantique (pour la recherche) : `src/aivc/semantic/engine.py`
-- Données du graphe : `src/aivc/semantic/graph.py` (qui a d'ailleurs une fonction `to_vis_data()`)
+Links:
+- Root file: [README.md](../../README.md)
+- Semantic engine (for search): `src/aivc/semantic/engine.py`
+- Graph data: `src/aivc/semantic/graph.py` (which has a `to_vis_data()` function)
 
-## 2. Fichiers Concernés
-- `src/aivc/cli.py` (à créer)
-- `src/aivc/web/` ou interface équivalente (HTML/JS/CSS statique ou mini-serveur Flask/FastAPI)
-- `.agent/workflows/` (si des scripts spécifiques au run web sont nécessaires)
+## 2. Concerned Files
+- `src/aivc/cli.py` (to be created)
+- `src/aivc/web/` or equivalent interface (static HTML/JS/CSS or mini Flask/FastAPI server)
+- `.agent/workflows/` (if specific web run scripts are needed)
 
-## 3. Objectifs (Definition of Done)
-- **CLI** : Une ligne de commande `aivc` est accessible localement avec au minimum `aivc status`, `aivc log` et `aivc search "query"`.
-- **Web App (Visualisation)** : Une interface web moderne et "premium" est accessible.
-- **Topologie du Graphe** : Le graphe s'affiche avec des noeuds représentant les fichiers.
-- **Esthétique (Encodage visuel)** : La taille des noeuds reflète leur fréquence de commit, et leur couleur reflète leur hiérarchie (dossier parent).
-- **Interactivité (Recherche Sémantique)** : Une barre de recherche permet d'interroger la mémoire sémantique. Les résultats illuminent/filtrent les noeuds concernés dans le graphe et exposent les détails (notes) des commits pertinents.
-- Le fallback en cas d'erreur de la CLI doit rester du crash pur ("Jamais de fallback", règle globale AIVC).
+## 3. Objectives (Definition of Done)
+- **CLI**: An `aivc` command line is accessible locally with at least `aivc status`, `aivc log`, and `aivc search "query"`.
+- **Web App (Visualization)**: A modern and "premium" web interface is accessible.
+- **Graph Topology**: The graph displays with nodes representing files.
+- **Aesthetics (Visual encoding)**: Node size reflects commit frequency, and color reflects hierarchy (parent folder).
+- **Interactivity (Semantic Search)**: A search bar allows querying semantic memory. Results light up/filter relevant nodes in the graph and expose details (notes) of pertinent commits.
+- CLI error fallbacks must remain pure crashes ("No fallbacks" global AIVC rule).

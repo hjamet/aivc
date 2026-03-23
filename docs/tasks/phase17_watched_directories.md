@@ -1,31 +1,31 @@
-# Phase 17 — Dossiers Surveillés (JIT Watcher)
+# Phase 17 — Watched Directories (JIT Watcher)
 
-## 1. Contexte & Discussion (Narratif)
+## 1. Context & Discussion (Narrative)
 
-> *Suite aux discussions architecturales après la Phase 16.*
+> *Following architectural discussions after Phase 16.*
 
-L'utilisateur exige un système de **surveillance intégrale, automatique et continue** des gros dossiers, déchargeant complètement l'agent LLM de la gestion manuelle du tracking. L'objectif est d'avoir un "Always-On Surveilled Scope" piloté par le serveur MCP.
+The user requires a system of **total, automatic, and continuous surveillance** of large folders, completely relieving the LLM agent of manual tracking management. The goal is to have an "Always-On Surveilled Scope" driven by the MCP server.
 
-L'Architecte a acté que le modèle le plus robuste est une architecture hybride **Daemon MCP Watcher + Startup Sync**. 
-1. **La réalité du Watcher** : Un watcher (ex: `watchdog`) ne capte les événements de création de fichier **que lorsqu'il tourne**. Si le serveur MCP est éteint pendant que l'utilisateur travaille, ces créations seront manquées.
-2. **La solution** : Pour garantir un système infaillible, le serveur MCP doit **absolument** faire un *Startup Scan* (via `os.walk`) à chaque démarrage pour rattraper son retard, PUIS lancer le *Watcher temps-réel* pour un confort total en continu.
+The Architect recorded that the most robust model is a hybrid **MCP Watcher Daemon + Startup Sync** architecture. 
+1. **The Watcher reality**: A watcher (e.g., `watchdog`) only captures file creation events **when it is running**. If the MCP server is off while the user is working, these creations will be missed.
+2. **The solution**: To ensure an infallible system, the MCP server **must** perform a *Startup Scan* (via `os.walk`) at every startup to catch up, THEN launch the *Real-time Watcher* for continuous total comfort.
 
-### 🚨 Règle Critique : Fichiers Supprimés
-Gérer les "nouveaux fichiers" est simple (on les `track()`). Mais la gestion des **fichiers supprimés** comporte un piège mortel :
-Si le Watcher détecte qu'un fichier a été supprimé du disque dur, **IL NE DOIT JAMAIS** appeler `untrack()`. Mettre un fichier en "untrack" l'efface de la mémoire d'AIVC, ce qui empêcherait le prochain `create_commit` de détecter l'action de suppression (et de l'inscrire dans l'historique de la base). 
-Le Watcher ne doit réagir qu'aux ajouts. Le moteur de diff (`compute_diff`) d'AIVC s'occupera naturellement d'enregistrer les suppressions lors du prochain commit.
+### 🚨 Critical Rule: Deleted Files
+Managing "new files" is simple (we `track()` them). But managing **deleted files** involves a deadly trap:
+If the Watcher detects that a file has been deleted from the hard drive, **IT MUST NEVER** call `untrack()`. Setting a file to "untrack" erases it from AIVC's memory, which would prevent the next `create_commit` from detecting the deletion action (and recording it in the database history). 
+The Watcher must only react to additions. AIVC's diff engine (`compute_diff`) will naturally handle recording deletions during the next commit.
 
-## 2. Fichiers Concernés
+## 2. Concerned Files
 
-- `pyproject.toml` (Ajout de la dépendance `watchdog`)
-- `src/aivc/core/workspace.py` (Mise à jour de `track`/`untrack` pour gérer le `watched_dirs`)
-- `src/aivc/cli.py` (Pas de nouvelles commandes, `track` et `untrack` gèrent dynamiquement la surveillance)
-- `src/aivc/server.py` (Implémentation du thread Watcher et du scan de démarrage, suppression des outils `watch_directory`)
+- `pyproject.toml` (Addition of `watchdog` dependency)
+- `src/aivc/core/workspace.py` (Update of `track`/`untrack` to handle `watched_dirs`)
+- `src/aivc/cli.py` (No new commands, `track` and `untrack` dynamically handle surveillance)
+- `src/aivc/server.py` (Implementation of the Watcher thread and startup scan, removal of `watch_directory` tools)
 
-## 3. Objectifs (Definition of Done)
+## 3. Objectives (Definition of Done)
 
-* **Surveillance automatique** : Si `aivc track <dir>` est appelé avec un dossier, il est automatiquement rajouté aux `watched_dirs`.
-* **Arrêt de surveillance** : Si `aivc untrack <dir>` est appelé avec un dossier, il supprime la surveillance ET détruit l'historique de tous les fichiers à l'intérieur.
-* **Scan au Démarrage (Sync)** : La fonction `serve()` effectue le scan JIT habituel.
-* **Watcher Réactif** : Un thread `watchdog` appelle `track(path)` sur les nouveaux fichiers créés dans ces dossiers.
-* **Protection de l'Historique** : Le Watcher ignore volontairement les `FileDeletedEvent`.
+* **Automatic surveillance**: If `aivc track <dir>` is called with a directory, it is automatically added to `watched_dirs`.
+* **Stop surveillance**: If `aivc untrack <dir>` is called with a directory, it removes surveillance AND destroys the history of all files inside.
+* **Startup Scan (Sync)**: The `serve()` function performs the usual JIT scan.
+* **Reactive Watcher**: A `watchdog` thread calls `track(path)` on new files created in these directories.
+* **Protection of History**: The Watcher intentionally ignores `FileDeletedEvent`.
