@@ -288,13 +288,13 @@
 
     <div id="init-loader">
         <div class="big-spinner"></div>
-        <div>Chargement du Graphe...</div>
+        <div>Loading Graph...</div>
     </div>
 
     <!-- Search Bar -->
     <div class="top-bar glass">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); margin-right: 8px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="text" id="searchInput" placeholder="Recherche sémantique dans la mémoire..." autocomplete="off">
+        <input type="text" id="searchInput" placeholder="Semantic search in memory..." autocomplete="off">
         <div class="spinner" id="searchSpinner"></div>
         <button class="reset-btn" id="resetBtn">Reset</button>
     </div>
@@ -303,12 +303,12 @@
     <div id="cy"></div>
 
     <!-- Relayout Button -->
-    <button class="relayout-btn" id="relayoutBtn" title="Relancer la simulation de forces">⟳ Relayout</button>
+    <button class="relayout-btn" id="relayoutBtn" title="Restart force simulation">⟳ Relayout</button>
 
     <!-- Results Sidebar -->
     <div class="sidebar glass" id="sidebar">
         <div class="sidebar-header">
-            <h2 id="resultsTitle">Résultats</h2>
+            <h2 id="resultsTitle">Results</h2>
         </div>
         <div class="sidebar-content" id="resultsContent">
             <!-- Cards go here -->
@@ -336,7 +336,7 @@
                 graphData = await res.json();
             } catch (err) {
                 console.error("Failed to load graph data", err);
-                document.getElementById('init-loader').innerHTML = 'Erreur de connexion au serveur AIVC.';
+                document.getElementById('init-loader').innerHTML = 'Error connecting to AIVC server.';
                 return;
             }
 
@@ -527,7 +527,7 @@ async function loadGitLog(append = false) {
                     <span>${c.timestamp.substring(0,10)}</span>
                     <span style="font-family: monospace;">${c.id.substring(0,8)}</span>
                 </div>
-                <div class="commit-files">${c.file_count} fichier(s) modifié(s)</div>
+                <div class="commit-files">${c.file_count} file(s) modified</div>
             </div>
         `).join('');
 
@@ -548,7 +548,7 @@ async function loadGitLog(append = false) {
         });
 
     } catch (err) {
-        if (!append) resultsContent.innerHTML = `<p style="color: #ff7b72;">Erreur: ${err.message}</p>`;
+        if (!append) resultsContent.innerHTML = `<p style="color: #ff7b72;">Error: ${err.message}</p>`;
     } finally {
         isFetchingLog = false;
     }
@@ -556,7 +556,7 @@ async function loadGitLog(append = false) {
 
 async function showFileHistory(nodeId) {
     currentSidebarMode = 'file';
-    resultsTitle.innerText = 'Historique fichier';
+    resultsTitle.innerText = 'File History';
     resultsContent.innerHTML = '<div style="text-align:center; padding: 20px;"><div class="spinner" style="display:inline-block;"></div></div>';
     sidebar.classList.add('open');
 
@@ -573,7 +573,7 @@ async function showFileHistory(nodeId) {
         resultsTitle.innerHTML = `<div style="font-size: 14px; word-break: break-all; color: var(--highlight);">${filename}</div>`;
         
         resultsContent.innerHTML = `
-            <button class="commit-detail-back" id="backToLog">← Retour au Git Log</button>
+            <button class="commit-detail-back" id="backToLog">← Back to Git Log</button>
             <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">${history.length} commit(s)</div>
             ${history.map(c => `
                 <div class="commit-card" data-commit-id='${c.commit_id}'>
@@ -599,7 +599,7 @@ async function showFileHistory(nodeId) {
         });
 
     } catch (err) {
-        resultsContent.innerHTML = `<p style="color: #ff7b72;">Erreur: ${err.message}</p>`;
+        resultsContent.innerHTML = `<p style="color: #ff7b72;">Error: ${err.message}</p>`;
     }
 }
             cy.on('free', 'node', function(e) { // Deleted
@@ -675,8 +675,8 @@ async function showFileHistory(nodeId) {
                     resetBtn.style.display = 'block';
 
                     if (commits.length === 0) {
-                        resultsTitle.innerText = "Aucun résultat";
-                        resultsContent.innerHTML = "<p style='color: var(--text-muted);'>Essayez une autre requête ou des mots-clés différents.</p>";
+                        resultsTitle.innerText = "No results";
+                        resultsContent.innerHTML = "<p style='color: var(--text-muted);'>Try another query or different keywords.</p>";
                         sidebar.classList.add('open');
                         resetSearch(false);
                         return;
@@ -722,7 +722,7 @@ async function showFileHistory(nodeId) {
                     console.error("Search failed", err);
                     searchSpinner.style.display = 'none';
                     resetBtn.style.display = 'block';
-                    alert("Erreur lors de la recherche sémantique.");
+                    alert("Error during semantic search.");
                 }
             }
 
@@ -744,7 +744,7 @@ async function showFileHistory(nodeId) {
 
             // Commit Detail View
             async function showCommitDetail(commitId) {
-                resultsTitle.innerText = 'Chargement...';
+                resultsTitle.innerText = 'Loading...';
                 resultsContent.innerHTML = '';
                  sidebar.classList.add('open');
 
@@ -753,20 +753,20 @@ async function showFileHistory(nodeId) {
                     const commit = await res.json();
 
                     if (commit.error) {
-                        resultsTitle.innerText = 'Erreur';
+                        resultsTitle.innerText = 'Error';
                         resultsContent.innerHTML = `<p style="color: #ff7b72;">${commit.error}</p>`;
                         return;
                     }
 
                     resultsTitle.innerText = commit.title;
                     resultsContent.innerHTML = `
-                        <button class="commit-detail-back" id="backToResults">← Retour</button>
+                        <button class="commit-detail-back" id="backToResults">← Back</button>
                         <div class="commit-meta">
                             <span>${commit.timestamp.substring(0, 10)}</span>
                             <span style="font-family: monospace; font-size: 11px;">${commit.id.substring(0, 8)}</span>
                         </div>
                         <div class="commit-detail-note">${commit.note}</div>
-                        <h3 style="font-size: 14px; margin: 16px 0 8px; color: var(--highlight);">Fichiers modifiés (${commit.changes.length})</h3>
+                        <h3 style="font-size: 14px; margin: 16px 0 8px; color: var(--highlight);">Modified files (${commit.changes.length})</h3>
                         ${commit.changes.map(c => `
                             <div class="commit-detail-change">
                                 <span style="color: ${c.action === 'added' ? '#7ee787' : c.action === 'deleted' ? '#ff7b72' : '#d2a8ff'};">[${c.action}]</span>
@@ -790,7 +790,7 @@ async function showFileHistory(nodeId) {
                     });
 
                 } catch (err) {
-                    resultsTitle.innerText = 'Erreur';
+                    resultsTitle.innerText = 'Error';
                     resultsContent.innerHTML = `<p style="color: #ff7b72;">${err.message}</p>`;
                 }
             }
@@ -813,7 +813,7 @@ async function showFileHistory(nodeId) {
                             <span>Score: ${c.score.toFixed(3)}</span>
                         </div>
                         <p class="commit-snippet">${c.snippet}...</p>
-                        ${c.file_paths.length ? `<div class="commit-files">${c.file_paths.length} fichier(s) associé(s)</div>` : ''}
+                        ${c.file_paths.length ? `<div class="commit-files">${c.file_paths.length} file(s) associated</div>` : ''}
                     </div>
                 `).join('');
 
@@ -847,13 +847,13 @@ async function showFileHistory(nodeId) {
                 });
             }
             
-            // Initialisation au demarrage
+            // Initialization on startup
             sidebar.classList.add("open");
             loadGitLog(false);
             
             } catch (globalError) {
                 console.error("Global JS Error: ", globalError);
-                document.getElementById('init-loader').innerHTML = '<div style="color:#ff7b72; font-weight:bold;">Erreur JS : ' + globalError.message + '</div>';
+                document.getElementById('init-loader').innerHTML = '<div style="color:#ff7b72; font-weight:bold;">JS Error : ' + globalError.message + '</div>';
             }
         });
     </script>
