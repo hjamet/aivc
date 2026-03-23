@@ -196,6 +196,41 @@ class CooccurrenceGraph:
             ).fetchall()
         ]
 
+    def get_file_commits_with_metadata(self, file_path: str) -> list[dict]:
+        """Return commits that touched a file, with full metadata.
+
+        Args:
+            file_path: Absolute path of the file.
+
+        Returns:
+            List of ``{"commit_id": str, "title": str, "timestamp": str}``
+            ordered by timestamp descending (newest first).
+
+        Raises:
+            KeyError: if the file is not in the graph.
+        """
+        row = self._execute(
+            "SELECT 1 FROM file_nodes WHERE file_path = ?", (file_path,)
+        ).fetchone()
+        if row is None:
+            raise KeyError(f"File {file_path!r} is not in the graph.")
+
+        rows = self._execute(
+            """
+            SELECT c.commit_id, c.title, c.timestamp
+            FROM edges e
+            JOIN commit_nodes c ON e.commit_id = c.commit_id
+            WHERE e.file_path = ?
+            ORDER BY c.timestamp DESC
+            """,
+            (file_path,),
+        ).fetchall()
+
+        return [
+            {"commit_id": r[0], "title": r[1], "timestamp": r[2]}
+            for r in rows
+        ]
+
     def get_commits_by_glob(self, pattern: str) -> list[str]:
         """Return commit IDs that touched any file matching a glob pattern.
 

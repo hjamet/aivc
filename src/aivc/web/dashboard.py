@@ -46,9 +46,23 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.send_json(self._api_search(query))
             return
 
+        if parsed.path == "/api/log":
+            qs = parse_qs(parsed.query)
+            offset = int(qs.get("offset", ["0"])[0])
+            limit = int(qs.get("limit", ["10"])[0])
+            self.send_json(self._api_log(offset=offset, limit=limit))
+            return
+
         if parsed.path.startswith("/api/commit/"):
             commit_id = parsed.path[len("/api/commit/"):]
             self.send_json(self._api_commit(commit_id))
+            return
+
+        if parsed.path.startswith("/api/file-history/"):
+            import urllib.parse
+            # The path might be url-encoded (e.g. spaces, slashes)
+            file_path = urllib.parse.unquote(parsed.path[len("/api/file-history/"):])
+            self.send_json(self._api_file_history(file_path))
             return
             
         # Default behavior: serve static files
@@ -108,6 +122,27 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 for c in commit.changes
             ],
         }
+
+    def _api_log(self, offset: int = 0, limit: int = 10):
+        """Return paginated commit log."""
+        commits = self.engine.get_log(limit=limit, offset=offset)
+        out = []
+        for c in commits:
+            out.append({
+                "id": c.id,
+                "title": c.title,
+                "timestamp": c.timestamp,
+                "file_count": len(c.changes),
+            })
+        return out
+
+    def _api_file_history(self, file_path: str):
+        """Return commit history for a specific file."""
+        try:
+            history = self.engine.get_file_history(file_path)
+            return history
+        except KeyError:
+            return {"error": f"File {file_path} not found in history."}
 
 
 def main():

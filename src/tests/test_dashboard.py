@@ -64,3 +64,46 @@ def test_dashboard_api_head():
     
     handler.send_response.assert_called_once_with(200)
     handler.end_headers.assert_called_once()
+
+def test_dashboard_api_log():
+    engine = MagicMock()
+    mock_commit = MagicMock()
+    mock_commit.id = "c1"
+    mock_commit.title = "test log"
+    mock_commit.timestamp = "2024-01-01"
+    mock_commit.changes = ["a.py", "b.py"]
+    
+    engine.get_log.return_value = [mock_commit]
+    
+    handler = DashboardHandler.__new__(DashboardHandler)
+    handler.engine = engine
+    
+    res = handler._api_log(offset=5, limit=2)
+    engine.get_log.assert_called_once_with(limit=2, offset=5)
+    
+    assert len(res) == 1
+    assert res[0]["id"] == "c1"
+    assert res[0]["file_count"] == 2
+
+
+def test_dashboard_api_file_history():
+    engine = MagicMock()
+    engine.get_file_history.return_value = [{"commit_id": "c1", "title": "test", "timestamp": "2024-01-01"}]
+    
+    handler = DashboardHandler.__new__(DashboardHandler)
+    handler.engine = engine
+    
+    res = handler._api_file_history("a.py")
+    engine.get_file_history.assert_called_once_with("a.py")
+    assert res[0]["commit_id"] == "c1"
+
+
+def test_dashboard_api_file_history_error():
+    engine = MagicMock()
+    engine.get_file_history.side_effect = KeyError("Not found")
+    
+    handler = DashboardHandler.__new__(DashboardHandler)
+    handler.engine = engine
+    
+    res = handler._api_file_history("unknown.py")
+    assert "error" in res

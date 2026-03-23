@@ -497,8 +497,113 @@
             });
 
             // Dynamic forces: after dragging a node, re-run without zoom reset
-            cy.on('free', 'node', function(e) {
-                cy.layout(layoutConfig(false, false)).run();
+let gitLogOffset = 0;
+const gitLogLimit = 15;
+let isFetchingLog = false;
+let hasMoreLog = true;
+let currentSidebarMode = 'log'; // 'log', 'search', 'file'
+
+async function loadGitLog(append = false) {
+    if (isFetchingLog || (!hasMoreLog && append)) return;
+    isFetchingLog = true;
+    
+    if (!append) {
+        gitLogOffset = 0;
+        hasMoreLog = true;
+        resultsContent.innerHTML = '<div style="text-align:center; padding: 20px;"><div class="spinner" style="display:inline-block;"></div></div>';
+    }
+
+    try {
+        const res = await fetch(`/api/log?offset=${gitLogOffset}&limit=${gitLogLimit}`);
+        const commits = await res.json();
+        
+        if (commits.length < gitLogLimit) hasMoreLog = false;
+        gitLogOffset += commits.length;
+
+        const html = commits.map(c => `
+            <div class="commit-card" data-commit-id='${c.id}'>
+                <h3 class="commit-title">${c.title}</h3>
+                <div class="commit-meta">
+                    <span>${c.timestamp.substring(0,10)}</span>
+                    <span style="font-family: monospace;">${c.id.substring(0,8)}</span>
+                </div>
+                <div class="commit-files">${c.file_count} fichier(s) modifié(s)</div>
+            </div>
+        `).join('');
+
+        if (append) {
+            resultsContent.insertAdjacentHTML('beforeend', html);
+        } else {
+            resultsTitle.innerText = "Git Log";
+            resultsContent.innerHTML = html;
+        }
+
+        // Bind clicks
+        document.querySelectorAll('.commit-card:not(.bound)').forEach(card => {
+            card.classList.add('bound');
+            card.addEventListener('click', async () => {
+                const commitId = card.getAttribute('data-commit-id');
+                await showCommitDetail(commitId);
+            });
+        });
+
+    } catch (err) {
+        if (!append) resultsContent.innerHTML = `<p style="color: #ff7b72;">Erreur: ${err.message}</p>`;
+    } finally {
+        isFetchingLog = false;
+    }
+}
+
+async function showFileHistory(nodeId) {
+    currentSidebarMode = 'file';
+    resultsTitle.innerText = 'Historique fichier';
+    resultsContent.innerHTML = '<div style="text-align:center; padding: 20px;"><div class="spinner" style="display:inline-block;"></div></div>';
+    sidebar.classList.add('open');
+
+    try {
+        const res = await fetch(`/api/file-history/${encodeURIComponent(nodeId)}`);
+        const history = await res.json();
+
+        if (history.error) {
+            resultsContent.innerHTML = `<p style="color: #ff7b72;">${history.error}</p>`;
+            return;
+        }
+
+        const filename = nodeId.split('/').pop();
+        resultsTitle.innerHTML = `<div style="font-size: 14px; word-break: break-all; color: var(--highlight);">${filename}</div>`;
+        
+        resultsContent.innerHTML = `
+            <button class="commit-detail-back" id="backToLog">← Retour au Git Log</button>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">${history.length} commit(s)</div>
+            ${history.map(c => `
+                <div class="commit-card" data-commit-id='${c.commit_id}'>
+                    <h3 class="commit-title">${c.title}</h3>
+                    <div class="commit-meta">
+                        <span>${c.timestamp.substring(0,10)}</span>
+                        <span style="font-family: monospace;">${c.commit_id.substring(0,8)}</span>
+                    </div>
+                </div>
+            `).join('')}
+        `;
+
+        document.getElementById('backToLog').addEventListener('click', () => {
+            currentSidebarMode = 'log';
+            loadGitLog(false);
+        });
+
+        document.querySelectorAll('.commit-card').forEach(card => {
+            card.addEventListener('click', async () => {
+                const commitId = card.getAttribute('data-commit-id');
+                await showCommitDetail(commitId);
+            });
+        });
+
+    } catch (err) {
+        resultsContent.innerHTML = `<p style="color: #ff7b72;">Erreur: ${err.message}</p>`;
+    }
+}
+            cy.on('free', 'node', function(e) { // Deleted
+                // cy.layout(layoutConfig(false, false)).run();
             });
 
             // 3. Search Logic
@@ -518,13 +623,24 @@
                 document.body.style.cursor = 'default';
             });
 
-            // Click node to focus (zoom + center)
+            // Click node to focus and show history
             cy.on('tap', 'node', function(e){
                 let node = e.target;
                 cy.animate({
                     center: { eles: node },
                     zoom: 2.5
                 }, { duration: 500 });
+                showFileHistory(node.id());
+            });
+
+            // Infinite scroll for Git Log
+            resultsContent.addEventListener('scroll', () => {
+                if (currentSidebarMode !== 'log') return;
+                
+                // If scrolled near bottom
+                if (resultsContent.scrollTop + resultsContent.clientHeight >= resultsContent.scrollHeight - 50) {
+                    loadGitLog(true); // append
+                }
             });
 
             let involvedFilesGlobal = new Set();
@@ -549,6 +665,7 @@
             async function doSearch(query) {
                 searchSpinner.style.display = 'block';
                 resetBtn.style.display = 'none';
+                currentSidebarMode = 'search';
                 
                 try {
                     const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -609,20 +726,27 @@
                 }
             }
 
-            function resetSearch(closeSidebar = true) {
+            function resetSearch(closeSidebar = false) {
                 involvedFilesGlobal.clear();
                 cy.batch(() => {
                     cy.elements().removeClass('highlight dim');
                 });
                 cy.animate({ fit: { padding: 30 } }, { duration: 500 });
                 resetBtn.style.display = 'none';
-                if (closeSidebar) sidebar.classList.remove('open');
+                
+                if (closeSidebar) {
+                    sidebar.classList.remove('open');
+                } else {
+                    currentSidebarMode = 'log';
+                    loadGitLog(false);
+                }
             }
 
             // Commit Detail View
             async function showCommitDetail(commitId) {
                 resultsTitle.innerText = 'Chargement...';
                 resultsContent.innerHTML = '';
+                 sidebar.classList.add('open');
 
                 try {
                     const res = await fetch(`/api/commit/${commitId}`);
@@ -636,7 +760,7 @@
 
                     resultsTitle.innerText = commit.title;
                     resultsContent.innerHTML = `
-                        <button class="commit-detail-back" id="backToResults">← Retour aux résultats</button>
+                        <button class="commit-detail-back" id="backToResults">← Retour</button>
                         <div class="commit-meta">
                             <span>${commit.timestamp.substring(0, 10)}</span>
                             <span style="font-family: monospace; font-size: 11px;">${commit.id.substring(0, 8)}</span>
@@ -653,10 +777,15 @@
                     `;
 
                     document.getElementById('backToResults').addEventListener('click', () => {
-                        if (lastSearchResults.length > 0) {
+                        if (currentSidebarMode === 'search' && lastSearchResults.length > 0) {
                             renderSearchResults(lastSearchResults);
+                        } else if (currentSidebarMode === 'file') {
+                            // Can't easily go back to previous file list without its ID, so fallback to log
+                            currentSidebarMode = 'log';
+                            loadGitLog(false);
                         } else {
-                            sidebar.classList.remove('open');
+                            currentSidebarMode = 'log';
+                            loadGitLog(false);
                         }
                     });
 
@@ -717,6 +846,11 @@
                     });
                 });
             }
+            
+            // Initialisation au demarrage
+            sidebar.classList.add("open");
+            loadGitLog(false);
+            
             } catch (globalError) {
                 console.error("Global JS Error: ", globalError);
                 document.getElementById('init-loader').innerHTML = '<div style="color:#ff7b72; font-weight:bold;">Erreur JS : ' + globalError.message + '</div>';

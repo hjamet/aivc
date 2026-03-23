@@ -197,6 +197,7 @@ aivc/
 | **15** | [Refactoring Performance I/O (CoreIndex)](docs/tasks/phase15_io_refactoring.md) | CoreIndex SQLite autonome, élimination `_all_commits()` | 🟢 Terminé |
 | **16** | [Fiabilisation BM25 & UX CLI](docs/tasks/phase16_fiabilisation_bm25_ux_cli.md) | Cache SQLite BM25, Optimisation extraits, Fallback Storage CLI | 🟢 Terminé |
 | **17** | [Dossiers Surveillés (JIT Watcher)](docs/tasks/phase17_watched_directories.md) | Auto-tracking transparent des nouveaux fichiers dans les dossiers surveillés via JIT. | 🟢 Terminé |
+| **19** | [Web Dashboard UX](docs/tasks/phase19_web_dashboard_ux.md) | Sidebar Git Log (Infinite Scroll), Historique fichier, Fix layout cose | 🟢 Terminé |
 
 ### Documentation Index
 | Titre (Lien) | Description |
@@ -214,3 +215,4 @@ aivc/
 | [Spec Phase 15](docs/tasks/phase15_io_refactoring.md) | Refactoring performance I/O. |
 | [Spec Phase 16](docs/tasks/phase16_fiabilisation_bm25_ux_cli.md) | Fiabilisation BM25 et UX CLI. |
 | [Spec Phase 17](docs/tasks/phase17_watched_directories.md) | Dossiers Surveillés et auto-tracking JIT. |
+| [Spec Phase 19](docs/tasks/phase19_web_dashboard_ux.md) | Améliorations UX du Web Dashboard (Sidebar + Forces). |

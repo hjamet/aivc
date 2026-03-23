@@ -277,9 +277,18 @@ class SemanticEngine:
         """Return status of all tracked files. See :meth:`Workspace.get_status`."""
         return self._workspace.get_status()
 
-    def get_log(self, limit: int = 20) -> list[Commit]:
+    def get_log(self, limit: int = 20, offset: int = 0) -> list[Commit]:
         """Return up to *limit* commits in reverse chronological order."""
-        return self._workspace.get_log(limit)
+        return self._workspace.get_log(limit, offset)
+
+    def get_file_history(self, file_path: str) -> list[dict]:
+        """Return commits that touched *file_path* with metadata.
+
+        Returns:
+            List of ``{"commit_id": str, "title": str, "timestamp": str}``
+            sorted by timestamp descending.
+        """
+        return self._graph.get_file_commits_with_metadata(file_path)
 
     def get_commit(self, commit_id: str) -> Commit:
         """Load a single commit by ID."""

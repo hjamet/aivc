@@ -422,16 +422,21 @@ class Workspace:
         """
         return self._load_commit(commit_id)
 
-    def get_log(self, limit: int = 20) -> list[Commit]:
+    def get_log(self, limit: int = 20, offset: int = 0) -> list[Commit]:
         """Return up to `limit` commits in reverse chronological order.
 
         Traverses the commit chain via parent_id starting from HEAD.
+        Skips the first `offset` commits for pagination support.
         """
         commits: list[Commit] = []
         current_id = self._state["head_commit_id"]
+        skipped = 0
         while current_id is not None and len(commits) < limit:
             commit = self._load_commit(current_id)
-            commits.append(commit)
+            if skipped < offset:
+                skipped += 1
+            else:
+                commits.append(commit)
             current_id = commit.parent_id
         return commits
 
