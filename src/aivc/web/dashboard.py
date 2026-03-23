@@ -70,12 +70,16 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def send_json(self, data: dict | list, status: int = 200):
         content = json.dumps(data).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Content-Length", str(len(content)))
-        self.end_headers()
-        self.wfile.write(content)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+        except (ConnectionResetError, BrokenPipeError):
+            # Client disconnected prematurely, harmless.
+            pass
 
     def _api_graph(self):
         """Return file nodes and co-occurrence edges."""
