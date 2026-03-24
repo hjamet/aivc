@@ -12,6 +12,14 @@ from __future__ import annotations
 
 import os
 import sys
+
+# Set mission-critical environment variables before heavy ML imports
+# This completely bypasses the 5-minute atexit/thread deadlock on Windows
+# caused by ChromaDB PostHog telemetry failing on corporate firewalls.
+os.environ["CHROMA_TELEMETRY_DISABLED"] = "1"
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from collections import Counter
 from pathlib import Path
 

@@ -9,6 +9,13 @@ import os
 import sys
 from pathlib import Path
 
+# Set mission-critical environment variables before heavy ML imports
+# This completely bypasses the 5-minute atexit/thread deadlock on Windows
+# caused by ChromaDB PostHog telemetry failing on corporate firewalls.
+os.environ["CHROMA_TELEMETRY_DISABLED"] = "1"
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 # SemanticEngine is imported inside `main()` after we check AIVC_STORAGE_ROOT
 # to keep CLI fast and error out early if the env var is missing.
 
