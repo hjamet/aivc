@@ -48,8 +48,12 @@ def compute_diff(
             )
 
         if not file_path.exists():
+            # Extract hash from richer format before using it
+            actual_hash = last_hash
+            if isinstance(actual_hash, dict):
+                actual_hash = actual_hash.get("hash")
             # File was deleted from disk since last commit.
-            old_size = blob_store.get_size(last_hash) if last_hash else 0
+            old_size = blob_store.get_size(actual_hash) if actual_hash else 0
             changes.append(
                 FileChange(
                     path=rel_path,
