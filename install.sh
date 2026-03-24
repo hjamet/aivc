@@ -92,7 +92,9 @@ fi
 # Normalize SOURCE_DIR for Windows if needed (uv/pip are often Windows binaries)
 SOURCE_DIR_NORM="${SOURCE_DIR}"
 if [[ "${OSTYPE:-}" == "msys"* || "${OSTYPE:-}" == "cygwin"* ]] && command -v cygpath >/dev/null 2>&1; then
-    SOURCE_DIR_NORM="$(cygpath -w "${SOURCE_DIR}")"
+    # Use -m (mixed style) to get C:/Users/... which is safer for Python on Windows
+    SOURCE_DIR_NORM="$(cygpath -m "${SOURCE_DIR}")"
+    info "Detected Windows environment (OSTYPE=${OSTYPE}). Normalized SOURCE_DIR: ${SOURCE_DIR_NORM}"
 fi
 
 info "Installing aivc[semantic] into the venv (this may take a moment for PyTorch/model downloads) ..."
