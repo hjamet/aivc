@@ -133,6 +133,17 @@ class SemanticEngine:
         """Return the number of commits waiting to be indexed or synced."""
         return self._index_queue.qsize() + self._sync_queue.qsize()
 
+    def wait_until_indexed(self, timeout: float = 30.0) -> bool:
+        """Wait until all background tasks (indexing/sync) are complete.
+        Returns True if finished, False if timed out.
+        """
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            if self.get_index_queue_size() == 0:
+                return True
+            time.sleep(0.1)
+        return False
+
     def _on_workspace_reload(self) -> None:
         """Callback from workspace when its state is reloaded from disk."""
         self._local_hints_index = None
@@ -194,8 +205,14 @@ class SemanticEngine:
         if self.__indexer is None:
             with self._ml_lock:
                 if self.__indexer is None:
-                    from aivc.semantic.indexer import Indexer
-                    self.__indexer = Indexer(self._storage_root)
+                    try:
+                        from aivc.semantic.indexer import Indexer
+                        self.__indexer = Indexer(self._storage_root)
+                    except RuntimeError as e:
+                        if "atexit" in str(e):
+                            # We are likely shutting down; don't crash the background thread
+                            return None
+                        raise
         return self.__indexer
 
     @property
@@ -204,8 +221,13 @@ class SemanticEngine:
         if self.__searcher is None:
             with self._ml_lock:
                 if self.__searcher is None:
-                    from aivc.semantic.searcher import Searcher
-                    self.__searcher = Searcher(self._indexer)
+                    try:
+                        from aivc.semantic.searcher import Searcher
+                        self.__searcher = Searcher(self._indexer)
+                    except RuntimeError as e:
+                        if "atexit" in str(e):
+                            return None
+                        raise
         return self.__searcher
 
     @property
@@ -214,8 +236,13 @@ class SemanticEngine:
         if self.__bm25_cache is None:
             with self._ml_lock:
                 if self.__bm25_cache is None:
-                    from aivc.search.bm25_cache import BM25Cache
-                    self.__bm25_cache = BM25Cache(self._storage_root)
+                    try:
+                        from aivc.search.bm25_cache import BM25Cache
+                        self.__bm25_cache = BM25Cache(self._storage_root)
+                    except RuntimeError as e:
+                        if "atexit" in str(e):
+                            return None
+                        raise
         return self.__bm25_cache
 
     # ------------------------------------------------------------------
@@ -468,11 +495,17 @@ class SemanticEngine:
     def find_local_equivalent(self, remote_path: str, remote_blob_hash: str | None = None) -> str | None:
         """Try to find a local tracked file that matches a remote path.
         
-        Optimised O(1) basename lookup.
+        Optimised O(1) basename lookup. Handles both Unix and Windows remote path styles.
         """
-        remote_p = Path(remote_path)
-        remote_basename = remote_p.name
-        remote_parent_name = remote_p.parent.name if remote_p.parent else ""
+        # Cross-platform basename extraction
+        remote_normalized = remote_path.replace("\\", "/")
+        parts = [p for p in remote_normalized.split("/") if p]
+        
+        if not parts:
+            return None
+            
+        remote_basename = parts[-1]
+        remote_parent_name = parts[-2] if len(parts) > 1 else ""
         
         # O(1) lookup in inverted index
         candidates = self._get_local_hints_index().get(remote_basename, [])

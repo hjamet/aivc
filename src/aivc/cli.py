@@ -27,6 +27,7 @@ GREEN = "\033[0;32m"
 YELLOW = "\033[0;33m"
 DIM = "\033[2m"
 BOLD = "\033[1m"
+MAGENTA = "\033[0;35m"
 RESET = "\033[0m"
 
 
@@ -89,11 +90,17 @@ def cmd_log(args: argparse.Namespace) -> None:
         print("No commits found in memory.")
         return
 
+    from aivc.config import get_machine_id
+    local_id = get_machine_id()
+
     for c in commits:
         files = engine.get_commit_files(c.id)
         files_str = ", ".join(files) if files else "—"
+        
+        m_id = c.machine_id or "unknown"
+        machine_tag = f" {MAGENTA}[{m_id}]{RESET}" if m_id != local_id else ""
 
-        print(f"{YELLOW}commit {c.id}{RESET}")
+        print(f"{YELLOW}commit {c.id}{machine_tag}{RESET}")
         print(f"{DIM}Date:{RESET}    {c.timestamp}")
         print(f"{DIM}Files:{RESET}   {files_str}")
         print(f"\n    {BOLD}{c.title}{RESET}\n")
@@ -115,8 +122,14 @@ def cmd_search(args: argparse.Namespace) -> None:
         print("No matching commits found.")
         return
 
+    from aivc.config import get_machine_id
+    local_id = get_machine_id()
+
     for i, r in enumerate(results, 1):
-        print(f"{CYAN}{BOLD}{i}. {r.title}{RESET} {DIM}(score: {r.score:.3f}){RESET}")
+        m_id = r.machine_id or "unknown"
+        machine_tag = f" {MAGENTA}[{m_id}]{RESET}" if m_id != local_id else ""
+        
+        print(f"{CYAN}{BOLD}{i}. {r.title}{RESET}{machine_tag} {DIM}(score: {r.score:.3f}){RESET}")
         print(f"   {DIM}ID:{RESET}    {r.commit_id}")
         print(f"   {DIM}Date:{RESET}  {r.timestamp}")
         print(f"   {DIM}Files:{RESET} {', '.join(r.file_paths) if r.file_paths else '—'}")
