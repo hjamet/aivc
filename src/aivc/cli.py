@@ -105,6 +105,9 @@ def cmd_search(args: argparse.Namespace) -> None:
         print(f"{DIM}Searching memory for: '{args.query}' (filter: '{args.glob}')...{RESET}\n")
     else:
         print(f"{DIM}Searching memory for: '{args.query}'...{RESET}\n")
+
+    # Ensure ML models are loaded and orphaned commits are reindexed
+    engine.warmup()
     
     results = engine.search(args.query, top_n=args.top_n, filter_glob=args.glob)
     
