@@ -104,10 +104,10 @@ class SemanticEngine:
                 break
             try:
                 # Cloud Sync push
-                self._sync_manager.push_commit(commit.id)
                 for change in commit.changes:
                     if change.blob_hash:
                         self._sync_manager.push_blob(change.blob_hash)
+                self._sync_manager.push_commit(commit.id)
             except Exception as e:
                 import sys
                 print(f"Error in async sync for commit {commit.id}: {e}", file=sys.stderr)

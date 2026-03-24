@@ -198,7 +198,7 @@ class NativeDriveSyncManager:
         if not self.enabled or not self.config.get("sync_blobs", True):
             return
 
-        local_path = self.storage_root / "blobs" / blob_hash[:2] / blob_hash
+        local_path = self.storage_root / "blobs" / blob_hash
         if not local_path.exists():
             return
 
@@ -311,7 +311,7 @@ class NativeDriveSyncManager:
         results = service.files().list(q=query, spaces="drive", fields="files(id)").execute()
         files = results.get("files", [])
 
-        local_dir = self.storage_root / "blobs" / blob_hash[:2]
+        local_dir = self.storage_root / "blobs"
         local_dir.mkdir(parents=True, exist_ok=True)
         local_path = local_dir / blob_hash
 
