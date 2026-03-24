@@ -134,7 +134,7 @@ class NativeDriveSyncManager:
     # Upload helpers
     # ------------------------------------------------------------------
 
-    def _upload_file(self, local_path: Path, folder_id: str, filename: str | None = None) -> str:
+    def _upload_file(self, local_path: Path, folder_id: str, filename: str | None = None, skip_if_exists: bool = False) -> str:
         """Upload a file to a specific Drive folder. Returns file ID."""
         from googleapiclient.http import MediaFileUpload
 
@@ -145,6 +145,9 @@ class NativeDriveSyncManager:
         query = f"name = '{target_name}' and '{folder_id}' in parents and trashed = false"
         results = service.files().list(q=query, spaces="drive", fields="files(id)").execute()
         existing = results.get("files", [])
+
+        if existing and skip_if_exists:
+            return existing[0]["id"]
 
         media = MediaFileUpload(str(local_path), resumable=True)
 
@@ -200,7 +203,55 @@ class NativeDriveSyncManager:
             return
 
         folder_id = self._get_blobs_folder_id()
-        self._upload_file(local_path, folder_id, filename=blob_hash)
+        self._upload_file(local_path, folder_id, filename=blob_hash, skip_if_exists=True)
+
+    def push_missing(self) -> dict:
+        """Finds all local commits and pushes those missing from Google Drive.
+        
+        Returns:
+            dict with 'commits_pushed' and 'blobs_pushed' counts.
+        """
+        if not self.enabled:
+            return {"commits_pushed": 0, "blobs_pushed": 0}
+
+        service = self._get_service()
+        commits_folder_id = self._get_commits_folder_id()
+
+        # 1. Get all local commits
+        local_commits_dir = self.storage_root / "commits"
+        if not local_commits_dir.exists():
+            return {"commits_pushed": 0, "blobs_pushed": 0}
+            
+        local_commits = {f.name for f in local_commits_dir.iterdir() if f.suffix == ".json"}
+        
+        # 2. Get remote commits for this machine
+        query = f"'{commits_folder_id}' in parents and trashed = false"
+        # We might need pagination if > 100 commits, but fine for MVP
+        results = service.files().list(q=query, spaces="drive", fields="files(name)").execute()
+        remote_commits = {f["name"] for f in results.get("files", [])}
+        
+        missing_commits = local_commits - remote_commits
+        
+        commits_pushed = 0
+        blobs_pushed = 0
+        
+        for commit_file in missing_commits:
+            commit_id = commit_file.replace(".json", "")
+            
+            # Read local commit to find blobs and push them first
+            try:
+                content = json.loads((local_commits_dir / commit_file).read_text(encoding="utf-8"))
+                for change in content.get("changes", []):
+                    if change.get("blob_hash"):
+                        self.push_blob(change["blob_hash"])
+                        blobs_pushed += 1
+            except Exception:
+                pass
+                
+            self.push_commit(commit_id)
+            commits_pushed += 1
+            
+        return {"commits_pushed": commits_pushed, "blobs_attempted": blobs_pushed}
 
     def pull_commits_from_others(self) -> None:
         """Pull commits from other machines listed in config."""

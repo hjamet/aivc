@@ -237,9 +237,11 @@ Follow these steps (takes ~2 minutes):
      - Click "Create"
   6. Copy the Client ID and Client Secret shown.
 
-  Also enable the Google Drive API:
+--- Step 2: Enable the Google Drive API ---
+
+  You MUST enable the API for your project before syncing:
   → https://console.cloud.google.com/apis/library/drive.googleapis.com
-  Click "ENABLE".
+  Click "ENABLE" and wait 1 minute.
 """)
 
     client_id = input(f"{BOLD}Paste your Client ID:{RESET} ").strip()
@@ -293,6 +295,43 @@ Follow these steps (takes ~2 minutes):
     print(f"  Config saved to: ~/.aivc/config.json")
     print(f"\n{YELLOW}Cloud sync is now ENABLED.{RESET}")
     print(f"AIVC will automatically sync commits and blobs to your Google Drive.")
+
+
+def cmd_sync_push(args: argparse.Namespace) -> None:
+    """Force sync (push) of all missing local commits to Google Drive."""
+    from aivc.config import get_aivc_config, get_machine_id, get_token_path
+
+    config = get_aivc_config()
+    sync_cfg = config.get("sync", {})
+    
+    if not sync_cfg.get("enabled"):
+        print(f"{RED}Cloud sync is currently disabled. Run 'aivc sync setup' first.{RESET}")
+        return
+        
+    if not get_token_path().exists():
+        print(f"{RED}Google Drive authentication missing. Run 'aivc sync setup' first.{RESET}")
+        return
+
+    print(f"{CYAN}{BOLD}AIVC Force Sync Push{RESET}")
+    print(f"{DIM}Analyzing local commits and comparing with Google Drive...{RESET}")
+    
+    try:
+        from aivc.sync.drive import NativeDriveSyncManager
+        manager = NativeDriveSyncManager(Path.home() / ".aivc" / "storage")
+        result = manager.push_missing()
+        
+        commits = result["commits_pushed"]
+        blobs = result["blobs_attempted"]
+        
+        if commits == 0:
+            print(f"\n{GREEN}✓ Everything is up-to-date! No missing local commits found.{RESET}")
+        else:
+            print(f"\n{GREEN}✓ Sync Push complete!{RESET}")
+            print(f"  Pushed {commits} missing commit(s).")
+            print(f"  Checked/Transferred {blobs} associated blob(s).")
+            
+    except Exception as e:
+        print(f"{RED}Error during sync push: {e}{RESET}")
 
 
 def cmd_sync_status(args: argparse.Namespace) -> None:
@@ -420,6 +459,7 @@ def main() -> None:
     sync_sub = parser_sync.add_subparsers(dest="sync_command", required=True)
     sync_sub.add_parser("setup", help="Interactive Google Drive sync setup")
     sync_sub.add_parser("status", help="Check cloud sync status")
+    sync_sub.add_parser("push", help="Force push all missing local commits to Drive")
 
     args = parser.parse_args()
 
@@ -444,6 +484,8 @@ def main() -> None:
             cmd_sync_setup(args)
         elif args.sync_command == "status":
             cmd_sync_status(args)
+        elif args.sync_command == "push":
+            cmd_sync_push(args)
 
 
 if __name__ == "__main__":
