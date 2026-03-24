@@ -199,6 +199,7 @@ aivc/
 | **17** | [Watched Directories (JIT Watcher)](docs/tasks/phase17_watched_directories.md) | Transparent auto-tracking of new files in watched directories via JIT. | 🟢 Finished |
 | **18** | [Internationalization and English Documentation](docs/tasks/internationalization_and_english_docs.md) | Full translation of README, technical documentation, and docstrings for collaboration with Amir. | 🟢 Finished |
 | **19** | [Web Dashboard UX](docs/tasks/phase19_web_dashboard_ux.md) | Sidebar Git Log (Infinite Scroll), File history, cose layout fix | 🟢 Finished |
+| **20** | [Google Drive Sync](docs/tasks/phase20_google_drive_sync.md) | Synchronisation inter-machines facultative et asynchrone des commits via Drive | 🟡 Planned |
 
 ### Documentation Index
 | Title (Link) | Description |
@@ -217,3 +218,4 @@ aivc/
 | [Phase 16 Spec](docs/tasks/phase16_fiabilisation_bm25_ux_cli.md) | BM25 reliability and CLI UX. |
 | [Phase 17 Spec](docs/tasks/phase17_watched_directories.md) | Watched Directories and JIT auto-tracking. |
 | [Phase 19 Spec](docs/tasks/phase19_web_dashboard_ux.md) | Web Dashboard UX improvements (Sidebar + Forces). |
+| [Phase 20 Spec](docs/tasks/phase20_google_drive_sync.md) | Google Drive Sync architecture for multi-machine commits. |
