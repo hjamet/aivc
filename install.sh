@@ -155,52 +155,6 @@ if not aivc_config_path.exists():
 PYEOF
 
 # ---------------------------------------------------------------------------
-# 5.5. Download rclone standalone
-# ---------------------------------------------------------------------------
-
-BIN_DIR="${AIVC_HOME}/bin"
-RCLONE_EXE="${BIN_DIR}/rclone"
-
-# On Windows/MSYS, we might need .exe suffix for the check
-if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-    RCLONE_EXE="${RCLONE_EXE}.exe"
-fi
-
-if [[ ! -f "${RCLONE_EXE}" ]]; then
-    info "Downloading rclone standalone binary..."
-    mkdir -p "${BIN_DIR}"
-    
-    # Detect architecture and OS
-    ARCH=$(uname -m)
-    case "${ARCH}" in
-        x86_64)  R_ARCH="amd64" ;;
-        aarch64) R_ARCH="arm64" ;;
-        *)       R_ARCH="amd64" ;; # Fallback
-    esac
-
-    RCLONE_ZIP="/tmp/rclone.zip"
-    
-    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-        info "Detected Windows (MSYS/Git Bash) environment."
-        URL="https://downloads.rclone.org/rclone-current-windows-${R_ARCH}.zip"
-        # Download
-        curl -fsSL "${URL}" -o "${RCLONE_ZIP}" || wget -q "${URL}" -O "${RCLONE_ZIP}"
-        # Extract only rclone.exe
-        unzip -j "${RCLONE_ZIP}" "*/rclone.exe" -d "${BIN_DIR}"
-    else
-        URL="https://downloads.rclone.org/rclone-current-linux-${R_ARCH}.zip"
-        curl -fsSL "${URL}" -o "${RCLONE_ZIP}" || wget -q "${URL}" -O "${RCLONE_ZIP}"
-        unzip -j "${RCLONE_ZIP}" "*/rclone" -d "${BIN_DIR}"
-        chmod +x "${RCLONE_EXE}"
-    fi
-    
-    rm -f "${RCLONE_ZIP}"
-    success "rclone installed to ${RCLONE_EXE}"
-else
-    info "rclone already installed at ${RCLONE_EXE}"
-fi
-
-# ---------------------------------------------------------------------------
 # 6. Inject AIVC best practices into ~/.gemini/GEMINI.md
 # ---------------------------------------------------------------------------
 

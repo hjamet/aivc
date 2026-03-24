@@ -65,7 +65,7 @@ track(path/glob/dir) --> workspace.json
 
 ### Cloud Sync & Multi-Machine (Phase 20 & 21)
 
-AIVC supports facultative cloud synchronization via `rclone`:
+AIVC supports facultative cloud synchronization:
 - **Global Blob Pool**: Blobs are shared in `AIVC_Sync/blobs/`, leveraging SHA-256 for cross-machine deduplication.
 - **Machine Isolation**: Commits and indexes remain isolated per machine in `AIVC_Sync/<machine_id>/`.
 - **Decoupled Workers**: High-latency cloud uploads never block local semantic indexing.
