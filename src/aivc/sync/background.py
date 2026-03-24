@@ -2,6 +2,7 @@
 BackgroundSyncer: Daemon thread to pull commits periodically (or at startup).
 """
 
+import sys
 import threading
 import time
 from pathlib import Path
@@ -33,7 +34,7 @@ class BackgroundSyncer:
             stats = self.manager.push_missing()
             pushed = stats.get("commits_pushed", 0)
             if pushed > 0:
-                print(f"[AIVC Sync] Auto-pushed {pushed} local commits to Drive.")
+                print(f"[AIVC Sync] Auto-pushed {pushed} local commits to Drive.", file=sys.stderr)
 
         except Exception as e:
             import sys
