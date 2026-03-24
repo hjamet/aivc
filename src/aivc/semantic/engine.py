@@ -134,6 +134,15 @@ class SemanticEngine:
         """Callback from workspace when its state is reloaded from disk."""
         self._local_hints_index = None
 
+    def warmup(self) -> None:
+        """Eagerly load heavy ML components (models, PyTorch) in a background thread.
+        This triggers importing SentenceTransformers, CrossEncoder, and ChromaDB,
+        masking the 15-30s start time without blocking JSON-RPC init.
+        """
+        # Force lazy evaluation of the properties
+        _ = self._indexer._collection
+        _ = self._searcher._cross_encoder
+
 
     # ------------------------------------------------------------------
     # Lazy properties for heavy ML components

@@ -753,7 +753,19 @@ def start_background_watchers():
 # Entry point
 # ---------------------------------------------------------------------------
 
+def _trigger_ml_warmup():
+    try:
+        _engine.warmup()
+    except Exception as e:
+        print(f"Background ML warmup failed: {e}", file=sys.stderr)
+
 if __name__ == "__main__":
+    import threading
+    
+    # Pre-load heavy ML models in background to mask the cold startup latency
+    # without blocking the Cursor JSON-RPC `initialize` handshake
+    threading.Thread(target=_trigger_ml_warmup, daemon=True, name="AIVC-ML-Warmup").start()
+    
     # Start background tasks
     start_background_watchers()
     _syncer.start()
