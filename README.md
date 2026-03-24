@@ -2,7 +2,7 @@
 
 **Long-term memory MCP server for LLM agents**, inspired by human memory and Git.
 
-> **Status**: 🟢 **Phase 26 (Finished)** : Auto Sync Push at Startup.
+> **Status**: 🟢 **Phase 27.1 (Finished)** : Windows/WSL Stability & Machine Distinction.
 
 ### Concept
 
@@ -19,7 +19,7 @@ AIVC transforms **commits** into memories for an AI agent. The system bypasses t
 
 ```bash
 # Quick install (automatically configures the MCP server)
-curl -fsSL -H "Cache-Control: no-cache" "https://raw.githubusercontent.com/hjamet/aivc/main/install.sh?v=$(date +%s)&force=true" | bash
+curl -fsSL -H "Cache-Control: no-cache" "https://raw.githubusercontent.com/hjamet/aivc/main/install.sh?v=$(date +%s)" | bash
 ```
 
 ```bash
@@ -220,6 +220,7 @@ aivc/
 | **23** | [State Sync & JIT Reload](docs/tasks/phase23_state_sync_reload.md) | Rechargement conditionnel de workspace.json pour éviter la désync CLI/MCP | 🟢 Finished |
 | **25** | [Native Google Drive Sync](docs/tasks/phase25_native_google_drive.md) | Native Google Drive API replacing rclone | 🟢 Finished |
 | **26** | [Auto Sync Push at Startup](docs/tasks/phase26_auto_sync_push.md) | Automatic push of missing local commits on server start | 🟢 Finished |
+| **27** | [Multi-Machine Distinction & Path Mapping](docs/tasks/phase27_remote_hints.md) | Distinction automatique WSL/Windows et mapping croisé des chemins | 🟢 Finished |
 
 ### Documentation Index
 | Title (Link) | Description |
@@ -244,3 +245,4 @@ aivc/
 | [Phase 23 Spec](docs/tasks/phase23_state_sync_reload.md) | State Sync & JIT Reload (Multi-process). |
 | [Phase 25 Spec](docs/tasks/phase25_native_google_drive.md) | Native Google Drive API replacing rclone. |
 | [Phase 26 Spec](docs/tasks/phase26_auto_sync_push.md) | Auto Sync Push at Startup. |
+| [Phase 27 Spec](docs/tasks/phase27_remote_hints.md) | Multi-Machine Distinction & Local Path Mapping. |
