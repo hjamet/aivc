@@ -116,7 +116,57 @@ config["mcpServers"]["aivc"] = {
 
 config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
 print(f"[aivc] MCP entry written to {config_path}")
+
+# --- NEW: Generate aivc config.json ---
+aivc_config_path = pathlib.Path.home() / ".aivc" / "config.json"
+import socket
+if not aivc_config_path.exists():
+    aivc_config = {
+        "machine_id": socket.gethostname(),
+        "sync": {
+            "enabled": False,
+            "remote_name": "aivc_remote",
+            "sync_blobs": True,
+            "remote_machines": []
+        }
+    }
+    aivc_config_path.write_text(json.dumps(aivc_config, indent=4), encoding="utf-8")
+    print(f"[aivc] Default config created at {aivc_config_path}")
+
 PYEOF
+
+# ---------------------------------------------------------------------------
+# 5.5. Download rclone standalone
+# ---------------------------------------------------------------------------
+
+BIN_DIR="${AIVC_HOME}/bin"
+RCLONE_EXE="${BIN_DIR}/rclone"
+
+if [[ ! -f "${RCLONE_EXE}" ]]; then
+    info "Downloading rclone standalone binary..."
+    mkdir -p "${BIN_DIR}"
+    
+    # Detect architecture
+    ARCH=$(uname -m)
+    case "${ARCH}" in
+        x86_64)  R_ARCH="amd64" ;;
+        aarch64) R_ARCH="arm64" ;;
+        *)       R_ARCH="amd64" ;; # Fallback
+    esac
+    
+    RCLONE_ZIP="/tmp/rclone.zip"
+    URL="https://downloads.rclone.org/rclone-current-linux-${R_ARCH}.zip"
+    
+    curl -fsSL "${URL}" -o "${RCLONE_ZIP}" || wget -q "${URL}" -O "${RCLONE_ZIP}"
+    
+    # Extract only the binary
+    unzip -j "${RCLONE_ZIP}" "*/rclone" -d "${BIN_DIR}"
+    chmod +x "${RCLONE_EXE}"
+    rm "${RCLONE_ZIP}"
+    success "rclone installed to ${RCLONE_EXE}"
+else
+    info "rclone already installed at ${RCLONE_EXE}"
+fi
 
 # ---------------------------------------------------------------------------
 # 6. Inject AIVC best practices into ~/.gemini/GEMINI.md

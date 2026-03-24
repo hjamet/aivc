@@ -2,7 +2,7 @@
 
 **Long-term memory MCP server for LLM agents**, inspired by human memory and Git.
 
-> **Status**: 🟢 Phase 18 — Auto-track consulted files + batch track/untrack.
+> **Status**: 🟢 Phase 20 — Cloud Sync (rclone) + Async Commit.
 
 ### Concept
 
@@ -160,6 +160,9 @@ aivc/
 | `aivc search <query> [-g GLOB]` | Semantic search in memory, with optional filter |
 | `aivc search-files <query>` | Lexical search (BM25) in current files |
 | `aivc web [-p PORT]` | Launch the interactive Web Dashboard |
+| `aivc sync setup` | Interactive cloud sync configuration (rclone) |
+| `aivc sync status` | Check sync status and remote machines |
+| `aivc config [key] [value]` | View or update AIVC configuration |
 | `aivc migrate` | Force JSON commit migration to SQLite |
 | `python -m pytest src/tests/ -v` | Run full test suite |
 | `uv pip install -e ".[dev]"` | Install core only (stdlib) |
@@ -199,7 +202,8 @@ aivc/
 | **17** | [Watched Directories (JIT Watcher)](docs/tasks/phase17_watched_directories.md) | Transparent auto-tracking of new files in watched directories via JIT. | 🟢 Finished |
 | **18** | [Internationalization and English Documentation](docs/tasks/internationalization_and_english_docs.md) | Full translation of README, technical documentation, and docstrings for collaboration with Amir. | 🟢 Finished |
 | **19** | [Web Dashboard UX](docs/tasks/phase19_web_dashboard_ux.md) | Sidebar Git Log (Infinite Scroll), File history, cose layout fix | 🟢 Finished |
-| **20** | [Google Drive Sync](docs/tasks/phase20_google_drive_sync.md) | Synchronisation inter-machines facultative et asynchrone des commits via Drive | 🟡 Planned |
+| **20** | [Cloud Sync & Async Indexing](docs/tasks/phase20_google_drive_sync.md) | Synchronisation inter-machines facultative et asynchrone des commits via Drive | 🟢 Finished |
+| **21** | [Async & Sync Consolidation](docs/tasks/phase21_async_sync_consolidation.md) | Dette technique : séparation CPU/IO, Graceful Shutdown, Global Cloud Blobs | 🟡 Planned |
 
 ### Documentation Index
 | Title (Link) | Description |
@@ -219,3 +223,4 @@ aivc/
 | [Phase 17 Spec](docs/tasks/phase17_watched_directories.md) | Watched Directories and JIT auto-tracking. |
 | [Phase 19 Spec](docs/tasks/phase19_web_dashboard_ux.md) | Web Dashboard UX improvements (Sidebar + Forces). |
 | [Phase 20 Spec](docs/tasks/phase20_google_drive_sync.md) | Google Drive Sync architecture for multi-machine commits. |
+| [Phase 21 Spec](docs/tasks/phase21_async_sync_consolidation.md) | Async and Cloud Sync Consolidation. |

@@ -310,7 +310,8 @@ class Workspace:
         self,
         title: str,
         note: str,
-        consulted_files: list[str] | None = None
+        consulted_files: list[str] | None = None,
+        machine_id: str = "",
     ) -> Commit:
         """Detect changes in tracked files and create a new commit.
 
@@ -321,6 +322,7 @@ class Workspace:
                              but not modified. Files that exist on disk but
                              aren't tracked will be auto-tracked. Non-existent
                              files are silently skipped.
+            machine_id: ID of the machine where the commit was created.
 
         Returns:
             The newly created Commit.
@@ -371,6 +373,7 @@ class Workspace:
             note=note,
             parent_id=self._state["head_commit_id"],
             changes=all_changes,
+            machine_id=machine_id,
         )
         self._save_commit(commit)
         self._index.add_commit(commit)

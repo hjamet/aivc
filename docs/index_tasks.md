@@ -19,3 +19,7 @@
 | [Phase 15: I/O Performance Refactoring (CoreIndex)](tasks/phase15_io_refactoring.md) | Standalone SQLite CoreIndex in `core/`, `_all_commits()` elimination | 2026-03-19 | `Up to date` |
 | [Phase 16: BM25 Reliability & CLI UX](tasks/phase16_fiabilisation_bm25_ux_cli.md) | SQLite BM25 cache, CLI Storage Fallback | 2026-03-19 | `Up to date` |
 | [Phase 17: Watched Directories (JIT Watcher)](tasks/phase17_watched_directories.md) | JIT auto-discovery and auto-tracking on observed directories | 2026-03-19 | `Up to date` |
+| [Phase 18: Internationalization](tasks/internationalization_and_english_docs.md) | Full translation of README, technical documentation | 2026-03-24 | `Up to date` |
+| [Phase 19: Web Dashboard UX](tasks/phase19_web_dashboard_ux.md) | Sidebar Git Log, File history, cose layout fix | 2026-03-24 | `Up to date` |
+| [Phase 20: Cloud Sync](tasks/phase20_google_drive_sync.md) | Google Drive Sync architecture for multi-machine commits | 2026-03-24 | `Up to date` |
+| [Phase 21: Async & Sync Consolidation](tasks/phase21_async_sync_consolidation.md) | Async and cloud sync architectural debt consolidation | 2026-03-24 | `Up to date` |

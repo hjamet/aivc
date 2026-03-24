@@ -13,13 +13,17 @@ Lazy Loading: The Indexer (ChromaDB + SentenceTransformer) and Searcher
 for CLI-style invocations that only need Workspace or Graph features.
 """
 
-from __future__ import annotations
-
+import threading
+import queue
+import time
 from pathlib import Path
+from typing import Any
 
 from aivc.core.commit import Commit
 from aivc.core.workspace import FileStatus, Workspace
 from aivc.semantic.graph import CooccurrenceGraph
+from aivc.config import get_machine_id
+from aivc.sync.sync import RcloneSyncManager
 
 
 class SemanticEngine:
@@ -52,6 +56,40 @@ class SemanticEngine:
         self.__indexer = None
         self.__searcher = None
         self.__bm25_cache = None
+
+        # Async Indexing & Sync
+        self._index_queue = queue.Queue()
+        self._sync_manager = RcloneSyncManager(storage_root)
+        self._indexing_thread = threading.Thread(target=self._worker_loop, daemon=True)
+        self._indexing_thread.start()
+
+    def _worker_loop(self):
+        """Background worker thread to index commits from the queue."""
+        while True:
+            commit = self._index_queue.get()
+            if commit is None: # Shutdown signal
+                break
+            try:
+                # 1. Semantic indexing (triggers lazy load of indexer if needed)
+                self._indexer.index_commit(commit)
+                
+                # 2. Cloud Sync push (if enabled)
+                if self._sync_manager.enabled:
+                    self._sync_manager.push_commit(commit.id)
+                    for change in commit.changes:
+                        if change.blob_hash:
+                            self._sync_manager.push_blob(change.blob_hash)
+            except Exception as e:
+                # Log error to stderr since we are in a background thread
+                import sys
+                print(f"Error in async indexing for commit {commit.id}: {e}", file=sys.stderr)
+            finally:
+                self._index_queue.task_done()
+
+    def get_index_queue_size(self) -> int:
+        """Return the number of commits waiting to be indexed."""
+        return self._index_queue.qsize()
+
 
     # ------------------------------------------------------------------
     # Lazy properties for heavy ML components
@@ -91,12 +129,12 @@ class SemanticEngine:
         note: str,
         consulted_files: list[str] | None = None
     ) -> Commit:
-        """Create a versioning commit and index it semantically.
+        """Create a versioning commit and index it semantically (asynchronously).
 
         1. Delegates to :meth:`Workspace.create_commit` (which detects diffs,
            stores blobs, and persists the commit JSON).
-        2. Indexes the commit note in ChromaDB.
-        3. Updates the co-occurrence graph.
+        2. Updates the co-occurrence graph.
+        3. Pushes the commit to the background worker queue for semantic indexing.
 
         Args:
             title: Short commit title.
@@ -110,13 +148,17 @@ class SemanticEngine:
             RuntimeError: if no changes detected and no files consulted.
         """
         # Step 1: core versioning (may raise RuntimeError if no changes)
-        commit = self._workspace.create_commit(title, note, consulted_files=consulted_files)
+        # Inject machine_id
+        machine_id = get_machine_id()
+        commit = self._workspace.create_commit(
+            title, note, consulted_files=consulted_files, machine_id=machine_id
+        )
 
-        # Step 2: semantic indexing — triggers lazy load on first call
-        self._indexer.index_commit(commit)
-
-        # Step 3: graph update (SQLite, always fast)
+        # Step 2: graph update (SQLite, always fast)
         self._graph.add_commit(commit)
+
+        # Step 3: async semantic indexing
+        self._index_queue.put(commit)
 
         return commit
 

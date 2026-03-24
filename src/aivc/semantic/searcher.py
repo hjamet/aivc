@@ -48,6 +48,9 @@ class SearchResult:
     file_paths: list[str]
     """Files that were changed in this commit (excluding deleted files)."""
 
+    machine_id: str = ""
+    """ID of the machine where the commit was created."""
+
 
 class Searcher:
     """Two-stage semantic search: Bi-Encoder (fast recall) → Cross-Encoder (precise rank).
@@ -163,6 +166,7 @@ class Searcher:
                     score=score,
                     snippet=snippet,
                     file_paths=hit["file_paths"],
+                    machine_id=hit.get("machine_id", ""),
                 )
             )
 

@@ -2,15 +2,45 @@
 Centralized configuration management for AIVC.
 """
 
-import os
-import sys
+import json
+import socket
 from pathlib import Path
 
 _STORAGE_ROOT_ENV = "AIVC_STORAGE_ROOT"
+_CONFIG_PATH = Path.home() / ".aivc" / "config.json"
+_RCLONE_BIN = Path.home() / ".aivc" / "bin" / "rclone"
 
 # ML Model configurations
 BI_ENCODER_MODEL = "all-MiniLM-L6-v2"
 CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+def get_aivc_config() -> dict:
+    """Read AIVC config from ~/.aivc/config.json."""
+    if not _CONFIG_PATH.exists():
+        return {}
+    try:
+        return json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+def save_aivc_config(config: dict) -> None:
+    """Save AIVC config to ~/.aivc/config.json."""
+    _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _CONFIG_PATH.write_text(json.dumps(config, indent=4), encoding="utf-8")
+
+def get_machine_id() -> str:
+    """Retrieve machine_id from config or fallback to hostname."""
+    config = get_aivc_config()
+    m_id = config.get("machine_id", "").strip()
+    if not m_id:
+        return socket.gethostname()
+    return m_id
+
+def get_rclone_exe() -> str:
+    """Get the path to the rclone executable."""
+    if _RCLONE_BIN.exists():
+        return str(_RCLONE_BIN)
+    return "rclone" # Fallback to PATH
 
 def get_storage_root(allow_fallback: bool = False) -> Path:
     """Retrieve and validate the AIVC storage root directory.

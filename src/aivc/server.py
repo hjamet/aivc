@@ -110,8 +110,15 @@ _storage_root = get_storage_root()
 # SemanticEngine is imported here (triggering a fast eager init of Workspace +
 # SQLite graph; the heavy ML components remain lazy until first use).
 from aivc.semantic.engine import SemanticEngine  # noqa: E402
+from aivc.sync.sync import RcloneSyncManager
+from aivc.sync.background import BackgroundSyncer
+from aivc.config import get_machine_id
 
 _engine = SemanticEngine(_storage_root)
+_sync_manager = RcloneSyncManager(_storage_root)
+_syncer = BackgroundSyncer(_storage_root)
+
+_local_machine_id = get_machine_id()
 
 # ---------------------------------------------------------------------------
 # FastMCP server instance
@@ -184,7 +191,7 @@ def create_commit(title: str, note: str, consulted_files: list[str] = []) -> str
 
 
 @mcp.tool()
-def search_memory(query: str, top_n: int = 5, filter_glob: str = "") -> str:
+def search_memory(query: str, top_n: int = 5, filter_glob: str = "", only_local: bool = False) -> str:
     """Search past commit notes by semantic meaning.
 
     Uses a Bi-Encoder + Cross-Encoder pipeline to retrieve the most relevant
@@ -199,21 +206,32 @@ def search_memory(query: str, top_n: int = 5, filter_glob: str = "") -> str:
         top_n: Number of results to return (default 5, max 20).
         filter_glob: Optional glob pattern (e.g. "src/*.py") to restrict search to commits
                      that touched matching files.
-
-    Returns:
-        A ranked list of matching commits + the most relevant file paths.
+        only_local: If True, only search commits created on this machine.
     """
     top_n = min(top_n, 20)
+    
+    # Check if indexing is in progress
+    indexing_queue_size = _engine.get_index_queue_size()
+    warning_header = ""
+    if indexing_queue_size > 0:
+        warning_header = f"⚠️  Note: {indexing_queue_size} recent commit(s) are still being indexed and may be missing from search results.\n\n"
+
     results = _engine.search(query, top_n=top_n, filter_glob=filter_glob)
 
+    if only_local:
+        results = [r for r in results if getattr(r, 'machine_id', _local_machine_id) == _local_machine_id]
+
     if not results:
-        return "No matching commits found in memory."
+        return warning_header + "No matching commits found in memory."
 
     # Build commit list
     commit_lines = []
     for i, r in enumerate(results, 1):
+        m_id = getattr(r, 'machine_id', "")
+        remote_tag = f" [Remote: {m_id}]" if m_id and m_id != _local_machine_id else ""
+        
         commit_lines.append(
-            f"{i}. [{r.timestamp[:10]}] {r.title}\n"
+            f"{i}. [{r.timestamp[:10]}] {r.title}{remote_tag}\n"
             f"   ID    : {r.commit_id}\n"
             f"   Score : {r.score:.3f}\n"
             f"   > {r.snippet}"
@@ -228,7 +246,7 @@ def search_memory(query: str, top_n: int = 5, filter_glob: str = "") -> str:
     for fp, count in file_counter.most_common(10):
         file_lines.append(f"  - {fp} (in {count}/{len(results)} results)")
 
-    output = "## Matching Commits\n\n"
+    output = warning_header + "## Matching Commits\n\n"
     output += "\n".join(commit_lines)
 
     if file_lines:
@@ -242,7 +260,7 @@ def search_memory(query: str, top_n: int = 5, filter_glob: str = "") -> str:
 
 
 @mcp.tool()
-def search_files_bm25(query: str, top_n: int = 5) -> str:
+def search_files_bm25(query: str, top_n: int = 5, only_local: bool = True) -> str:
     """Search for keywords or exact code patterns in current tracked files.
 
     Uses BM25 (lexical ranking) on the actual text content of files currently
@@ -251,9 +269,7 @@ def search_files_bm25(query: str, top_n: int = 5) -> str:
     Args:
         query: Keywords or code fragment (e.g. "function_name" or "import os").
         top_n: Number of results to return (default 5).
-
-    Returns:
-        A list of matching files with their relative paths and context snippets.
+        only_local: (Ignored) BM25 search is always local as it looks at disk.
     """
     results = _engine.search_files_bm25(query, top_n=top_n)
 
@@ -319,11 +335,16 @@ def consult_commit(commit_id: str) -> str:
         else "  (no file changes recorded)"
     )
 
+    machine_line = ""
+    if commit.machine_id and commit.machine_id != _local_machine_id:
+        machine_line = f"**Machine**   : {commit.machine_id} (Distant)\n"
+
     return (
         f"# Commit: {commit.title}\n\n"
         f"**ID**        : {commit.id}\n"
         f"**Timestamp** : {commit.timestamp}\n"
-        f"**Parent**    : {commit.parent_id or 'none (initial commit)'}\n\n"
+        f"**Parent**    : {commit.parent_id or 'none (initial commit)'}\n"
+        f"{machine_line}\n"
         f"{context_block}"
         f"## Files Changed\n{changes_summary}\n\n"
         f"## Note\n\n{commit.note}"
@@ -331,7 +352,7 @@ def consult_commit(commit_id: str) -> str:
 
 
 @mcp.tool()
-def get_recent_commits(limit: int = 10, offset: int = 0) -> str:
+def get_recent_commits(limit: int = 10, offset: int = 0, only_local: bool = False) -> str:
     """Display the recent commit history (like `git log`).
 
     Use this tool at the start of a session or when you need to recall what
@@ -342,14 +363,16 @@ def get_recent_commits(limit: int = 10, offset: int = 0) -> str:
     Args:
         limit:  Number of commits to show (default 10, max 50).
         offset: Number of commits to skip from the most recent (default 0).
-
-    Returns:
-        A formatted list of recent commits with their associated file paths.
+        only_local: If True, only show commits created on this machine.
     """
     limit = min(limit, 50)
 
     # get_log fetches `offset + limit` commits and then slices.
     all_recent = _engine.get_log(limit=offset + limit)
+    
+    if only_local:
+        all_recent = [c for c in all_recent if c.machine_id == _local_machine_id]
+
     page = all_recent[offset : offset + limit]
 
     if not page:
@@ -363,8 +386,9 @@ def get_recent_commits(limit: int = 10, offset: int = 0) -> str:
         except KeyError:
             files_str = "—"
 
+        m_tag = f" [Remote: {commit.machine_id}]" if commit.machine_id and commit.machine_id != _local_machine_id else ""
         lines.append(
-            f"{i:>3}. [{commit.timestamp[:10]}] {commit.title}\n"
+            f"{i:>3}. [{commit.timestamp[:10]}] {commit.title}{m_tag}\n"
             f"      ID    : {commit.id}\n"
             f"      Files : {files_str}"
         )
@@ -423,19 +447,53 @@ def read_historical_file(file_path: str, commit_id: str) -> str:
     Scans the commit chain backwards from `commit_id` to find the most recent
     blob for `file_path` at or before that commit.
 
+    If the file content exists only on a remote machine, it will be downloaded
+    automatically if cloud sync is enabled.
+
     Args:
         file_path: The path of the file to read.
         commit_id: The UUID of the commit at which to read the file.
-
-    Returns:
-        The UTF-8 decoded content of the file at that point in time.
-
-    Raises:
-        KeyError: If the file or commit is not found in history.
-        UnicodeDecodeError: If the file content is not valid UTF-8.
     """
-    raw: bytes = _engine.read_file_at_commit(file_path, commit_id)
-    return raw.decode("utf-8")
+    warning_header = ""
+    try:
+        raw: bytes = _engine.read_file_at_commit(file_path, commit_id)
+    except FileNotFoundError:
+        # If the file hasn't been found locally, it might be a distant blob.
+        # Find which commit exactly has this blob to know the machine_id.
+        commit = _engine.get_commit(commit_id)
+        target_commit = None
+        target_blob_hash = None
+        
+        # Walk back to find the blob hash
+        cid = commit_id
+        while cid:
+            c = _engine.get_commit(cid)
+            for change in c.changes:
+                if change.path == file_path and change.blob_hash:
+                    target_commit = c
+                    target_blob_hash = change.blob_hash
+                    break
+            if target_commit: break
+            cid = c.parent_id
+            
+        if target_commit and target_commit.machine_id and target_commit.machine_id != _local_machine_id:
+            if not _sync_manager.enabled:
+                raise RuntimeError(
+                    f"File {file_path!r} exists only on remote machine {target_commit.machine_id!r} "
+                    "and cloud sync is disabled."
+                )
+            
+            # Show a warning to the agent
+            warning_header = f"⚠️  [Remote: {target_commit.machine_id}] This file was downloaded from the cloud.\n"
+            
+            # Attempt to fetch
+            _sync_manager.fetch_blob(target_blob_hash, target_commit.machine_id)
+            # Try reading again
+            raw = _engine.read_file_at_commit(file_path, commit_id)
+        else:
+            raise
+
+    return warning_header + raw.decode("utf-8")
 
 
 @mcp.tool()
@@ -667,6 +725,7 @@ def start_background_watchers():
 if __name__ == "__main__":
     # Start background tasks
     start_background_watchers()
+    _syncer.start()
     
     # Run MCP server
     mcp.run(transport="stdio")

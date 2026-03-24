@@ -411,8 +411,9 @@
                         style: {
                             'border-width': 3,
                             'border-color': '#fff',
-                            'width': ele => ele.data('size') * 1.5,
-                            'height': ele => ele.data('size') * 1.5,
+                            // Size scales with relevance: base ×1.1 up to ×2.0
+                            'width': ele => ele.data('size') * (1.1 + (ele.data('relevance') || 0) * 0.9),
+                            'height': ele => ele.data('size') * (1.1 + (ele.data('relevance') || 0) * 0.9),
                             'z-index': 100,
                             'color': '#ffffff',
                             'font-weight': 'bold',
@@ -442,8 +443,9 @@
                         style: {
                             'border-width': 2,
                             'border-color': '#d2a8ff',
-                            'width': ele => ele.data('size') * 1.3,
-                            'height': ele => ele.data('size') * 1.3,
+                            // Size scales with relevance (co-occurrence weight): base ×1.0 up to ×1.8
+                            'width': ele => ele.data('size') * (1.0 + (ele.data('relevance') || 0) * 0.8),
+                            'height': ele => ele.data('size') * (1.0 + (ele.data('relevance') || 0) * 0.8),
                             'z-index': 150,
                             'color': '#e0e0e0',
                             'font-weight': '500',
@@ -663,11 +665,18 @@ async function showFileHistory(nodeId) {
             });
 
             // Click node: highlight it + distance-1 neighbors, dim rest
+            // Neighbor size is proportional to co-occurrence weight (edge weight)
             cy.on('tap', 'node', function(e){
                 let node = e.target;
                 let neighborhood = node.neighborhood();
                 let neighborNodes = neighborhood.nodes();
                 let neighborEdges = neighborhood.edges();
+
+                // Compute max edge weight for normalization
+                let maxWeight = 1;
+                neighborEdges.forEach(edge => {
+                    if (edge.data('weight') > maxWeight) maxWeight = edge.data('weight');
+                });
 
                 cy.batch(() => {
                     // Clear all previous selection classes
@@ -681,9 +690,18 @@ async function showFileHistory(nodeId) {
                     node.removeClass('dim');
                     node.addClass('selected');
 
-                    // Highlight neighbors
-                    neighborNodes.removeClass('dim');
-                    neighborNodes.addClass('neighbor');
+                    // Highlight neighbors with relevance proportional to edge weight
+                    neighborNodes.forEach(neighborNode => {
+                        // Find connecting edge to get weight
+                        let connectingEdge = neighborEdges.filter(e =>
+                            e.source().id() === neighborNode.id() || e.target().id() === neighborNode.id()
+                        );
+                        let weight = connectingEdge.length > 0 ? connectingEdge[0].data('weight') : 1;
+                        let relevance = weight / maxWeight; // normalized 0-1
+                        neighborNode.data('relevance', relevance);
+                        neighborNode.removeClass('dim');
+                        neighborNode.addClass('neighbor');
+                    });
 
                     // Highlight edges connecting to neighbors
                     neighborEdges.removeClass('dim');
@@ -704,10 +722,12 @@ async function showFileHistory(nodeId) {
                 if (e.target === cy) {
                     cy.batch(() => {
                         cy.elements().removeClass('selected neighbor neighbor-edge dim');
+                        cy.nodes().removeData('relevance');
                         // Re-apply search highlight if active
                         if (involvedFilesGlobal.size > 0) {
                             cy.nodes().forEach(n => {
                                 if (involvedFilesGlobal.has(n.id())) {
+                                    n.data('relevance', fileRelevanceGlobal[n.id()] || 0);
                                     n.addClass('highlight');
                                 } else {
                                     n.addClass('dim');
@@ -730,6 +750,7 @@ async function showFileHistory(nodeId) {
             });
 
             let involvedFilesGlobal = new Set();
+            let fileRelevanceGlobal = {};  // file_path -> normalized relevance [0,1]
             let lastSearchResults = [];  // Store for commit detail navigation
 
             searchInput.addEventListener('keydown', async (e) => {
@@ -768,18 +789,39 @@ async function showFileHistory(nodeId) {
                         return;
                     }
 
-                    // Extract all files involved
+                    // Compute per-file relevance from scores
                     involvedFilesGlobal.clear();
+                    fileRelevanceGlobal = {};
+
+                    // Normalize scores to [0, 1]
+                    const scores = commits.map(c => c.score);
+                    const minScore = Math.min(...scores);
+                    const maxScore = Math.max(...scores);
+                    const scoreRange = (maxScore - minScore) || 1;
+
                     commits.forEach(c => {
-                        c.file_paths.forEach(f => involvedFilesGlobal.add(f));
+                        const normalizedScore = (c.score - minScore) / scoreRange; // 0 to 1
+                        c.file_paths.forEach(f => {
+                            involvedFilesGlobal.add(f);
+                            if (!fileRelevanceGlobal[f]) fileRelevanceGlobal[f] = 0;
+                            fileRelevanceGlobal[f] += normalizedScore;
+                        });
                     });
 
-                    // Update Graph Style
+                    // Normalize per-file relevance to [0, 1]
+                    const maxFileRel = Math.max(...Object.values(fileRelevanceGlobal), 0.001);
+                    for (const f in fileRelevanceGlobal) {
+                        fileRelevanceGlobal[f] /= maxFileRel;
+                    }
+
+                    // Update Graph Style with proportional sizing
                     cy.batch(() => {
-                        cy.elements().removeClass('highlight dim');
+                        cy.elements().removeClass('highlight dim selected neighbor neighbor-edge');
                         
                         cy.nodes().forEach(node => {
-                            if (involvedFilesGlobal.has(node.id())) {
+                            const rel = fileRelevanceGlobal[node.id()];
+                            if (rel !== undefined) {
+                                node.data('relevance', rel);
                                 node.addClass('highlight');
                             } else {
                                 node.addClass('dim');
@@ -814,8 +856,10 @@ async function showFileHistory(nodeId) {
 
             function resetSearch(closeSidebar = false) {
                 involvedFilesGlobal.clear();
+                fileRelevanceGlobal = {};
                 cy.batch(() => {
-                    cy.elements().removeClass('highlight dim');
+                    cy.elements().removeClass('highlight dim selected neighbor neighbor-edge');
+                    cy.nodes().removeData('relevance');
                 });
                 cy.animate({ fit: { padding: 30 } }, { duration: 500 });
                 resetBtn.style.display = 'none';

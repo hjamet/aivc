@@ -96,6 +96,7 @@ class Indexer:
             "commit_id": commit.id,
             "title": commit.title,
             "timestamp": commit.timestamp,
+            "machine_id": commit.machine_id,
             # ChromaDB metadata values must be str/int/float/bool.
             # Store file paths as a comma-joined string.
             "file_paths": "\n".join(file_paths),
@@ -217,6 +218,7 @@ class Indexer:
                     "commit_id": meta["commit_id"],
                     "title": meta["title"],
                     "timestamp": meta["timestamp"],
+                    "machine_id": meta.get("machine_id", ""),
                     "file_paths": [p for p in file_paths_str.split("\n") if p],
                     "document": doc,
                 }

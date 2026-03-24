@@ -164,6 +164,104 @@ def cmd_web(args: argparse.Namespace) -> None:
     sys.argv = ["aivc-web", "--port", str(args.port)]
     dashboard_main()
 
+
+def cmd_config(args: argparse.Namespace) -> None:
+    """Manage AIVC configuration."""
+    from aivc.config import get_aivc_config, save_aivc_config
+    config = get_aivc_config()
+
+    if args.key and args.value:
+        # Simple nested key support (e.g. sync.enabled)
+        parts = args.key.split(".")
+        target = config
+        for p in parts[:-1]:
+            if p not in target: target[p] = {}
+            target = target[p]
+        
+        # Type conversion attempt
+        val = args.value
+        if val.lower() == "true": val = True
+        elif val.lower() == "false": val = False
+        elif val.isdigit(): val = int(val)
+        
+        target[parts[-1]] = val
+        save_aivc_config(config)
+        print(f"{GREEN}Config updated: {args.key} = {val}{RESET}")
+    else:
+        import json
+        print(f"{YELLOW}{BOLD}Current AIVC Configuration:{RESET}")
+        print(json.dumps(config, indent=2))
+
+
+def cmd_sync_setup(args: argparse.Namespace) -> None:
+    """Guide the user through rclone sync setup."""
+    from aivc.config import get_aivc_config, save_aivc_config, get_rclone_exe
+    import subprocess
+    
+    config = get_aivc_config()
+    if "sync" not in config: config["sync"] = {}
+    
+    print(f"{CYAN}{BOLD}=== AIVC Cloud Sync Setup ==={RESET}")
+    print("This will configure rclone to sync your memory between machines.")
+    
+    rclone = get_rclone_exe()
+    print(f"\n1. {BOLD}Rclone binary:{RESET} {rclone}")
+    
+    print(f"\n2. {BOLD}Remote Configuration:{RESET}")
+    print("You must first create a remote named 'aivc_remote' (or your choice) via 'rclone config'.")
+    print("We recommend Google Drive, but any rclone-supported backend works.")
+    
+    remote_name = input(f"Enter your rclone remote name (default: {config['sync'].get('remote_name', 'aivc_remote')}): ").strip()
+    if remote_name: config["sync"]["remote_name"] = remote_name
+    elif "remote_name" not in config["sync"]: config["sync"]["remote_name"] = "aivc_remote"
+
+    enabled = input("Enable cloud sync? (y/n, default: y): ").strip().lower() != 'n'
+    config["sync"]["enabled"] = enabled
+
+    save_aivc_config(config)
+    print(f"\n{GREEN}Success! Configuration saved to ~/.aivc/config.json{RESET}")
+    if enabled:
+        print(f"{YELLOW}Cloud sync is now ENABLED.{RESET}")
+    else:
+        print(f"{DIM}Cloud sync is currently DISABLED.{RESET}")
+
+
+def cmd_sync_status(args: argparse.Namespace) -> None:
+    """Show cloud sync status and remote machines."""
+    from aivc.config import get_aivc_config, get_machine_id
+    from aivc.sync.sync import RcloneSyncManager
+    
+    config = get_aivc_config()
+    sync_cfg = config.get("sync", {})
+    m_id = get_machine_id()
+    
+    print(f"{CYAN}{BOLD}AIVC Sync Status:{RESET}")
+    print(f"  {BOLD}Local Machine ID:{RESET} {m_id}")
+    print(f"  {BOLD}Sync Enabled:{RESET}     {GREEN if sync_cfg.get('enabled') else YELLOW}{sync_cfg.get('enabled', False)}{RESET}")
+    print(f"  {BOLD}Remote Name:{RESET}      {sync_cfg.get('remote_name', '—')}")
+    
+    if sync_cfg.get("enabled"):
+        try:
+            manager = RcloneSyncManager(Path.home() / ".aivc" / "storage")
+            print(f"\n{DIM}Checking remote machines via rclone...{RESET}")
+            # list dirs in AIVC_Sync/
+            remote = sync_cfg.get("remote_name")
+            res = manager._run_rclone(["lsf", f"{remote}:AIVC_Sync/"], check=False)
+            if res.returncode == 0:
+                others = [d.rstrip('/') for d in res.stdout.splitlines() if d.rstrip('/') != m_id]
+                print(f"  {BOLD}Remote machines seen:{RESET} {', '.join(others) if others else 'none yet'}")
+                
+                # Auto-update remote_machines list in config if needed
+                if set(others) != set(sync_cfg.get("remote_machines", [])):
+                    config["sync"]["remote_machines"] = list(set(others))
+                    from aivc.config import save_aivc_config
+                    save_aivc_config(config)
+                    print(f"{DIM}(Updated remote_machines list in config){RESET}")
+            else:
+                print(f"{RED}Error connecting to remote: {res.stderr.strip()}{RESET}")
+        except Exception as e:
+            print(f"{RED}Error: {e}{RESET}")
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -250,6 +348,23 @@ def main() -> None:
         help="Port to serve the dashboard on (default: 8765)"
     )
 
+    # config
+    parser_config = subparsers.add_parser(
+        "config",
+        help="Manage AIVC configuration"
+    )
+    parser_config.add_argument("key", type=str, nargs="?", help="Config key (path.to.key)")
+    parser_config.add_argument("value", type=str, nargs="?", help="New value")
+
+    # sync
+    parser_sync = subparsers.add_parser(
+        "sync",
+        help="Manage cloud synchronization"
+    )
+    sync_sub = parser_sync.add_subparsers(dest="sync_command", required=True)
+    sync_sub.add_parser("setup", help="Interactive rclone sync setup")
+    sync_sub.add_parser("status", help="Check cloud sync status")
+
     args = parser.parse_args()
 
     if args.command == "status":
@@ -266,6 +381,13 @@ def main() -> None:
         cmd_search_files(args)
     elif args.command == "web":
         cmd_web(args)
+    elif args.command == "config":
+        cmd_config(args)
+    elif args.command == "sync":
+        if args.sync_command == "setup":
+            cmd_sync_setup(args)
+        elif args.sync_command == "status":
+            cmd_sync_status(args)
 
 
 if __name__ == "__main__":

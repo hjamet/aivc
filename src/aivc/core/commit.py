@@ -80,13 +80,16 @@ class Commit:
     changes: list[FileChange] = field(default_factory=list)
     """List of file changes recorded in this commit."""
 
-    @classmethod
+    machine_id: str = ""
+    """ID of the machine where the commit was created (empty for local/legacy)."""
+
     def create(
         cls,
         title: str,
         note: str,
         parent_id: str | None,
         changes: list[FileChange],
+        machine_id: str = "",
     ) -> "Commit":
         """Factory: create a new Commit with a fresh UUID and current UTC timestamp."""
         if not title.strip():
@@ -100,6 +103,7 @@ class Commit:
             note=note,
             parent_id=parent_id,
             changes=changes,
+            machine_id=machine_id,
         )
 
 
@@ -115,6 +119,7 @@ def commit_to_dict(commit: Commit) -> dict[str, Any]:
         "title": commit.title,
         "note": commit.note,
         "parent_id": commit.parent_id,
+        "machine_id": commit.machine_id,
         "changes": [
             {
                 "path": c.path,
@@ -163,6 +168,7 @@ def commit_from_dict(data: dict[str, Any]) -> Commit:
         title=data["title"],
         note=data["note"],
         parent_id=data["parent_id"],
+        machine_id=data.get("machine_id", ""),  # Default to empty for legacy
         changes=changes,
     )
 
