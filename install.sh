@@ -88,10 +88,10 @@ fi
 # 4. Install the package with semantic dependencies
 # ---------------------------------------------------------------------------
 
-info "Installing aivc[semantic] into the venv (this may take a moment) ..."
+info "Installing aivc[all] into the venv (this may take a moment) ..."
 # We use relative paths for install to avoid Windows/MSYS absolute path mangling
 pushd "${SOURCE_DIR}" >/dev/null
-uv pip install --python "${VENV_PYTHON}" -e ".[semantic]"
+uv pip install --python "${VENV_PYTHON}" -e ".[all]"
 popd >/dev/null
 
 # ---------------------------------------------------------------------------
