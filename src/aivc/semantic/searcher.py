@@ -67,8 +67,9 @@ class Searcher:
     def _cross_encoder(self):
         """Lazy-loaded CrossEncoder model."""
         if self.__cross_encoder is None:
+            import sys
             from sentence_transformers import CrossEncoder
-            print(f"\n\033[2m[aivc] Initialising/Downloading CrossEncoder model (this may take a moment)...\033[0m")
+            print(f"\n\033[2m[aivc] Initialising/Downloading CrossEncoder model (this may take a moment)...\033[0m", file=sys.stderr)
             self.__cross_encoder = CrossEncoder(CROSS_ENCODER_MODEL)
         return self.__cross_encoder
 
