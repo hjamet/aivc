@@ -58,6 +58,7 @@ class SemanticEngine:
         self.__indexer = None
         self.__searcher = None
         self.__bm25_cache = None
+        self._local_hints_index = None
 
         # Async Indexing & Sync
         self._index_queue = queue.Queue()
@@ -72,6 +73,9 @@ class SemanticEngine:
 
         # Ensure graceful shutdown
         atexit.register(self.shutdown)
+
+        # Register workspace reload callback
+        self._workspace.register_reload_callback(self._on_workspace_reload)
 
     def _indexing_worker_loop(self):
         """Background worker thread to index commits from the queue."""
@@ -125,6 +129,10 @@ class SemanticEngine:
     def get_index_queue_size(self) -> int:
         """Return the number of commits waiting to be indexed or synced."""
         return self._index_queue.qsize() + self._sync_queue.qsize()
+
+    def _on_workspace_reload(self) -> None:
+        """Callback from workspace when its state is reloaded from disk."""
+        self._local_hints_index = None
 
 
     # ------------------------------------------------------------------
@@ -195,6 +203,9 @@ class SemanticEngine:
 
         # Step 3: async semantic indexing
         self._index_queue.put(commit)
+
+        # Step 4: Invalidate hints cache (new files might have been auto-tracked)
+        self._local_hints_index = None
 
         return commit
 
@@ -341,6 +352,7 @@ class SemanticEngine:
 
     def track(self, path: str, ignores: list[str] | None = None) -> dict[str, Any]:
         """Track a file, directory, or glob. See :meth:`Workspace.track`."""
+        self._local_hints_index = None
         return self._workspace.track(path, ignores)
 
     def get_watched_dirs(self) -> dict[str, dict[str, Any]]:
@@ -349,6 +361,7 @@ class SemanticEngine:
 
     def untrack(self, path_or_glob: str) -> None:
         """Remove a file/dir from tracking. See :meth:`Workspace.untrack`."""
+        self._local_hints_index = None
         self._workspace.untrack(path_or_glob)
 
     def get_status(self) -> list[FileStatus]:
@@ -384,37 +397,48 @@ class SemanticEngine:
         """Explicitly migrate JSON commits to SQLite index."""
         self._workspace.migrate_index()
 
+    def _get_local_hints_index(self) -> dict[str, list[str]]:
+        """Lazy-build an inverted index {basename: [paths]} for fast lookups."""
+        if self._local_hints_index is None:
+            index = {}
+            # Use get_tracked_paths for O(1) path retrieval (no FileStatus overhead)
+            for path_str in self._workspace.get_tracked_paths():
+                basename = Path(path_str).name
+                if basename not in index:
+                    index[basename] = []
+                index[basename].append(path_str)
+            self._local_hints_index = index
+        return self._local_hints_index
+
     def find_local_equivalent(self, remote_path: str, remote_blob_hash: str | None = None) -> str | None:
         """Try to find a local tracked file that matches a remote path.
         
-        Heuristic:
-        1. Exact match if possible (unlikely).
-        2. Same basename + same immediate parent folder name.
-        3. If blob_hash provided, check if it exists in local history for suspected files.
+        Optimised O(1) basename lookup.
         """
-        tracked_files = self.get_status()
-        if not tracked_files:
-            return None
-        
         remote_p = Path(remote_path)
         remote_basename = remote_p.name
         remote_parent_name = remote_p.parent.name if remote_p.parent else ""
         
-        candidates = []
-        for s in tracked_files:
-            lp = Path(s.path)
+        # O(1) lookup in inverted index
+        candidates = self._get_local_hints_index().get(remote_basename, [])
+        if not candidates:
+            return None
+        
+        final_candidates = []
+        for local_path in candidates:
+            lp = Path(local_path)
             # 1. Check strong match via blob hash if available
             if remote_blob_hash:
-                local_blobs = self._index.get_blob_hashes_for_file(s.path)
+                # _index is CoreIndex (SQLite) - this is still an I/O hit but 
+                # only for files already matching the basename.
+                local_blobs = self._workspace._index.get_blob_hashes_for_file(local_path)
                 if remote_blob_hash in local_blobs:
-                    return s.path
+                    return local_path
             
-            # 2. Basename match
-            if lp.name == remote_basename:
-                # 3. Parent folder match (depth 1)
-                local_parent_name = lp.parent.name if lp.parent else ""
-                if local_parent_name == remote_parent_name:
-                    candidates.append(s.path)
+            # 2. Parent folder match (depth 1)
+            local_parent_name = lp.parent.name if lp.parent else ""
+            if local_parent_name == remote_parent_name:
+                final_candidates.append(local_path)
         
-        return candidates[0] if candidates else None
+        return final_candidates[0] if final_candidates else None
 

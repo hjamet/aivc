@@ -83,6 +83,7 @@ class Commit:
     machine_id: str = ""
     """ID of the machine where the commit was created (empty for local/legacy)."""
 
+    @classmethod
     def create(
         cls,
         title: str,

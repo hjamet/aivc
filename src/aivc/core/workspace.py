@@ -57,9 +57,12 @@ class Workspace:
         self._commits_dir.mkdir(parents=True, exist_ok=True)
         self._blob_store = BlobStore(self._root)
         self._index = CoreIndex(self._root)
+        self._last_mtime = 0.0
+        self._on_reload_callbacks = []
 
         if self._workspace_path.exists():
             self._state = self._load_state()
+            self._last_mtime = self._workspace_path.stat().st_mtime
             
             # Migration: convert stored relative paths to absolute
             migrated = False
@@ -93,6 +96,7 @@ class Workspace:
                 "watched_dirs": {},
             }
             self._save_state()
+            # _save_state updates _last_mtime
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -112,6 +116,29 @@ class Workspace:
         self._workspace_path.write_text(
             json.dumps(self._state, indent=2), encoding="utf-8"
         )
+        self._last_mtime = self._workspace_path.stat().st_mtime
+
+    def register_reload_callback(self, callback: Any) -> None:
+        """Register a callback to be executed when the state is reloaded from disk."""
+        self._on_reload_callbacks.append(callback)
+
+    def _reload_state_if_needed(self) -> bool:
+        """Check if workspace.json has changed on disk and reload if so.
+        
+        Returns:
+            True if state was reloaded, False otherwise.
+        """
+        if not self._workspace_path.exists():
+            return False
+        
+        current_mtime = self._workspace_path.stat().st_mtime
+        if current_mtime > self._last_mtime:
+            self._state = self._load_state()
+            self._last_mtime = current_mtime
+            for cb in self._on_reload_callbacks:
+                cb()
+            return True
+        return False
 
     def _commit_path(self, commit_id: str) -> Path:
         return self._commits_dir / f"{commit_id}.json"
@@ -205,6 +232,7 @@ class Workspace:
         Raises:
             ValueError: if no matching files are found.
         """
+        self._reload_state_if_needed()
         p = Path(path).resolve()
         abs_p = str(p)
 
@@ -249,6 +277,7 @@ class Workspace:
 
     def get_watched_dirs(self) -> dict[str, dict[str, Any]]:
         """Return the dictionary of watched directories."""
+        self._reload_state_if_needed()
         return self._state.get("watched_dirs", {})
 
     def untrack(self, path_or_glob: str) -> None:
@@ -262,6 +291,7 @@ class Workspace:
         Raises:
             KeyError: if no matching files or watched directories are found.
         """
+        self._reload_state_if_needed()
         abs_p = str(Path(path_or_glob).resolve())
         removed_watch = False
 
@@ -306,6 +336,11 @@ class Workspace:
             
         self._save_state()
 
+    def get_tracked_paths(self) -> list[str]:
+        """Return just the list of tracked file absolute paths (fast)."""
+        self._reload_state_if_needed()
+        return list(self._state["tracked_files"].keys())
+
     def create_commit(
         self,
         title: str,
@@ -330,6 +365,7 @@ class Workspace:
         Raises:
             RuntimeError: if no changes are detected and no files were consulted.
         """
+        self._reload_state_if_needed()
         changes = compute_diff(self._state["tracked_files"], self._blob_store)
         
         # Handle consulted files
@@ -397,6 +433,7 @@ class Workspace:
         For each file: current on-disk size and total history size (all
         blobs ever associated with this file across all commits).
         """
+        self._reload_state_if_needed()
         statuses = []
         for rel_path in self._state["tracked_files"]:
             p = Path(rel_path)
@@ -431,6 +468,7 @@ class Workspace:
         Traverses the commit chain via parent_id starting from HEAD.
         Skips the first `offset` commits for pagination support.
         """
+        self._reload_state_if_needed()
         commits: list[Commit] = []
         current_id = self._state["head_commit_id"]
         skipped = 0

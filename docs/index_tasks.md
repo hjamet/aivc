@@ -23,3 +23,5 @@
 | [Phase 19: Web Dashboard UX](tasks/phase19_web_dashboard_ux.md) | Sidebar Git Log, File history, cose layout fix | 2026-03-24 | `Up to date` |
 | [Phase 20: Cloud Sync](tasks/phase20_google_drive_sync.md) | Google Drive Sync architecture for multi-machine commits | 2026-03-24 | `Up to date` |
 | [Phase 21: Async & Sync Consolidation](tasks/phase21_async_sync_consolidation.md) | Async and cloud sync architectural debt consolidation | 2026-03-24 | `Up to date` |
+| [Phase 22: Local Hints Optimization](tasks/phase22_local_hints_optimization.md) | O(1) basename index for local path hints | 2026-03-24 | `Up to date` |
+| [Phase 23 — Synchronisation d'État](tasks/phase23_state_sync_reload.md) | Reload JIT du workspace via mtime | 2026-03-24 | `Up to date` |

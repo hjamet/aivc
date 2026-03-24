@@ -2,7 +2,7 @@
 
 **Long-term memory MCP server for LLM agents**, inspired by human memory and Git.
 
-> **Status**: 🟢 Phase 21 — Async & Sync Consolidation.
+> **Status**: 🟢 **Phase 23 (Terminée)** : Synchronisation d'état multi-processus via rechargement JIT (`mtime`) et callbacks d'invalidation de cache.
 
 ### Concept
 
@@ -214,6 +214,8 @@ aivc/
 | **19** | [Web Dashboard UX](docs/tasks/phase19_web_dashboard_ux.md) | Sidebar Git Log (Infinite Scroll), File history, cose layout fix | 🟢 Finished |
 | **20** | [Cloud Sync & Async Indexing](docs/tasks/phase20_google_drive_sync.md) | Synchronisation inter-machines facultative et asynchrone des commits via Drive | 🟢 Finished |
 | **21** | [Async & Sync Consolidation](docs/tasks/phase21_async_sync_consolidation.md) | Dette technique : séparation CPU/IO, Graceful Shutdown, Global Cloud Blobs | 🟢 Finished |
+| **22** | [Local Hints Optimization](docs/tasks/phase22_local_hints_optimization.md) | Optimisation O(1) de la recherche de correspondances locales | 🟢 Finished |
+| **23** | [State Sync & JIT Reload](docs/tasks/phase23_state_sync_reload.md) | Rechargement conditionnel de workspace.json pour éviter la désync CLI/MCP | 🟡 Planned |
 
 ### Documentation Index
 | Title (Link) | Description |
@@ -234,3 +236,5 @@ aivc/
 | [Phase 19 Spec](docs/tasks/phase19_web_dashboard_ux.md) | Web Dashboard UX improvements (Sidebar + Forces). |
 | [Phase 20 Spec](docs/tasks/phase20_google_drive_sync.md) | Google Drive Sync architecture for multi-machine commits. |
 | [Phase 21 Spec](docs/tasks/phase21_async_sync_consolidation.md) | Async and Cloud Sync Consolidation. |
+| [Phase 22 Spec](docs/tasks/phase22_local_hints_optimization.md) | Local Hints Optimization (O(1)). |
+| [Phase 23 Spec](docs/tasks/phase23_state_sync_reload.md) | State Sync & JIT Reload (Multi-process). |

@@ -27,6 +27,7 @@ os.environ["AIVC_STORAGE_ROOT"] = _FAKE_STORAGE
 
 # Build a mock SemanticEngine class and patch at import time.
 _mock_engine = MagicMock()
+_mock_engine.get_index_queue_size.return_value = 0
 
 
 def _import_server():
@@ -139,9 +140,9 @@ class TestCreateCommit(unittest.TestCase):
         self.assertIn("no tracked files changed", result)
 
 
-class TestSearchMemory(unittest.TestCase):
     def setUp(self):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
+        _mock_engine.get_index_queue_size.return_value = 0
 
     def test_returns_commit_list_without_note(self):
         _mock_engine.search.return_value = [_make_search_result()]
