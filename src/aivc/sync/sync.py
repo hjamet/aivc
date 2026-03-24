@@ -42,12 +42,13 @@ class RcloneSyncManager:
         self._run_rclone(["copy", str(local_path), remote_path])
 
     def push_blob(self, blob_hash: str):
-        """Push a local blob to the remote."""
+        """Push a local blob to the remote global pool."""
         if not self.enabled or not self.config.get("sync_blobs", True):
             return
             
         local_path = self.storage_root / "blobs" / blob_hash[:2] / blob_hash
-        remote_path = f"{self.remote_name}:AIVC_Sync/{self.machine_id}/blobs/"
+        # GLOBAL POOL: AIVC_Sync/blobs/
+        remote_path = f"{self.remote_name}:AIVC_Sync/blobs/"
         
         self._run_rclone(["copy", str(local_path), remote_path])
 
@@ -67,17 +68,24 @@ class RcloneSyncManager:
             # Use --ignore-existing to avoid overwriting or redundant downloads
             self._run_rclone(["copy", remote_path, str(local_path), "--ignore-existing"])
 
-    def fetch_blob(self, blob_hash: str, machine_id: str):
-        """Fetch a missing blob from a specific remote machine's folder."""
+    def fetch_blob(self, blob_hash: str, machine_id: str | None = None):
+        """Fetch a missing blob from the remote global pool."""
         if not self.enabled:
             raise RuntimeError("Cloud sync is disabled. Cannot fetch distant blob.")
             
-        remote_path = f"{self.remote_name}:AIVC_Sync/{machine_id}/blobs/{blob_hash}"
+        # Try global pool first
+        remote_path = f"{self.remote_name}:AIVC_Sync/blobs/{blob_hash}"
         local_dir = self.storage_root / "blobs" / blob_hash[:2]
         local_dir.mkdir(parents=True, exist_ok=True)
         
         self._run_rclone(["copy", remote_path, str(local_dir)])
         
         local_path = local_dir / blob_hash
+        if not local_path.exists() and machine_id:
+            # Fallback to legacy machine-specific folder if provided
+            remote_path = f"{self.remote_name}:AIVC_Sync/{machine_id}/blobs/{blob_hash}"
+            self._run_rclone(["copy", remote_path, str(local_dir)])
+            
         if not local_path.exists():
-            raise FileNotFoundError(f"Blob {blob_hash} not found on remote machine {machine_id}.")
+            machine_info = f" on remote machine {machine_id}" if machine_id else ""
+            raise FileNotFoundError(f"Blob {blob_hash} not found in global pool{machine_info}.")

@@ -244,7 +244,15 @@ def search_memory(query: str, top_n: int = 5, filter_glob: str = "", only_local:
 
     file_lines = []
     for fp, count in file_counter.most_common(10):
-        file_lines.append(f"  - {fp} (in {count}/{len(results)} results)")
+        hint = ""
+        # If results are remote, try to find local hints
+        is_remote = any(getattr(r, 'machine_id', "") != _local_machine_id for r in results)
+        if is_remote:
+            local_match = _engine.find_local_equivalent(fp)
+            if local_match:
+                hint = f" (probablement `{local_match}` localement)"
+        
+        file_lines.append(f"  - {fp}{hint} (in {count}/{len(results)} results)")
 
     output = warning_header + "## Matching Commits\n\n"
     output += "\n".join(commit_lines)
@@ -326,14 +334,21 @@ def consult_commit(commit_id: str) -> str:
     if prev_str or next_str:
         context_block = f"{prev_str}{next_str}\n"
 
-    changes_summary = (
-        "\n".join(
-            f"  - [{c.action}] {c.path}" + (f" ({c.format_impact()})" if c.action != "consulted" else "")
-            for c in commit.changes
-        )
-        if commit.changes
-        else "  (no file changes recorded)"
-    )
+    changes_summary = []
+    for c in commit.changes:
+        line = f"  - [{c.action}] {c.path}"
+        if c.action != "consulted":
+            line += f" ({c.format_impact()})"
+        
+        # Add local hint for remote commits
+        if commit.machine_id and commit.machine_id != _local_machine_id:
+            local_match = _engine.find_local_equivalent(c.path, c.blob_hash)
+            if local_match:
+                line += f" (probablement `{local_match}` localement)"
+        
+        changes_summary.append(line)
+    
+    changes_summary_str = "\n".join(changes_summary) if changes_summary else "  (no file changes recorded)"
 
     machine_line = ""
     if commit.machine_id and commit.machine_id != _local_machine_id:
@@ -382,7 +397,15 @@ def get_recent_commits(limit: int = 10, offset: int = 0, only_local: bool = Fals
     for i, commit in enumerate(page, offset + 1):
         try:
             files = _engine.get_commit_files(commit.id)
-            files_str = ", ".join(files) if files else "—"
+            formatted_files = []
+            for f in files:
+                if commit.machine_id and commit.machine_id != _local_machine_id:
+                    local_match = _engine.find_local_equivalent(f)
+                    if local_match:
+                        formatted_files.append(f"{f} (local: {Path(local_match).name})")
+                        continue
+                formatted_files.append(f)
+            files_str = ", ".join(formatted_files) if formatted_files else "—"
         except KeyError:
             files_str = "—"
 

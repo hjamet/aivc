@@ -2,7 +2,7 @@
 
 **Long-term memory MCP server for LLM agents**, inspired by human memory and Git.
 
-> **Status**: 🟢 Phase 20 — Cloud Sync (rclone) + Async Commit.
+> **Status**: 🟢 Phase 21 — Async & Sync Consolidation.
 
 ### Concept
 
@@ -57,9 +57,19 @@ SHA-256 content-addressable storage, inspired by Git:
 track(path/glob/dir) --> workspace.json
     | create_commit(title, note)
     --> compute_diff() --> BlobStore.store() --> Commit.json
+    | SemanticEngine Indexing Queue (CPU) --> ChromaDB
+    | SemanticEngine Sync Queue (I/O) --> rclone (Cloud)
     | untrack(file)
     --> BlobStore.decrement_ref() --> GC if refcount=0
 ```
+
+### Cloud Sync & Multi-Machine (Phase 20 & 21)
+
+AIVC supports facultative cloud synchronization via `rclone`:
+- **Global Blob Pool**: Blobs are shared in `AIVC_Sync/blobs/`, leveraging SHA-256 for cross-machine deduplication.
+- **Machine Isolation**: Commits and indexes remain isolated per machine in `AIVC_Sync/<machine_id>/`.
+- **Decoupled Workers**: High-latency cloud uploads never block local semantic indexing.
+- **Local Path Hints**: Distant commits automatically suggest equivalent local paths based on basename and context.
 
 ### Exposed MCP Tools (Phase 3)
 
@@ -203,7 +213,7 @@ aivc/
 | **18** | [Internationalization and English Documentation](docs/tasks/internationalization_and_english_docs.md) | Full translation of README, technical documentation, and docstrings for collaboration with Amir. | 🟢 Finished |
 | **19** | [Web Dashboard UX](docs/tasks/phase19_web_dashboard_ux.md) | Sidebar Git Log (Infinite Scroll), File history, cose layout fix | 🟢 Finished |
 | **20** | [Cloud Sync & Async Indexing](docs/tasks/phase20_google_drive_sync.md) | Synchronisation inter-machines facultative et asynchrone des commits via Drive | 🟢 Finished |
-| **21** | [Async & Sync Consolidation](docs/tasks/phase21_async_sync_consolidation.md) | Dette technique : séparation CPU/IO, Graceful Shutdown, Global Cloud Blobs | 🟡 Planned |
+| **21** | [Async & Sync Consolidation](docs/tasks/phase21_async_sync_consolidation.md) | Dette technique : séparation CPU/IO, Graceful Shutdown, Global Cloud Blobs | 🟢 Finished |
 
 ### Documentation Index
 | Title (Link) | Description |

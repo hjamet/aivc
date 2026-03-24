@@ -4,6 +4,8 @@ Centralized configuration management for AIVC.
 
 import json
 import socket
+import os
+import sys
 from pathlib import Path
 
 _STORAGE_ROOT_ENV = "AIVC_STORAGE_ROOT"

@@ -16,6 +16,8 @@ for CLI-style invocations that only need Workspace or Graph features.
 import threading
 import queue
 import time
+import atexit
+import os
 from pathlib import Path
 from typing import Any
 
@@ -59,11 +61,19 @@ class SemanticEngine:
 
         # Async Indexing & Sync
         self._index_queue = queue.Queue()
+        self._sync_queue = queue.Queue()
         self._sync_manager = RcloneSyncManager(storage_root)
-        self._indexing_thread = threading.Thread(target=self._worker_loop, daemon=True)
+        
+        self._indexing_thread = threading.Thread(target=self._indexing_worker_loop, daemon=True)
+        self._sync_thread = threading.Thread(target=self._sync_worker_loop, daemon=True)
+        
         self._indexing_thread.start()
+        self._sync_thread.start()
 
-    def _worker_loop(self):
+        # Ensure graceful shutdown
+        atexit.register(self.shutdown)
+
+    def _indexing_worker_loop(self):
         """Background worker thread to index commits from the queue."""
         while True:
             commit = self._index_queue.get()
@@ -73,22 +83,48 @@ class SemanticEngine:
                 # 1. Semantic indexing (triggers lazy load of indexer if needed)
                 self._indexer.index_commit(commit)
                 
-                # 2. Cloud Sync push (if enabled)
+                # 2. Forward to sync queue if enabled
                 if self._sync_manager.enabled:
-                    self._sync_manager.push_commit(commit.id)
-                    for change in commit.changes:
-                        if change.blob_hash:
-                            self._sync_manager.push_blob(change.blob_hash)
+                    self._sync_queue.put(commit)
             except Exception as e:
-                # Log error to stderr since we are in a background thread
                 import sys
                 print(f"Error in async indexing for commit {commit.id}: {e}", file=sys.stderr)
             finally:
                 self._index_queue.task_done()
 
+    def _sync_worker_loop(self):
+        """Background worker thread to push commits/blobs to cloud."""
+        while True:
+            commit = self._sync_queue.get()
+            if commit is None: # Shutdown signal
+                break
+            try:
+                # Cloud Sync push
+                self._sync_manager.push_commit(commit.id)
+                for change in commit.changes:
+                    if change.blob_hash:
+                        self._sync_manager.push_blob(change.blob_hash)
+            except Exception as e:
+                import sys
+                print(f"Error in async sync for commit {commit.id}: {e}", file=sys.stderr)
+            finally:
+                self._sync_queue.task_done()
+
+    def shutdown(self, timeout: float = 5.0):
+        """Signal workers to stop and wait for them to finish."""
+        # 1. Signal indexing
+        self._index_queue.put(None)
+        # 2. Wait for indexing to finish (so it pushes remaining to sync)
+        self._indexing_thread.join(timeout=timeout/2)
+        
+        # 3. Signal sync
+        self._sync_queue.put(None)
+        # 4. Wait for sync
+        self._sync_thread.join(timeout=timeout/2)
+
     def get_index_queue_size(self) -> int:
-        """Return the number of commits waiting to be indexed."""
-        return self._index_queue.qsize()
+        """Return the number of commits waiting to be indexed or synced."""
+        return self._index_queue.qsize() + self._sync_queue.qsize()
 
 
     # ------------------------------------------------------------------
@@ -347,4 +383,38 @@ class SemanticEngine:
     def migrate_index(self) -> None:
         """Explicitly migrate JSON commits to SQLite index."""
         self._workspace.migrate_index()
+
+    def find_local_equivalent(self, remote_path: str, remote_blob_hash: str | None = None) -> str | None:
+        """Try to find a local tracked file that matches a remote path.
+        
+        Heuristic:
+        1. Exact match if possible (unlikely).
+        2. Same basename + same immediate parent folder name.
+        3. If blob_hash provided, check if it exists in local history for suspected files.
+        """
+        tracked_files = self.get_status()
+        if not tracked_files:
+            return None
+        
+        remote_p = Path(remote_path)
+        remote_basename = remote_p.name
+        remote_parent_name = remote_p.parent.name if remote_p.parent else ""
+        
+        candidates = []
+        for s in tracked_files:
+            lp = Path(s.path)
+            # 1. Check strong match via blob hash if available
+            if remote_blob_hash:
+                local_blobs = self._index.get_blob_hashes_for_file(s.path)
+                if remote_blob_hash in local_blobs:
+                    return s.path
+            
+            # 2. Basename match
+            if lp.name == remote_basename:
+                # 3. Parent folder match (depth 1)
+                local_parent_name = lp.parent.name if lp.parent else ""
+                if local_parent_name == remote_parent_name:
+                    candidates.append(s.path)
+        
+        return candidates[0] if candidates else None
 
