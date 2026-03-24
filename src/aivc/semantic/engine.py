@@ -59,6 +59,9 @@ class SemanticEngine:
         self.__searcher = None
         self.__bm25_cache = None
         self._local_hints_index = None
+        
+        # Prevent PyTorch/Chroma multithreading import gridlocks
+        self._ml_lock = threading.Lock()
 
         # Async Indexing & Sync
         self._index_queue = queue.Queue()
@@ -189,24 +192,30 @@ class SemanticEngine:
     def _indexer(self):
         """Lazy-loaded Indexer (ChromaDB + SentenceTransformer bi-encoder)."""
         if self.__indexer is None:
-            from aivc.semantic.indexer import Indexer
-            self.__indexer = Indexer(self._storage_root)
+            with self._ml_lock:
+                if self.__indexer is None:
+                    from aivc.semantic.indexer import Indexer
+                    self.__indexer = Indexer(self._storage_root)
         return self.__indexer
 
     @property
     def _searcher(self):
         """Lazy-loaded Searcher (Cross-Encoder reranking pipeline)."""
         if self.__searcher is None:
-            from aivc.semantic.searcher import Searcher
-            self.__searcher = Searcher(self._indexer)
+            with self._ml_lock:
+                if self.__searcher is None:
+                    from aivc.semantic.searcher import Searcher
+                    self.__searcher = Searcher(self._indexer)
         return self.__searcher
 
     @property
     def _bm25_cache(self):
         """Lazy-loaded BM25Cache (SQLite-backed tokenization cache)."""
         if self.__bm25_cache is None:
-            from aivc.search.bm25_cache import BM25Cache
-            self.__bm25_cache = BM25Cache(self._storage_root)
+            with self._ml_lock:
+                if self.__bm25_cache is None:
+                    from aivc.search.bm25_cache import BM25Cache
+                    self.__bm25_cache = BM25Cache(self._storage_root)
         return self.__bm25_cache
 
     # ------------------------------------------------------------------
