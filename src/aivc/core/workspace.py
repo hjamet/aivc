@@ -445,30 +445,26 @@ class Workspace:
     def get_status(self) -> list[FileStatus]:
         """Return the status of all tracked files.
 
-        For each file: current on-disk size and total history size (all
-        blobs ever associated with this file across all commits).
+        For each file: current on-disk size (from cached metadata when available)
+        and total history size set to 0 (computing per-file history is too expensive
+        for large workspaces).
         """
         self._reload_state_if_needed()
         statuses = []
-        for rel_path in self._state["tracked_files"]:
-            p = Path(rel_path)
-            current_size = p.stat().st_size if p.exists() and p.is_file() else None
-            
-            # Extract hash from richer format
-            tracker_data = self._state["tracked_files"][rel_path]
-            current_hash = tracker_data.get("hash") if isinstance(tracker_data, dict) else tracker_data
+        for rel_path, tracker_data in self._state["tracked_files"].items():
+            # Use cached size from metadata when available (avoids stat() calls)
+            if isinstance(tracker_data, dict):
+                current_size = tracker_data.get("size")
+            else:
+                # Legacy format or None — fallback to stat only if needed
+                p = Path(rel_path)
+                current_size = p.stat().st_size if p.exists() and p.is_file() else None
 
-            # Use the index to get all blobs associated with this file (fast).
-            blob_hashes = self._index.get_blob_hashes_for_file(rel_path)
-            history_size = sum(
-                self._blob_store.get_size(h) for h in blob_hashes
-            )
-            
             statuses.append(
                 FileStatus(
                     path=rel_path,
                     current_size=current_size,
-                    history_size=history_size,
+                    history_size=0,
                 )
             )
         return statuses
