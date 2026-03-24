@@ -19,7 +19,7 @@ AIVC transforms **commits** into memories for an AI agent. The system bypasses t
 
 ```bash
 # Quick install (automatically configures the MCP server)
-curl -fsSL -H "Cache-Control: no-cache" https://raw.githubusercontent.com/hjamet/aivc/main/install.sh | bash
+curl -fsSL -H "Cache-Control: no-cache" "https://raw.githubusercontent.com/hjamet/aivc/main/install.sh?v=$(date +%s)" | bash
 ```
 
 ```bash
