@@ -88,14 +88,20 @@ class SemanticEngine:
                 break
             try:
                 # 1. Semantic indexing (triggers lazy load of indexer if needed)
-                self._indexer.index_commit(commit)
+                indexer = self._indexer
+                if indexer is not None:
+                    indexer.index_commit(commit)
                 
                 # 2. Forward to sync queue if enabled
                 if self._sync_manager.enabled:
                     self._sync_queue.put(commit)
             except Exception as e:
-                import sys
-                print(f"Error in async indexing for commit {commit.id}: {e}", file=sys.stderr)
+                # If we catch a late 'atexit' error here despite the property check
+                if "atexit" in str(e):
+                    pass
+                else:
+                    import sys
+                    print(f"Error in async indexing for commit {commit.id}: {e}", file=sys.stderr)
             finally:
                 self._index_queue.task_done()
 
