@@ -114,6 +114,10 @@ def cmd_search(args: argparse.Namespace) -> None:
         print(f"{DIM}Searching memory for: '{args.query}'...{RESET}\n")
 
     # Ensure ML models are loaded and orphaned commits are reindexed
+    import sys
+    if sys.platform == "win32" or (os.path.exists("/proc/version") and "microsoft" in open("/proc/version").read().lower()):
+        print(f"{YELLOW}Chargement des modèles ML (cette étape prend ~10-15s à froid sous Windows)...{RESET}", flush=True)
+
     engine.warmup()
     
     results = engine.search(args.query, top_n=args.top_n, filter_glob=args.glob)

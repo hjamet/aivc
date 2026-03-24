@@ -80,18 +80,26 @@ uv venv "${VENV_DIR}" --python python3
 if [[ -f "${VENV_DIR}/Scripts/python.exe" ]]; then
     VENV_PYTHON="${VENV_DIR}/Scripts/python.exe"
     VENV_BIN_DIR="${VENV_DIR}/Scripts"
+    WINDOWS=1
 else
     VENV_PYTHON="${VENV_DIR}/bin/python"
     VENV_BIN_DIR="${VENV_DIR}/bin"
+    WINDOWS=0
 fi
 
 # 4. Install the package with semantic dependencies
 # ---------------------------------------------------------------------------
 
 info "Installing aivc[all] into the venv (this may take a moment) ..."
-# We use relative paths for install to avoid Windows/MSYS absolute path mangling
 pushd "${SOURCE_DIR}" >/dev/null
-uv pip install --python "${VENV_PYTHON}" -e ".[all]"
+
+EXTRA_ARGS=""
+if [[ "$WINDOWS" == "1" ]]; then
+    info "Windows detected — adding CUDA 12.1 index for GPU acceleration..."
+    EXTRA_ARGS="--extra-index-url https://download.pytorch.org/whl/cu121"
+fi
+
+uv pip install $EXTRA_ARGS --python "${VENV_PYTHON}" -e ".[all]"
 popd >/dev/null
 
 # ---------------------------------------------------------------------------
