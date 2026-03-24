@@ -32,11 +32,22 @@ def save_aivc_config(config: dict) -> None:
     _CONFIG_PATH.write_text(json.dumps(config, indent=4), encoding="utf-8")
 
 def get_machine_id() -> str:
-    """Retrieve machine_id from config or fallback to hostname."""
+    """Retrieve machine_id from config or fallback to hostname (with WSL detection)."""
     config = get_aivc_config()
     m_id = config.get("machine_id", "").strip()
+    
     if not m_id:
-        return socket.gethostname()
+        hostname = socket.gethostname()
+        # Detect WSL (Windows Subsystem for Linux)
+        try:
+            if os.path.exists("/proc/version"):
+                with open("/proc/version", "r") as f:
+                    if "microsoft" in f.read().lower():
+                        return f"{hostname}-WSL"
+        except Exception:
+            pass
+        return hostname
+        
     return m_id
 
 def get_credentials_path() -> Path:
