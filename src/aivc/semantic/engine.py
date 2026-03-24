@@ -135,13 +135,50 @@ class SemanticEngine:
         self._local_hints_index = None
 
     def warmup(self) -> None:
-        """Eagerly load heavy ML components (models, PyTorch) in a background thread.
-        This triggers importing SentenceTransformers, CrossEncoder, and ChromaDB,
-        masking the 15-30s start time without blocking JSON-RPC init.
+        """Eagerly load heavy ML components and reindex orphaned commits.
+
+        This method:
+        1. Forces lazy-loading of SentenceTransformer, CrossEncoder, and ChromaDB.
+        2. Detects commits that exist on disk (JSON) but are missing from the
+           ChromaDB vector index (e.g. because async indexing crashed on a
+           previous run) and indexes them.
+
+        Safe to call from a background thread; Python's import lock prevents
+        race conditions with concurrent tool calls.
         """
-        # Force lazy evaluation of the properties
+        import sys
+
+        # Step 1: Force lazy evaluation of the heavy ML components
         _ = self._indexer._collection
         _ = self._searcher._cross_encoder
+
+        # Step 2: Reindex orphaned commits (on-disk JSON but not in ChromaDB)
+        all_commits = self._workspace.get_log(limit=999999)
+        indexed_count = self._indexer._collection.count()
+
+        if len(all_commits) > indexed_count:
+            missing = []
+            for commit in all_commits:
+                if not self._indexer.is_indexed(commit.id):
+                    missing.append(commit)
+
+            if missing:
+                print(
+                    f"[aivc] Reindexing {len(missing)} orphaned commit(s)...",
+                    file=sys.stderr,
+                )
+                for commit in missing:
+                    try:
+                        self._indexer.index_commit(commit)
+                    except Exception as e:
+                        print(
+                            f"[aivc] Failed to reindex {commit.id}: {e}",
+                            file=sys.stderr,
+                        )
+                print(
+                    f"[aivc] Warmup complete. Index now has {self._indexer._collection.count()} commit(s).",
+                    file=sys.stderr,
+                )
 
 
     # ------------------------------------------------------------------
