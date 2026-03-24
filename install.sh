@@ -115,14 +115,15 @@ config_path = home / ".gemini" / "antigravity" / "mcp_config.json"
 config_path.parent.mkdir(parents=True, exist_ok=True)
 
 if config_path.exists():
-    raw = config_path.read_text(encoding="utf-8").strip()
-    if not raw:
-        config = {}
-    else:
-        try:
+    try:
+        raw = config_path.read_text(encoding="utf-8").strip()
+        if not raw:
+            config = {}
+        else:
             config = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            sys.exit(f"[aivc] ERROR: {config_path} contains invalid JSON: {exc}")
+    except Exception:
+        # If anything goes wrong (invalid JSON, empty, etc.), start fresh.
+        config = {}
 else:
     config = {}
 
