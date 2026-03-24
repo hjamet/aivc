@@ -68,14 +68,29 @@ fi
 
 VENV_DIR="${AIVC_HOME}/venv"
 info "Creating virtual environment at ${VENV_DIR} ..."
+
+# Robustly clear existing venv to avoid "os error 1" on Windows/MSYS2
+if [[ -d "${VENV_DIR}" ]]; then
+    rm -rf "${VENV_DIR}"
+fi
+
 uv venv "${VENV_DIR}" --python python3
+
+# Detect venv python path (Windows uses Scripts/, Unix uses bin/)
+if [[ -f "${VENV_DIR}/Scripts/python.exe" ]]; then
+    VENV_PYTHON="${VENV_DIR}/Scripts/python.exe"
+    VENV_BIN_DIR="${VENV_DIR}/Scripts"
+else
+    VENV_PYTHON="${VENV_DIR}/bin/python"
+    VENV_BIN_DIR="${VENV_DIR}/bin"
+fi
 
 # ---------------------------------------------------------------------------
 # 4. Install the package with semantic dependencies
 # ---------------------------------------------------------------------------
 
 info "Installing aivc[semantic] into the venv (this may take a moment for PyTorch/model downloads) ..."
-uv pip install --python "${VENV_DIR}/bin/python" -e "${SOURCE_DIR}[semantic]"
+uv pip install --python "${VENV_PYTHON}" -e "${SOURCE_DIR}[semantic]"
 
 # ---------------------------------------------------------------------------
 # 5. Inject AIVC into ~/.gemini/antigravity/mcp_config.json
@@ -85,13 +100,16 @@ MCP_CONFIG="${HOME}/.gemini/antigravity/mcp_config.json"
 info "Configuring MCP server entry in ${MCP_CONFIG} ..."
 
 # Use Python's json module to safely read, update, and write the config.
-# If mcp_config.json does not exist, it is created from scratch.
-"${VENV_DIR}/bin/python" - <<PYEOF
+# We use the venv python itself to resolve native Windows paths if needed.
+"${VENV_PYTHON}" - <<PYEOF
 import json
 import pathlib
 import sys
+import os
 
-config_path = pathlib.Path("${MCP_CONFIG}")
+# Use pathlib to get native home (handles ~ correctly on both OS)
+home = pathlib.Path.home()
+config_path = home / ".gemini" / "antigravity" / "mcp_config.json"
 config_path.parent.mkdir(parents=True, exist_ok=True)
 
 if config_path.exists():
@@ -106,19 +124,20 @@ else:
 if "mcpServers" not in config:
     config["mcpServers"] = {}
 
+# Use sys.executable for the exact absolute path to this python
 config["mcpServers"]["aivc"] = {
-    "command": "${VENV_DIR}/bin/python",
+    "command": sys.executable,
     "args": ["-m", "aivc.server"],
     "env": {
-        "AIVC_STORAGE_ROOT": str(pathlib.Path.home() / ".aivc" / "storage")
+        "AIVC_STORAGE_ROOT": str(home / ".aivc" / "storage")
     },
 }
 
 config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
 print(f"[aivc] MCP entry written to {config_path}")
 
-# --- NEW: Generate aivc config.json ---
-aivc_config_path = pathlib.Path.home() / ".aivc" / "config.json"
+# --- Generate aivc config.json ---
+aivc_config_path = home / ".aivc" / "config.json"
 import socket
 if not aivc_config_path.exists():
     aivc_config = {
@@ -142,27 +161,40 @@ PYEOF
 BIN_DIR="${AIVC_HOME}/bin"
 RCLONE_EXE="${BIN_DIR}/rclone"
 
+# On Windows/MSYS, we might need .exe suffix for the check
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+    RCLONE_EXE="${RCLONE_EXE}.exe"
+fi
+
 if [[ ! -f "${RCLONE_EXE}" ]]; then
     info "Downloading rclone standalone binary..."
     mkdir -p "${BIN_DIR}"
     
-    # Detect architecture
+    # Detect architecture and OS
     ARCH=$(uname -m)
     case "${ARCH}" in
         x86_64)  R_ARCH="amd64" ;;
         aarch64) R_ARCH="arm64" ;;
         *)       R_ARCH="amd64" ;; # Fallback
     esac
-    
+
     RCLONE_ZIP="/tmp/rclone.zip"
-    URL="https://downloads.rclone.org/rclone-current-linux-${R_ARCH}.zip"
     
-    curl -fsSL "${URL}" -o "${RCLONE_ZIP}" || wget -q "${URL}" -O "${RCLONE_ZIP}"
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+        info "Detected Windows (MSYS/Git Bash) environment."
+        URL="https://downloads.rclone.org/rclone-current-windows-${R_ARCH}.zip"
+        # Download
+        curl -fsSL "${URL}" -o "${RCLONE_ZIP}" || wget -q "${URL}" -O "${RCLONE_ZIP}"
+        # Extract only rclone.exe
+        unzip -j "${RCLONE_ZIP}" "*/rclone.exe" -d "${BIN_DIR}"
+    else
+        URL="https://downloads.rclone.org/rclone-current-linux-${R_ARCH}.zip"
+        curl -fsSL "${URL}" -o "${RCLONE_ZIP}" || wget -q "${URL}" -O "${RCLONE_ZIP}"
+        unzip -j "${RCLONE_ZIP}" "*/rclone" -d "${BIN_DIR}"
+        chmod +x "${RCLONE_EXE}"
+    fi
     
-    # Extract only the binary
-    unzip -j "${RCLONE_ZIP}" "*/rclone" -d "${BIN_DIR}"
-    chmod +x "${RCLONE_EXE}"
-    rm "${RCLONE_ZIP}"
+    rm -f "${RCLONE_ZIP}"
     success "rclone installed to ${RCLONE_EXE}"
 else
     info "rclone already installed at ${RCLONE_EXE}"
@@ -223,13 +255,14 @@ mkdir -p "$(dirname "${GEMINI_MD}")"
 
 if [[ -f "${GEMINI_MD}" ]] && grep -qF "${MARKER_START}" "${GEMINI_MD}"; then
     # Update existing block (replace content between markers).
-    "${VENV_DIR}/bin/python" - <<PYEOF2
+    "${VENV_PYTHON}" - <<PYEOF2
 import pathlib, re
 
-gemini = pathlib.Path("${GEMINI_MD}")
+# Handle Windows home correctly via pathlib
+gemini = pathlib.Path.home() / ".gemini" / "GEMINI.md"
 content = gemini.read_text(encoding="utf-8")
 
-block = '''${AIVC_BLOCK}'''
+block = r'''${AIVC_BLOCK}'''
 
 pattern = re.compile(
     r"${MARKER_START}.*?${MARKER_END}",
@@ -255,17 +288,29 @@ echo ""
 echo "  Storage root : ${AIVC_HOME}/storage"
 echo "  Venv         : ${VENV_DIR}"
 
-# 7. Symlink CLI to ~/.local/bin
+# 7. Expose CLI wrapper
 USER_BIN_DIR="${HOME}/.local/bin"
 mkdir -p "${USER_BIN_DIR}"
-ln -sf "${VENV_DIR}/bin/aivc" "${USER_BIN_DIR}/aivc"
+AIVC_WRAPPER="${USER_BIN_DIR}/aivc"
 
-echo "  CLI Command  : aivc (symlinked in ${USER_BIN_DIR})"
+info "Creating CLI wrapper at ${AIVC_WRAPPER} ..."
+cat <<EOF > "${AIVC_WRAPPER}"
+#!/usr/bin/env bash
+# AIVC CLI Wrapper
+exec "${VENV_PYTHON}" -m aivc.cli "\$@"
+EOF
+chmod +x "${AIVC_WRAPPER}"
+
+echo "  CLI Command  : aivc (wrapper in ${USER_BIN_DIR})"
 echo "  MCP config   : ${MCP_CONFIG}"
 
 # 8. Run migration
 info "Running CoreIndex migration..."
-AIVC_STORAGE_ROOT="${AIVC_HOME}/storage" "${VENV_DIR}/bin/aivc" migrate || info "Migration skipped (or not needed)."
+AIVC_STORAGE_ROOT="${AIVC_HOME}/storage" "${VENV_PYTHON}" -m aivc.cli migrate || info "Migration skipped (or not needed)."
+
+echo "  Agent rules  : ${GEMINI_MD}"
+echo ""
+echo "Restart Gemini Antigravity to pick up the new MCP server."
 
 echo "  Agent rules  : ${GEMINI_MD}"
 echo ""
