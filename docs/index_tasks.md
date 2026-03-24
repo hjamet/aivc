@@ -26,3 +26,4 @@
 | [Phase 22: Local Hints Optimization](tasks/phase22_local_hints_optimization.md) | O(1) basename index for local path hints | 2026-03-24 | `Up to date` |
 | [Phase 23 — State Sync](tasks/phase23_state_sync_reload.md) | Reload JIT du workspace via mtime | 2026-03-24 | `Up to date` |
 | [Phase 25 — Native Google Drive](tasks/phase25_native_google_drive.md) | Native Google Drive API replacing rclone | 2026-03-24 | `Up to date` |
+| [Phase 26 — Auto Sync Push](tasks/phase26_auto_sync_push.md) | Automatic push of missing commits at startup | 2026-03-24 | `Up to date` |

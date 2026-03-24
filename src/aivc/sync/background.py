@@ -24,12 +24,20 @@ class BackgroundSyncer:
         self._thread.start()
 
     def _run(self):
-        """Single pull at startup (as requested in Phase 20)."""
+        """Sync pulls and pushes at startup."""
         try:
+            # 1. Pull from others
             self.manager.pull_commits_from_others()
+
+            # 2. Push missing local commits
+            stats = self.manager.push_missing()
+            pushed = stats.get("commits_pushed", 0)
+            if pushed > 0:
+                print(f"[AIVC Sync] Auto-pushed {pushed} local commits to Drive.")
+
         except Exception as e:
             import sys
-            print(f"Background pull failed: {e}", file=sys.stderr)
+            print(f"Background sync failed: {e}", file=sys.stderr)
 
     def stop(self):
         """Stop the syncer."""

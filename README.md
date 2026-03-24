@@ -2,7 +2,7 @@
 
 **Long-term memory MCP server for LLM agents**, inspired by human memory and Git.
 
-> **Status**: 🟢 **Phase 25 (Finished)** : Native Google Drive sync replacing rclone, with built-in OAuth flow.
+> **Status**: 🟢 **Phase 26 (Finished)** : Auto Sync Push at Startup.
 
 ### Concept
 
@@ -219,6 +219,7 @@ aivc/
 | **22** | [Local Hints Optimization](docs/tasks/phase22_local_hints_optimization.md) | Optimisation O(1) de la recherche de correspondances locales | 🟢 Finished |
 | **23** | [State Sync & JIT Reload](docs/tasks/phase23_state_sync_reload.md) | Rechargement conditionnel de workspace.json pour éviter la désync CLI/MCP | 🟢 Finished |
 | **25** | [Native Google Drive Sync](docs/tasks/phase25_native_google_drive.md) | Native Google Drive API replacing rclone | 🟢 Finished |
+| **26** | [Auto Sync Push at Startup](docs/tasks/phase26_auto_sync_push.md) | Automatic push of missing local commits on server start | 🟢 Finished |
 
 ### Documentation Index
 | Title (Link) | Description |
@@ -241,3 +242,5 @@ aivc/
 | [Phase 21 Spec](docs/tasks/phase21_async_sync_consolidation.md) | Async and Cloud Sync Consolidation. |
 | [Phase 22 Spec](docs/tasks/phase22_local_hints_optimization.md) | Local Hints Optimization (O(1)). |
 | [Phase 23 Spec](docs/tasks/phase23_state_sync_reload.md) | State Sync & JIT Reload (Multi-process). |
+| [Phase 25 Spec](docs/tasks/phase25_native_google_drive.md) | Native Google Drive API replacing rclone. |
+| [Phase 26 Spec](docs/tasks/phase26_auto_sync_push.md) | Auto Sync Push at Startup. |
