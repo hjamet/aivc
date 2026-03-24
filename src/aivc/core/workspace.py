@@ -64,16 +64,22 @@ class Workspace:
             self._state = self._load_state()
             self._last_mtime = self._workspace_path.stat().st_mtime
             
-            # Migration: convert stored relative paths to absolute
+            # Migration: convert stored relative paths to absolute and richer format
             migrated = False
             new_tracked = {}
-            for path_str, hash_val in self._state.get("tracked_files", {}).items():
+            for path_str, tracker_data in self._state.get("tracked_files", {}).items():
                 p = Path(path_str)
-                if not p.is_absolute():
+                abs_path = str(p if p.is_absolute() else Path.cwd() / p)
+                if abs_path != path_str:
                     migrated = True
-                    new_tracked[str(Path.cwd() / p)] = hash_val
+                
+                # Enrich format if it's just a string hash
+                if isinstance(tracker_data, str) or tracker_data is None:
+                    migrated = True
+                    # Initially, we don't have mtime/size, so we just wrap the hash
+                    new_tracked[abs_path] = {"hash": tracker_data, "mtime": None, "size": None}
                 else:
-                    new_tracked[path_str] = hash_val
+                    new_tracked[abs_path] = tracker_data
             
             if migrated:
                 self._state["tracked_files"] = new_tracked
@@ -267,7 +273,8 @@ class Workspace:
                 continue
 
             if abs_f not in self._state["tracked_files"]:
-                self._state["tracked_files"][abs_f] = None  # never committed yet
+                # Initialize with richer format
+                self._state["tracked_files"][abs_f] = {"hash": None, "mtime": None, "size": None}
                 newly_tracked.append(abs_f)
         self._save_state()
         return {
@@ -316,19 +323,20 @@ class Workspace:
         for file_path in to_untrack:
             # Collect commits referencing this file via the index (fast).
             affected_commit_ids = self._index.get_commits_touching_file(file_path)
-            for cid in affected_commit_ids:
-                commit = self._load_commit(cid)
-                updated_changes = []
-                for change in commit.changes:
-                    if change.path == file_path:
-                        if change.blob_hash is not None:
-                            self._blob_store.decrement_ref(change.blob_hash)
-                    else:
-                        updated_changes.append(change)
-                
-                if len(updated_changes) != len(commit.changes):
-                    commit.changes = updated_changes
-                    self._save_commit(commit)
+            with self._blob_store.batch():
+                for cid in affected_commit_ids:
+                    commit = self._load_commit(cid)
+                    updated_changes = []
+                    for change in commit.changes:
+                        if change.path == file_path:
+                            if change.blob_hash is not None:
+                                self._blob_store.decrement_ref(change.blob_hash)
+                        else:
+                            updated_changes.append(change)
+                    
+                    if len(updated_changes) != len(commit.changes):
+                        commit.changes = updated_changes
+                        self._save_commit(commit)
 
             # Cleanup the index for this file.
             self._index.remove_file_changes(file_path)
@@ -366,37 +374,38 @@ class Workspace:
             RuntimeError: if no changes are detected and no files were consulted.
         """
         self._reload_state_if_needed()
-        changes = compute_diff(self._state["tracked_files"], self._blob_store)
-        
-        # Handle consulted files
-        consulted_changes = []
-        if consulted_files:
-            for path in consulted_files:
-                abs_path = str(Path(path).resolve())
-                if abs_path not in self._state["tracked_files"]:
-                    # Auto-track consulted files if they exist on disk
-                    if Path(abs_path).is_file():
-                        self._state["tracked_files"][abs_path] = None
-                    else:
-                        # File doesn't exist — skip silently
+        with self._blob_store.batch():
+            changes = compute_diff(self._state["tracked_files"], self._blob_store)
+            
+            # Handle consulted files
+            consulted_changes = []
+            if consulted_files:
+                for path in consulted_files:
+                    abs_path = str(Path(path).resolve())
+                    if abs_path not in self._state["tracked_files"]:
+                        # Auto-track consulted files if they exist on disk
+                        if Path(abs_path).is_file():
+                            self._state["tracked_files"][abs_path] = {"hash": None, "mtime": None, "size": None}
+                        else:
+                            # File doesn't exist — skip silently
+                            continue
+                    
+                    # Check if it was already modified/added/deleted.
+                    # If it's already in 'changes', we don't add it as 'consulted'.
+                    if any(c.path == abs_path for c in changes):
                         continue
-                
-                # Check if it was already modified/added/deleted.
-                # If it's already in 'changes', we don't add it as 'consulted'.
-                if any(c.path == abs_path for c in changes):
-                    continue
 
-                consulted_changes.append(
-                    FileChange(
-                        path=abs_path,
-                        action="consulted",
-                        blob_hash=None,
-                        bytes_added=0,
-                        bytes_removed=0,
+                    consulted_changes.append(
+                        FileChange(
+                            path=abs_path,
+                            action="consulted",
+                            blob_hash=None,
+                            bytes_added=0,
+                            bytes_removed=0,
+                        )
                     )
-                )
-        
-        all_changes = changes + consulted_changes
+            
+            all_changes = changes + consulted_changes
 
         if not all_changes:
             raise RuntimeError(
@@ -414,14 +423,20 @@ class Workspace:
         self._save_commit(commit)
         self._index.add_commit(commit)
 
-        # Update tracked_files with the new hashes.
+        # Update tracked_files with the new hashes and metadata.
         for change in changes:
             if change.action == "deleted":
-                # Keep the file in tracking but mark hash as None
-                # (it might come back).
-                self._state["tracked_files"][change.path] = None
+                # Keep the file in tracking but mark hash as None (it might come back).
+                self._state["tracked_files"][change.path] = {"hash": None, "mtime": None, "size": None}
             else:
-                self._state["tracked_files"][change.path] = change.blob_hash
+                # Store new hash and capture current disk metadata
+                p = Path(change.path)
+                stat = p.stat()
+                self._state["tracked_files"][change.path] = {
+                    "hash": change.blob_hash,
+                    "mtime": stat.st_mtime,
+                    "size": stat.st_size
+                }
 
         self._state["head_commit_id"] = commit.id
         self._save_state()
@@ -439,6 +454,10 @@ class Workspace:
             p = Path(rel_path)
             current_size = p.stat().st_size if p.exists() and p.is_file() else None
             
+            # Extract hash from richer format
+            tracker_data = self._state["tracked_files"][rel_path]
+            current_hash = tracker_data.get("hash") if isinstance(tracker_data, dict) else tracker_data
+
             # Use the index to get all blobs associated with this file (fast).
             blob_hashes = self._index.get_blob_hashes_for_file(rel_path)
             history_size = sum(

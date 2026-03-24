@@ -8,7 +8,9 @@ from disk when no file or commit references them anymore (GC).
 
 import hashlib
 import json
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Generator
 
 
 class BlobStore:
@@ -32,18 +34,42 @@ class BlobStore:
         self._blobs_dir.mkdir(parents=True, exist_ok=True)
         if not self._refcounts_path.exists():
             self._refcounts_path.write_text("{}", encoding="utf-8")
+        
+        self._batch_mode = False
+        self._refcounts_cache: dict[str, int] | None = None
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
     def _load_refcounts(self) -> dict[str, int]:
+        if self._batch_mode and self._refcounts_cache is not None:
+            return self._refcounts_cache
         return json.loads(self._refcounts_path.read_text(encoding="utf-8"))
 
     def _save_refcounts(self, refcounts: dict[str, int]) -> None:
+        if self._batch_mode:
+            self._refcounts_cache = refcounts
+            return
         self._refcounts_path.write_text(
             json.dumps(refcounts, indent=2), encoding="utf-8"
         )
+
+    @contextmanager
+    def batch(self) -> Generator[None, None, None]:
+        """Context manager to batch multiple refcount updates into a single disk write."""
+        self._batch_mode = True
+        self._refcounts_cache = self._load_refcounts()
+        try:
+            yield
+        finally:
+            self._batch_mode = False
+            if self._refcounts_cache is not None:
+                # Force save to disk at the end of the batch
+                self._refcounts_path.write_text(
+                    json.dumps(self._refcounts_cache, indent=2), encoding="utf-8"
+                )
+            self._refcounts_cache = None
 
     def _blob_path(self, hash_: str) -> Path:
         return self._blobs_dir / hash_

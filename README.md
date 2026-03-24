@@ -2,7 +2,7 @@
 
 **Long-term memory MCP server for LLM agents**, inspired by human memory and Git.
 
-> **Status**: 🟢 **Phase 27.1 (Finished)** : Windows/WSL Stability & Machine Distinction.
+> **Status**: 🟢 **Phase 28 (Finished)** : Synchronous I/O Optimization (Batching & Fast Diff).
 
 ### Concept
 
@@ -246,3 +246,4 @@ aivc/
 | [Phase 25 Spec](docs/tasks/phase25_native_google_drive.md) | Native Google Drive API replacing rclone. |
 | [Phase 26 Spec](docs/tasks/phase26_auto_sync_push.md) | Auto Sync Push at Startup. |
 | [Phase 27 Spec](docs/tasks/phase27_remote_hints.md) | Multi-Machine Distinction & Local Path Mapping. |
+| [Phase 28 Spec](docs/tasks/phase28_io_optimizations.md) | Synchronous I/O Optimization (Batching & Fast Diff). |
