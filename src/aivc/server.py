@@ -547,10 +547,17 @@ def get_status() -> str:
     separator = "-" * len(header)
     rows = [header, separator]
 
-    for s in statuses:
+    MAX_DISPLAY = 100
+    display_statuses = statuses[:MAX_DISPLAY]
+    
+    for s in display_statuses:
         current = _format_bytes(s.current_size) if s.current_size is not None else "missing"
         history = _format_bytes(s.history_size)
         rows.append(f"{s.path:<60} {current:>10} {history:>10}")
+
+    if len(statuses) > MAX_DISPLAY:
+        hidden = len(statuses) - MAX_DISPLAY
+        rows.append(f"... and {hidden} more files not shown (output truncated to {MAX_DISPLAY} files) ...")
 
     rows.append(separator)
     rows.append(f"Total tracked: {len(statuses)} file(s)")
