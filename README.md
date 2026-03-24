@@ -2,7 +2,7 @@
 
 **Long-term memory MCP server for LLM agents**, inspired by human memory and Git.
 
-> **Status**: 🟢 **Phase 23 (Terminée)** : Synchronisation d'état multi-processus via rechargement JIT (`mtime`) et callbacks d'invalidation de cache.
+> **Status**: 🟢 **Phase 25 (Finished)** : Native Google Drive sync replacing rclone, with built-in OAuth flow.
 
 ### Concept
 
@@ -70,6 +70,7 @@ AIVC supports facultative cloud synchronization via `rclone`:
 - **Machine Isolation**: Commits and indexes remain isolated per machine in `AIVC_Sync/<machine_id>/`.
 - **Decoupled Workers**: High-latency cloud uploads never block local semantic indexing.
 - **Local Path Hints**: Distant commits automatically suggest equivalent local paths based on basename and context.
+- **Native Google Drive API**: No external tools needed (replaces legacy rclone integration).
 
 ### Exposed MCP Tools (Phase 3)
 
@@ -94,6 +95,7 @@ AIVC supports facultative cloud synchronization via `rclone`:
 |-------|-------------|
 | [Architecture Index](docs/index_architecture.md) | Technical architecture of the project |
 | [Tasks Index](docs/index_tasks.md) | Roadmap task specifications |
+| [Sync Index](docs/index_sync.md) | Documentation for Cloud/Drive synchronization |
 
 ---
 
@@ -170,7 +172,7 @@ aivc/
 | `aivc search <query> [-g GLOB]` | Semantic search in memory, with optional filter |
 | `aivc search-files <query>` | Lexical search (BM25) in current files |
 | `aivc web [-p PORT]` | Launch the interactive Web Dashboard |
-| `aivc sync setup` | Interactive cloud sync configuration (rclone) |
+| `aivc sync setup` | Interactive Google Drive sync setup (OAuth) |
 | `aivc sync status` | Check sync status and remote machines |
 | `aivc config [key] [value]` | View or update AIVC configuration |
 | `aivc migrate` | Force JSON commit migration to SQLite |
@@ -215,7 +217,8 @@ aivc/
 | **20** | [Cloud Sync & Async Indexing](docs/tasks/phase20_google_drive_sync.md) | Synchronisation inter-machines facultative et asynchrone des commits via Drive | 🟢 Finished |
 | **21** | [Async & Sync Consolidation](docs/tasks/phase21_async_sync_consolidation.md) | Dette technique : séparation CPU/IO, Graceful Shutdown, Global Cloud Blobs | 🟢 Finished |
 | **22** | [Local Hints Optimization](docs/tasks/phase22_local_hints_optimization.md) | Optimisation O(1) de la recherche de correspondances locales | 🟢 Finished |
-| **23** | [State Sync & JIT Reload](docs/tasks/phase23_state_sync_reload.md) | Rechargement conditionnel de workspace.json pour éviter la désync CLI/MCP | 🟡 Planned |
+| **23** | [State Sync & JIT Reload](docs/tasks/phase23_state_sync_reload.md) | Rechargement conditionnel de workspace.json pour éviter la désync CLI/MCP | 🟢 Finished |
+| **25** | [Native Google Drive Sync](docs/tasks/phase25_native_google_drive.md) | Native Google Drive API replacing rclone | 🟢 Finished |
 
 ### Documentation Index
 | Title (Link) | Description |

@@ -10,7 +10,8 @@ from pathlib import Path
 
 _STORAGE_ROOT_ENV = "AIVC_STORAGE_ROOT"
 _CONFIG_PATH = Path.home() / ".aivc" / "config.json"
-_RCLONE_BIN = Path.home() / ".aivc" / "bin" / "rclone"
+_CREDENTIALS_PATH = Path.home() / ".aivc" / "credentials.json"
+_TOKEN_PATH = Path.home() / ".aivc" / "token.json"
 
 # ML Model configurations
 BI_ENCODER_MODEL = "all-MiniLM-L6-v2"
@@ -38,11 +39,13 @@ def get_machine_id() -> str:
         return socket.gethostname()
     return m_id
 
-def get_rclone_exe() -> str:
-    """Get the path to the rclone executable."""
-    if _RCLONE_BIN.exists():
-        return str(_RCLONE_BIN)
-    return "rclone" # Fallback to PATH
+def get_credentials_path() -> Path:
+    """Return the path to the Google OAuth credentials file."""
+    return _CREDENTIALS_PATH
+
+def get_token_path() -> Path:
+    """Return the path to the Google OAuth token file."""
+    return _TOKEN_PATH
 
 def get_storage_root(allow_fallback: bool = False) -> Path:
     """Retrieve and validate the AIVC storage root directory.

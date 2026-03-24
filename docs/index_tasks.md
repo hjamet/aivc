@@ -24,4 +24,5 @@
 | [Phase 20: Cloud Sync](tasks/phase20_google_drive_sync.md) | Google Drive Sync architecture for multi-machine commits | 2026-03-24 | `Up to date` |
 | [Phase 21: Async & Sync Consolidation](tasks/phase21_async_sync_consolidation.md) | Async and cloud sync architectural debt consolidation | 2026-03-24 | `Up to date` |
 | [Phase 22: Local Hints Optimization](tasks/phase22_local_hints_optimization.md) | O(1) basename index for local path hints | 2026-03-24 | `Up to date` |
-| [Phase 23 — Synchronisation d'État](tasks/phase23_state_sync_reload.md) | Reload JIT du workspace via mtime | 2026-03-24 | `Up to date` |
+| [Phase 23 — State Sync](tasks/phase23_state_sync_reload.md) | Reload JIT du workspace via mtime | 2026-03-24 | `Up to date` |
+| [Phase 25 — Native Google Drive](tasks/phase25_native_google_drive.md) | Native Google Drive API replacing rclone | 2026-03-24 | `Up to date` |

@@ -110,12 +110,12 @@ _storage_root = get_storage_root()
 # SemanticEngine is imported here (triggering a fast eager init of Workspace +
 # SQLite graph; the heavy ML components remain lazy until first use).
 from aivc.semantic.engine import SemanticEngine  # noqa: E402
-from aivc.sync.sync import RcloneSyncManager
+from aivc.sync.drive import NativeDriveSyncManager
 from aivc.sync.background import BackgroundSyncer
 from aivc.config import get_machine_id
 
 _engine = SemanticEngine(_storage_root)
-_sync_manager = RcloneSyncManager(_storage_root)
+_sync_manager = NativeDriveSyncManager(_storage_root)
 _syncer = BackgroundSyncer(_storage_root)
 
 _local_machine_id = get_machine_id()

@@ -193,72 +193,128 @@ def cmd_config(args: argparse.Namespace) -> None:
         print(json.dumps(config, indent=2))
 
 
+RED = "\033[0;31m"
+
+
 def cmd_sync_setup(args: argparse.Namespace) -> None:
-    """Guide the user through rclone sync setup."""
-    from aivc.config import get_aivc_config, save_aivc_config, get_rclone_exe
-    import subprocess
-    
+    """Guide the user through Google Drive sync setup (native OAuth)."""
+    from aivc.config import get_aivc_config, save_aivc_config, get_credentials_path, get_token_path
+
     config = get_aivc_config()
-    if "sync" not in config: config["sync"] = {}
-    
-    print(f"{CYAN}{BOLD}=== AIVC Cloud Sync Setup ==={RESET}")
-    print("This will configure rclone to sync your memory between machines.")
-    
-    rclone = get_rclone_exe()
-    print(f"\n1. {BOLD}Rclone binary:{RESET} {rclone}")
-    
-    print(f"\n2. {BOLD}Remote Configuration:{RESET}")
-    print("You must first create a remote named 'aivc_remote' (or your choice) via 'rclone config'.")
-    print("We recommend Google Drive, but any rclone-supported backend works.")
-    
-    remote_name = input(f"Enter your rclone remote name (default: {config['sync'].get('remote_name', 'aivc_remote')}): ").strip()
-    if remote_name: config["sync"]["remote_name"] = remote_name
-    elif "remote_name" not in config["sync"]: config["sync"]["remote_name"] = "aivc_remote"
+    if "sync" not in config:
+        config["sync"] = {}
 
-    enabled = input("Enable cloud sync? (y/n, default: y): ").strip().lower() != 'n'
-    config["sync"]["enabled"] = enabled
+    print(f"{CYAN}{BOLD}=== AIVC Cloud Sync Setup (Google Drive) ==={RESET}")
+    print("This will configure AIVC to sync your memory across machines via Google Drive.\n")
 
+    # Step 1: Check if already authenticated
+    token_path = get_token_path()
+    if token_path.exists():
+        print(f"{GREEN}✓ Existing authentication found at {token_path}{RESET}")
+        reauth = input("Re-authenticate? (y/n, default: n): ").strip().lower()
+        if reauth != "y":
+            config["sync"]["enabled"] = True
+            save_aivc_config(config)
+            print(f"\n{GREEN}Cloud sync is ENABLED.{RESET}")
+            return
+
+    # Step 2: Guide user to get credentials
+    print(f"{YELLOW}{BOLD}--- Step 1: Create Google Cloud Credentials ---{RESET}")
+    print("""
+To sync via Google Drive, you need a Google Cloud OAuth Client ID.
+Follow these steps (takes ~2 minutes):
+
+  1. Go to: https://console.cloud.google.com/apis/credentials
+  2. Create a project (or select an existing one).
+  3. Click "+ CREATE CREDENTIALS" → "OAuth client ID".
+  4. If prompted, configure the consent screen:
+     - User Type: "External" → Create
+     - App name: "AIVC" → Save (skip optional fields)
+     - Add yourself as a test user → Save
+  5. Back in Credentials:
+     - Application type: "Desktop app"
+     - Name: "AIVC CLI"
+     - Click "Create"
+  6. Copy the Client ID and Client Secret shown.
+
+  Also enable the Google Drive API:
+  → https://console.cloud.google.com/apis/library/drive.googleapis.com
+  Click "ENABLE".
+""")
+
+    client_id = input(f"{BOLD}Paste your Client ID:{RESET} ").strip()
+    if not client_id:
+        print(f"{RED}Aborted: Client ID is required.{RESET}")
+        return
+
+    client_secret = input(f"{BOLD}Paste your Client Secret:{RESET} ").strip()
+    if not client_secret:
+        print(f"{RED}Aborted: Client Secret is required.{RESET}")
+        return
+
+    # Step 3: Run OAuth flow
+    print(f"\n{DIM}Opening your browser for Google authorization...{RESET}")
+
+    try:
+        from google_auth_oauthlib.flow import InstalledAppFlow
+    except ImportError:
+        print(f"{RED}Error: Google auth libraries not installed.{RESET}")
+        print(f"Run: pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib")
+        return
+
+    client_config = {
+        "installed": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": ["http://localhost"],
+        }
+    }
+
+    scopes = ["https://www.googleapis.com/auth/drive.file"]
+    flow = InstalledAppFlow.from_client_config(client_config, scopes)
+    creds = flow.run_local_server(port=0)
+
+    # Save credentials and token
+    creds_path = get_credentials_path()
+    creds_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import json
+    creds_path.write_text(json.dumps(client_config), encoding="utf-8")
+    token_path.write_text(creds.to_json(), encoding="utf-8")
+
+    # Update config
+    config["sync"]["enabled"] = True
     save_aivc_config(config)
-    print(f"\n{GREEN}Success! Configuration saved to ~/.aivc/config.json{RESET}")
-    if enabled:
-        print(f"{YELLOW}Cloud sync is now ENABLED.{RESET}")
-    else:
-        print(f"{DIM}Cloud sync is currently DISABLED.{RESET}")
+
+    print(f"\n{GREEN}{BOLD}✓ Authentication successful!{RESET}")
+    print(f"  Token saved to: {token_path}")
+    print(f"  Config saved to: ~/.aivc/config.json")
+    print(f"\n{YELLOW}Cloud sync is now ENABLED.{RESET}")
+    print(f"AIVC will automatically sync commits and blobs to your Google Drive.")
 
 
 def cmd_sync_status(args: argparse.Namespace) -> None:
     """Show cloud sync status and remote machines."""
-    from aivc.config import get_aivc_config, get_machine_id
-    from aivc.sync.sync import RcloneSyncManager
-    
+    from aivc.config import get_aivc_config, get_machine_id, get_token_path
+
     config = get_aivc_config()
     sync_cfg = config.get("sync", {})
     m_id = get_machine_id()
-    
+
     print(f"{CYAN}{BOLD}AIVC Sync Status:{RESET}")
-    print(f"  {BOLD}Local Machine ID:{RESET} {m_id}")
-    print(f"  {BOLD}Sync Enabled:{RESET}     {GREEN if sync_cfg.get('enabled') else YELLOW}{sync_cfg.get('enabled', False)}{RESET}")
-    print(f"  {BOLD}Remote Name:{RESET}      {sync_cfg.get('remote_name', '—')}")
-    
+    print(f"  {BOLD}Local Machine ID:{RESET}  {m_id}")
+    print(f"  {BOLD}Sync Enabled:{RESET}      {GREEN if sync_cfg.get('enabled') else YELLOW}{sync_cfg.get('enabled', False)}{RESET}")
+    print(f"  {BOLD}Auth Token:{RESET}        {'✓ present' if get_token_path().exists() else '✗ missing (run aivc sync setup)'}")
+
     if sync_cfg.get("enabled"):
         try:
-            manager = RcloneSyncManager(Path.home() / ".aivc" / "storage")
-            print(f"\n{DIM}Checking remote machines via rclone...{RESET}")
-            # list dirs in AIVC_Sync/
-            remote = sync_cfg.get("remote_name")
-            res = manager._run_rclone(["lsf", f"{remote}:AIVC_Sync/"], check=False)
-            if res.returncode == 0:
-                others = [d.rstrip('/') for d in res.stdout.splitlines() if d.rstrip('/') != m_id]
-                print(f"  {BOLD}Remote machines seen:{RESET} {', '.join(others) if others else 'none yet'}")
-                
-                # Auto-update remote_machines list in config if needed
-                if set(others) != set(sync_cfg.get("remote_machines", [])):
-                    config["sync"]["remote_machines"] = list(set(others))
-                    from aivc.config import save_aivc_config
-                    save_aivc_config(config)
-                    print(f"{DIM}(Updated remote_machines list in config){RESET}")
-            else:
-                print(f"{RED}Error connecting to remote: {res.stderr.strip()}{RESET}")
+            from aivc.sync.drive import NativeDriveSyncManager
+            manager = NativeDriveSyncManager(Path.home() / ".aivc" / "storage")
+            print(f"\n{DIM}Checking remote machines on Google Drive...{RESET}")
+            others = manager.list_remote_machines()
+            print(f"  {BOLD}Remote machines seen:{RESET} {', '.join(others) if others else 'none yet'}")
         except Exception as e:
             print(f"{RED}Error: {e}{RESET}")
 
@@ -362,7 +418,7 @@ def main() -> None:
         help="Manage cloud synchronization"
     )
     sync_sub = parser_sync.add_subparsers(dest="sync_command", required=True)
-    sync_sub.add_parser("setup", help="Interactive rclone sync setup")
+    sync_sub.add_parser("setup", help="Interactive Google Drive sync setup")
     sync_sub.add_parser("status", help="Check cloud sync status")
 
     args = parser.parse_args()

@@ -21,6 +21,11 @@ semantic = [
     "rank-bm25>=0.2.0",
     "watchdog>=4.0.0",
 ]
+sync = [
+    "google-api-python-client>=2.0",
+    "google-auth-httplib2>=0.1",
+    "google-auth-oauthlib>=1.0",
+]
 all = [
     "pytest>=8.0",
     "chromadb>=0.6",
@@ -28,6 +33,9 @@ all = [
     "mcp>=1.0",
     "rank-bm25>=0.2.0",
     "watchdog>=4.0.0",
+    "google-api-python-client>=2.0",
+    "google-auth-httplib2>=0.1",
+    "google-auth-oauthlib>=1.0",
 ]
 
 [tool.setuptools.packages.find]

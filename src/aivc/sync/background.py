@@ -5,13 +5,13 @@ BackgroundSyncer: Daemon thread to pull commits periodically (or at startup).
 import threading
 import time
 from pathlib import Path
-from aivc.sync.sync import RcloneSyncManager
+from aivc.sync.drive import NativeDriveSyncManager
 
 class BackgroundSyncer:
     """Daemon responsible for pulling distant commits at startup and potentially periodically."""
     
     def __init__(self, storage_root: Path):
-        self.manager = RcloneSyncManager(storage_root)
+        self.manager = NativeDriveSyncManager(storage_root)
         self._stop_event = threading.Event()
         self._thread = None
 

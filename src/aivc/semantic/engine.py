@@ -25,7 +25,7 @@ from aivc.core.commit import Commit
 from aivc.core.workspace import FileStatus, Workspace
 from aivc.semantic.graph import CooccurrenceGraph
 from aivc.config import get_machine_id
-from aivc.sync.sync import RcloneSyncManager
+from aivc.sync.drive import NativeDriveSyncManager
 
 
 class SemanticEngine:
@@ -63,7 +63,7 @@ class SemanticEngine:
         # Async Indexing & Sync
         self._index_queue = queue.Queue()
         self._sync_queue = queue.Queue()
-        self._sync_manager = RcloneSyncManager(storage_root)
+        self._sync_manager = NativeDriveSyncManager(storage_root)
         
         self._indexing_thread = threading.Thread(target=self._indexing_worker_loop, daemon=True)
         self._sync_thread = threading.Thread(target=self._sync_worker_loop, daemon=True)
