@@ -13,6 +13,10 @@ _CONFIG_PATH = Path.home() / ".aivc" / "config.json"
 _CREDENTIALS_PATH = Path.home() / ".aivc" / "credentials.json"
 _TOKEN_PATH = Path.home() / ".aivc" / "token.json"
 
+# Disable network telemetry that causes massive latency spikes on Windows
+os.environ["ANONYMIZED_TELEMETRY"] = "False"  # ChromaDB
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"  # HuggingFace
+
 # ML Model configurations
 BI_ENCODER_MODEL = "all-MiniLM-L6-v2"
 CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
