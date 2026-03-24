@@ -25,6 +25,18 @@ from aivc.config import BI_ENCODER_MODEL
 
 _COLLECTION_NAME = "aivc_commits"
 
+# Module-level singleton to prevent ChromaDB's build_from_config from
+# loading the model a second time (~5s wasted on Windows NTFS).
+_shared_model: SentenceTransformer | None = None
+
+
+def _get_shared_model() -> SentenceTransformer:
+    """Return the shared SentenceTransformer model (lazy singleton)."""
+    global _shared_model
+    if _shared_model is None:
+        _shared_model = SentenceTransformer(BI_ENCODER_MODEL)
+    return _shared_model
+
 
 class _SentenceTransformerEF(EmbeddingFunction):
     """ChromaDB-compatible embedding function backed by SentenceTransformers."""
@@ -41,7 +53,8 @@ class _SentenceTransformerEF(EmbeddingFunction):
 
     @staticmethod
     def build_from_config(config: dict) -> "_SentenceTransformerEF":
-        return _SentenceTransformerEF(SentenceTransformer(BI_ENCODER_MODEL))
+        # Reuse the shared singleton — do NOT create a new model instance
+        return _SentenceTransformerEF(_get_shared_model())
 
     def __call__(self, input: Documents) -> Embeddings:  # noqa: A002
         return self._model.encode(list(input), convert_to_numpy=True).tolist()
@@ -69,7 +82,7 @@ class Indexer:
         self._chroma_dir = storage_root / self._CHROMA_DIR
         self._chroma_dir.mkdir(parents=True, exist_ok=True)
 
-        self._model = SentenceTransformer(BI_ENCODER_MODEL)
+        self._model = _get_shared_model()
         self._ef = _SentenceTransformerEF(self._model)
 
         self._client = chromadb.PersistentClient(path=str(self._chroma_dir))
