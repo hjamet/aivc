@@ -85,20 +85,14 @@ else
     VENV_BIN_DIR="${VENV_DIR}/bin"
 fi
 
-# ---------------------------------------------------------------------------
 # 4. Install the package with semantic dependencies
 # ---------------------------------------------------------------------------
 
-# Normalize SOURCE_DIR for Windows if needed (uv/pip are often Windows binaries)
-SOURCE_DIR_NORM="${SOURCE_DIR}"
-if command -v cygpath >/dev/null 2>&1; then
-    # Use -m (mixed style) to get C:/Users/... which is safer for Python on Windows
-    SOURCE_DIR_NORM="$(cygpath -m "${SOURCE_DIR}")"
-    info "Path normalization (cygpath): ${SOURCE_DIR_NORM}"
-fi
-
-info "Installing aivc[semantic] into the venv (this may take a moment for PyTorch/model downloads) ..."
-uv pip install --python "${VENV_PYTHON}" -e "${SOURCE_DIR_NORM}[semantic]"
+info "Installing aivc[semantic] into the venv (this may take a moment) ..."
+# We use relative paths for install to avoid Windows/MSYS absolute path mangling
+pushd "${SOURCE_DIR}" >/dev/null
+uv pip install --python "${VENV_PYTHON}" -e ".[semantic]"
+popd >/dev/null
 
 # ---------------------------------------------------------------------------
 # 5. Inject AIVC into ~/.gemini/antigravity/mcp_config.json
