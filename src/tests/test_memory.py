@@ -1,7 +1,7 @@
-"""Unit tests for Commit and FileChange dataclasses."""
+"""Unit tests for Memory and FileChange dataclasses."""
 
 import pytest
-from aivc.core.commit import Commit, FileChange, commit_from_dict, commit_to_dict
+from aivc.core.memory import Memory, FileChange, memory_from_dict, memory_to_dict
 
 
 def make_file_change(
@@ -20,7 +20,7 @@ def make_file_change(
     )
 
 
-def make_commit(**kwargs) -> Commit:
+def make_memory(**kwargs) -> Memory:
     defaults = dict(
         title="Add feature X",
         note="## Details\n\nThis is a detailed note.",
@@ -28,7 +28,7 @@ def make_commit(**kwargs) -> Commit:
         changes=[make_file_change()],
     )
     defaults.update(kwargs)
-    return Commit.create(**defaults)
+    return Memory.create(**defaults)
 
 
 # ---------------------------------------------------------------------------
@@ -63,32 +63,32 @@ def test_file_change_format_impact() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Commit creation
+# Memory creation
 # ---------------------------------------------------------------------------
 
-def test_commit_create_generates_unique_ids() -> None:
-    c1 = make_commit()
-    c2 = make_commit()
-    assert c1.id != c2.id
+def test_memory_create_generates_unique_ids() -> None:
+    m1 = make_memory()
+    m2 = make_memory()
+    assert m1.id != m2.id
 
 
-def test_commit_empty_title_crashes() -> None:
+def test_memory_empty_title_crashes() -> None:
     with pytest.raises(ValueError, match="title cannot be empty"):
-        Commit.create(title="  ", note="valid note", parent_id=None, changes=[])
+        Memory.create(title="  ", note="valid note", parent_id=None, changes=[])
 
 
-def test_commit_empty_note_crashes() -> None:
+def test_memory_empty_note_crashes() -> None:
     with pytest.raises(ValueError, match="note cannot be empty"):
-        Commit.create(title="Valid title", note="   ", parent_id=None, changes=[])
+        Memory.create(title="Valid title", note="   ", parent_id=None, changes=[])
 
 
 # ---------------------------------------------------------------------------
 # Serialisation roundtrip
 # ---------------------------------------------------------------------------
 
-def test_commit_roundtrip() -> None:
-    original = make_commit()
-    restored = commit_from_dict(commit_to_dict(original))
+def test_memory_roundtrip() -> None:
+    original = make_memory()
+    restored = memory_from_dict(memory_to_dict(original))
     assert restored.id == original.id
     assert restored.title == original.title
     assert restored.note == original.note
@@ -98,15 +98,15 @@ def test_commit_roundtrip() -> None:
     assert restored.changes[0].bytes_added == original.changes[0].bytes_added
 
 
-def test_commit_from_dict_crashes_on_missing_field() -> None:
-    d = commit_to_dict(make_commit())
+def test_memory_from_dict_crashes_on_missing_field() -> None:
+    d = memory_to_dict(make_memory())
     del d["note"]
     with pytest.raises(ValueError, match="missing fields"):
-        commit_from_dict(d)
+        memory_from_dict(d)
 
 
-def test_commit_from_dict_crashes_on_missing_change_field() -> None:
-    d = commit_to_dict(make_commit())
+def test_memory_from_dict_crashes_on_missing_change_field() -> None:
+    d = memory_to_dict(make_memory())
     del d["changes"][0]["bytes_added"]
     with pytest.raises(ValueError, match="missing fields"):
-        commit_from_dict(d)
+        memory_from_dict(d)

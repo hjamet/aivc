@@ -5,14 +5,14 @@ from __future__ import annotations
 import pytest
 from pathlib import Path
 
-from aivc.core.commit import Commit, FileChange
+from aivc.core.memory import Memory, FileChange
 
 
-def _make_commit(
-    commit_id: str,
-    title: str = "Commit",
+def _make_memory(
+    memory_id: str,
+    title: str = "Memory",
     file_paths: list[str] | None = None,
-) -> Commit:
+) -> Memory:
     if file_paths is None:
         file_paths = []
     changes = [
@@ -22,8 +22,8 @@ def _make_commit(
         )
         for fp in file_paths
     ]
-    return Commit(
-        id=commit_id,
+    return Memory(
+        id=memory_id,
         timestamp="2026-01-01T00:00:00+00:00",
         title=title,
         note="note",
@@ -39,107 +39,107 @@ def graph(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# add_commit
+# add_memory
 # ---------------------------------------------------------------------------
 
-def test_add_commit_registers_commit_node(graph) -> None:
-    c = _make_commit("c1", file_paths=["a.py", "b.py"])
-    graph.add_commit(c)
+def test_add_memory_registers_memory_node(graph) -> None:
+    m = _make_memory("m1", file_paths=["a.py", "b.py"])
+    graph.add_memory(m)
     # Verify via public API
-    assert graph.get_commit_files("c1") == ["a.py", "b.py"] or \
-           set(graph.get_commit_files("c1")) == {"a.py", "b.py"}
+    assert graph.get_memory_files("m1") == ["a.py", "b.py"] or \
+           set(graph.get_memory_files("m1")) == {"a.py", "b.py"}
 
 
-def test_add_commit_registers_file_nodes(graph) -> None:
-    c = _make_commit("c1", file_paths=["a.py", "b.py"])
-    graph.add_commit(c)
-    assert "c1" in graph.get_file_commits("a.py")
-    assert "c1" in graph.get_file_commits("b.py")
+def test_add_memory_registers_file_nodes(graph) -> None:
+    m = _make_memory("m1", file_paths=["a.py", "b.py"])
+    graph.add_memory(m)
+    assert "m1" in graph.get_file_memories("a.py")
+    assert "m1" in graph.get_file_memories("b.py")
 
 
-def test_add_commit_is_idempotent(graph) -> None:
-    c = _make_commit("c1", file_paths=["a.py"])
-    graph.add_commit(c)
-    graph.add_commit(c)
-    # File must still list commit only once.
-    assert graph.get_file_commits("a.py").count("c1") == 1
+def test_add_memory_is_idempotent(graph) -> None:
+    m = _make_memory("m1", file_paths=["a.py"])
+    graph.add_memory(m)
+    graph.add_memory(m)
+    # File must still list memory only once.
+    assert graph.get_file_memories("a.py").count("m1") == 1
 
 
-def test_add_commit_persists_to_disk(tmp_path) -> None:
+def test_add_memory_persists_to_disk(tmp_path) -> None:
     from aivc.semantic.graph import CooccurrenceGraph
     storage = tmp_path / "storage"
     g1 = CooccurrenceGraph(storage)
-    c = _make_commit("c1", file_paths=["a.py"])
-    g1.add_commit(c)
+    m = _make_memory("m1", file_paths=["a.py"])
+    g1.add_memory(m)
 
     # Load a fresh instance from the same root — data must persist.
     g2 = CooccurrenceGraph(storage)
-    assert set(g2.get_commit_files("c1")) == {"a.py"}
+    assert set(g2.get_memory_files("m1")) == {"a.py"}
 
 
 # ---------------------------------------------------------------------------
-# remove_commit
+# remove_memory
 # ---------------------------------------------------------------------------
 
-def test_remove_commit_deletes_commit_node(graph) -> None:
-    c = _make_commit("c1", file_paths=["a.py"])
-    graph.add_commit(c)
-    graph.remove_commit("c1")
+def test_remove_memory_deletes_memory_node(graph) -> None:
+    m = _make_memory("m1", file_paths=["a.py"])
+    graph.add_memory(m)
+    graph.remove_memory("m1")
     with pytest.raises(KeyError):
-        graph.get_commit_files("c1")
+        graph.get_memory_files("m1")
 
 
-def test_remove_commit_cleans_up_orphan_file_node(graph) -> None:
-    c = _make_commit("c1", file_paths=["solo.py"])
-    graph.add_commit(c)
-    graph.remove_commit("c1")
-    # "solo.py" has no remaining commits → must be removed.
+def test_remove_memory_cleans_up_orphan_file_node(graph) -> None:
+    m = _make_memory("m1", file_paths=["solo.py"])
+    graph.add_memory(m)
+    graph.remove_memory("m1")
+    # "solo.py" has no remaining memories → must be removed.
     with pytest.raises(KeyError):
-        graph.get_file_commits("solo.py")
+        graph.get_file_memories("solo.py")
 
 
-def test_remove_commit_keeps_shared_file_node(graph) -> None:
-    c1 = _make_commit("c1", file_paths=["shared.py", "only_c1.py"])
-    c2 = _make_commit("c2", file_paths=["shared.py"])
-    graph.add_commit(c1)
-    graph.add_commit(c2)
-    graph.remove_commit("c1")
-    # "shared.py" is still referenced by c2.
-    assert "c2" in graph.get_file_commits("shared.py")
+def test_remove_memory_keeps_shared_file_node(graph) -> None:
+    m1 = _make_memory("m1", file_paths=["shared.py", "only_m1.py"])
+    m2 = _make_memory("m2", file_paths=["shared.py"])
+    graph.add_memory(m1)
+    graph.add_memory(m2)
+    graph.remove_memory("m1")
+    # "shared.py" is still referenced by m2.
+    assert "m2" in graph.get_file_memories("shared.py")
 
 
-def test_remove_commit_raises_if_not_in_graph(graph) -> None:
+def test_remove_memory_raises_if_not_in_graph(graph) -> None:
     with pytest.raises(KeyError, match="not in the graph"):
-        graph.remove_commit("nonexistent")
+        graph.remove_memory("nonexistent")
 
 
 # ---------------------------------------------------------------------------
 # Queries
 # ---------------------------------------------------------------------------
 
-def test_get_commit_files(graph) -> None:
-    c = _make_commit("c1", file_paths=["a.py", "b.py"])
-    graph.add_commit(c)
-    assert set(graph.get_commit_files("c1")) == {"a.py", "b.py"}
+def test_get_memory_files(graph) -> None:
+    m = _make_memory("m1", file_paths=["a.py", "b.py"])
+    graph.add_memory(m)
+    assert set(graph.get_memory_files("m1")) == {"a.py", "b.py"}
 
 
-def test_get_file_commits(graph) -> None:
-    c1 = _make_commit("c1", file_paths=["a.py"])
-    c2 = _make_commit("c2", file_paths=["a.py"])
-    graph.add_commit(c1)
-    graph.add_commit(c2)
-    assert set(graph.get_file_commits("a.py")) == {"c1", "c2"}
+def test_get_file_memories(graph) -> None:
+    m1 = _make_memory("m1", file_paths=["a.py"])
+    m2 = _make_memory("m2", file_paths=["a.py"])
+    graph.add_memory(m1)
+    graph.add_memory(m2)
+    assert set(graph.get_file_memories("a.py")) == {"m1", "m2"}
 
 
 def test_get_related_files_basic(graph) -> None:
-    c1 = _make_commit("c1", file_paths=["a.py", "b.py", "c.py"])
-    c2 = _make_commit("c2", file_paths=["a.py", "b.py"])
-    graph.add_commit(c1)
-    graph.add_commit(c2)
+    m1 = _make_memory("m1", file_paths=["a.py", "b.py", "c.py"])
+    m2 = _make_memory("m2", file_paths=["a.py", "b.py"])
+    graph.add_memory(m1)
+    graph.add_memory(m2)
     related = dict(graph.get_related_files("a.py"))
-    # "b.py" appears in both commits alongside "a.py".
+    # "b.py" appears in both memories alongside "a.py".
     assert related["b.py"] == 2
-    # "c.py" appears only in c1.
+    # "c.py" appears only in m1.
     assert related.get("c.py", 0) == 1
     # "a.py" itself must not be in results.
     assert "a.py" not in related
@@ -155,47 +155,47 @@ def test_get_related_files_raises_for_unknown(graph) -> None:
 # ---------------------------------------------------------------------------
 
 def test_to_vis_data_structure(graph) -> None:
-    c = _make_commit("c1", title="My commit", file_paths=["a.py"])
-    graph.add_commit(c)
+    m = _make_memory("m1", title="My memory", file_paths=["a.py"])
+    graph.add_memory(m)
     data = graph.to_vis_data()
     assert "nodes" in data
     assert "edges" in data
 
     node_ids = {n["id"] for n in data["nodes"]}
-    assert "c1" in node_ids
+    assert "m1" in node_ids
     assert "a.py" in node_ids
 
     edge_sources = {e["source"] for e in data["edges"]}
-    assert "c1" in edge_sources
+    assert "m1" in edge_sources
 
 # ---------------------------------------------------------------------------
-# get_commits_by_glob
+# get_memories_by_glob
 # ---------------------------------------------------------------------------
 
-def test_get_commits_by_glob_basic(graph) -> None:
-    c1 = _make_commit("c1", file_paths=["/abs/path/src/a.py", "/abs/path/src/b.py"])
-    c2 = _make_commit("c2", file_paths=["/abs/path/docs/readme.md"])
-    graph.add_commit(c1)
-    graph.add_commit(c2)
-    commits = graph.get_commits_by_glob("*.py")
-    assert set(commits) == {"c1"}
+def test_get_memories_by_glob_basic(graph) -> None:
+    m1 = _make_memory("m1", file_paths=["/abs/path/src/a.py", "/abs/path/src/b.py"])
+    m2 = _make_memory("m2", file_paths=["/abs/path/docs/readme.md"])
+    graph.add_memory(m1)
+    graph.add_memory(m2)
+    memories = graph.get_memories_by_glob("*.py")
+    assert set(memories) == {"m1"}
 
-def test_get_commits_by_glob_specific_dir(graph) -> None:
-    c1 = _make_commit("c1", file_paths=["/usr/src/semantic/a.py"])
-    c2 = _make_commit("c2", file_paths=["/usr/src/core/b.py"])
-    graph.add_commit(c1)
-    graph.add_commit(c2)
-    commits = graph.get_commits_by_glob("*/semantic/*.py")
-    assert set(commits) == {"c1"}
+def test_get_memories_by_glob_specific_dir(graph) -> None:
+    m1 = _make_memory("m1", file_paths=["/usr/src/semantic/a.py"])
+    m2 = _make_memory("m2", file_paths=["/usr/src/core/b.py"])
+    graph.add_memory(m1)
+    graph.add_memory(m2)
+    memories = graph.get_memories_by_glob("*/semantic/*.py")
+    assert set(memories) == {"m1"}
 
-def test_get_commits_by_glob_no_match(graph) -> None:
-    c1 = _make_commit("c1", file_paths=["/src/a.py"])
-    graph.add_commit(c1)
-    assert graph.get_commits_by_glob("*.md") == []
+def test_get_memories_by_glob_no_match(graph) -> None:
+    m1 = _make_memory("m1", file_paths=["/src/a.py"])
+    graph.add_memory(m1)
+    assert graph.get_memories_by_glob("*.md") == []
 
-def test_get_commits_by_glob_all_match(graph) -> None:
-    c1 = _make_commit("c1", file_paths=["/src/a.py"])
-    c2 = _make_commit("c2", file_paths=["/docs/b.md"])
-    graph.add_commit(c1)
-    graph.add_commit(c2)
-    assert set(graph.get_commits_by_glob("*")) == {"c1", "c2"}
+def test_get_memories_by_glob_all_match(graph) -> None:
+    m1 = _make_memory("m1", file_paths=["/src/a.py"])
+    m2 = _make_memory("m2", file_paths=["/docs/b.md"])
+    graph.add_memory(m1)
+    graph.add_memory(m2)
+    assert set(graph.get_memories_by_glob("*")) == {"m1", "m2"}

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from aivc.core.blob_store import BlobStore
-from aivc.core.commit import Commit, FileChange, commit_from_dict, commit_to_dict
+from aivc.core.memory import Memory, FileChange, memory_from_dict, memory_to_dict
 from aivc.core.diff import compute_diff
 from aivc.core.index import CoreIndex
 
@@ -36,12 +36,12 @@ class FileStatus:
 
 
 class Workspace:
-    """Orchestrates tracking, commits, GC, and status reporting.
+    """Orchestrates tracking, memories, GC, and status reporting.
 
     Disk layout under <storage_root>:
-        workspace.json       — tracked files + head commit id
+        workspace.json       — tracked files + head memory id (stored as head_commit_id)
         commits/
-            <uuid>.json      — individual commit records
+            <uuid>.json      — individual memory records
         blobs/               — managed by BlobStore
         refcounts.json       — managed by BlobStore
     """
@@ -146,18 +146,18 @@ class Workspace:
             return True
         return False
 
-    def _commit_path(self, commit_id: str) -> Path:
-        return self._commits_dir / f"{commit_id}.json"
+    def _memory_path(self, memory_id: str) -> Path:
+        return self._commits_dir / f"{memory_id}.json"
 
-    def _save_commit(self, commit: Commit) -> None:
-        path = self._commit_path(commit.id)
-        path.write_text(json.dumps(commit_to_dict(commit), indent=2), encoding="utf-8")
+    def _save_memory(self, memory: Memory) -> None:
+        path = self._memory_path(memory.id)
+        path.write_text(json.dumps(memory_to_dict(memory), indent=2), encoding="utf-8")
 
-    def _load_commit(self, commit_id: str) -> Commit:
-        path = self._commit_path(commit_id)
+    def _load_memory(self, memory_id: str) -> Memory:
+        path = self._memory_path(memory_id)
         if not path.exists():
-            raise KeyError(f"Commit {commit_id!r} not found.")
-        return commit_from_dict(json.loads(path.read_text(encoding="utf-8")))
+            raise KeyError(f"Memory {memory_id!r} not found.")
+        return memory_from_dict(json.loads(path.read_text(encoding="utf-8")))
 
     def _is_hidden(self, path: Path) -> bool:
         """Check if any component of the path starts with a dot."""
@@ -210,7 +210,7 @@ class Workspace:
         return all_files, hidden_count
     
     def migrate_index(self) -> None:
-        """Ensure all existing JSON commits are in the SQLite index.
+        """Ensure all existing JSON memories are in the SQLite index.
         
         This is an explicit migration call, usually triggered via CLI.
         """
@@ -321,22 +321,22 @@ class Workspace:
             raise KeyError(f"Path {path_or_glob!r} is not tracked or watched.")
 
         for file_path in to_untrack:
-            # Collect commits referencing this file via the index (fast).
-            affected_commit_ids = self._index.get_commits_touching_file(file_path)
+            # Collect memories referencing this file via the index (fast).
+            affected_memory_ids = self._index.get_memories_touching_file(file_path)
             with self._blob_store.batch():
-                for cid in affected_commit_ids:
-                    commit = self._load_commit(cid)
+                for mid in affected_memory_ids:
+                    memory = self._load_memory(mid)
                     updated_changes = []
-                    for change in commit.changes:
+                    for change in memory.changes:
                         if change.path == file_path:
                             if change.blob_hash is not None:
                                 self._blob_store.decrement_ref(change.blob_hash)
                         else:
                             updated_changes.append(change)
                     
-                    if len(updated_changes) != len(commit.changes):
-                        commit.changes = updated_changes
-                        self._save_commit(commit)
+                    if len(updated_changes) != len(memory.changes):
+                        memory.changes = updated_changes
+                        self._save_memory(memory)
 
             # Cleanup the index for this file.
             self._index.remove_file_changes(file_path)
@@ -349,26 +349,26 @@ class Workspace:
         self._reload_state_if_needed()
         return list(self._state["tracked_files"].keys())
 
-    def create_commit(
+    def create_memory(
         self,
         title: str,
         note: str,
         consulted_files: list[str] | None = None,
         machine_id: str = "",
-    ) -> Commit:
-        """Detect changes in tracked files and create a new commit.
+    ) -> Memory:
+        """Detect changes in tracked files and create a new memory.
 
         Args:
-            title: Short title for the commit.
+            title: Short title for the memory.
             note: Detailed Markdown note (the LLM's 'memory').
             consulted_files: Optional list of file paths that were consulted
                              but not modified. Files that exist on disk but
                              aren't tracked will be auto-tracked. Non-existent
                              files are silently skipped.
-            machine_id: ID of the machine where the commit was created.
+            machine_id: ID of the machine where the memory was created.
 
         Returns:
-            The newly created Commit.
+            The newly created Memory.
 
         Raises:
             RuntimeError: if no changes are detected and no files were consulted.
@@ -410,18 +410,18 @@ class Workspace:
         if not all_changes:
             raise RuntimeError(
                 "No changes detected in tracked files and no files consulted. "
-                "Nothing to commit."
+                "Nothing to remember."
             )
 
-        commit = Commit.create(
+        memory = Memory.create(
             title=title,
             note=note,
             parent_id=self._state["head_commit_id"],
             changes=all_changes,
             machine_id=machine_id,
         )
-        self._save_commit(commit)
-        self._index.add_commit(commit)
+        self._save_memory(memory)
+        self._index.add_memory(memory)
 
         # Update tracked_files with the new hashes and metadata.
         for change in changes:
@@ -438,95 +438,102 @@ class Workspace:
                     "size": stat.st_size
                 }
 
-        self._state["head_commit_id"] = commit.id
+        self._state["head_commit_id"] = memory.id
         self._save_state()
-        return commit
+        return memory
 
     def get_status(self) -> list[FileStatus]:
         """Return the status of all tracked files.
 
-        For each file: current on-disk size (from cached metadata when available)
-        and total history size set to 0 (computing per-file history is too expensive
-        for large workspaces).
+        For each file: current on-disk size and total history size in AIVC.
+        Uses the index to efficiently recover historical blob hashes.
         """
         self._reload_state_if_needed()
         statuses = []
-        for rel_path, tracker_data in self._state["tracked_files"].items():
-            # Use cached size from metadata when available (avoids stat() calls)
-            if isinstance(tracker_data, dict):
-                current_size = tracker_data.get("size")
-            else:
-                # Legacy format or None — fallback to stat only if needed
-                p = Path(rel_path)
-                current_size = p.stat().st_size if p.exists() and p.is_file() else None
+        for abs_path in self._state["tracked_files"]:
+            p = Path(abs_path)
+            
+            # Current size must reflect reality on disk
+            current_size = None
+            if p.exists() and p.is_file():
+                try:
+                    current_size = p.stat().st_size
+                except (PermissionError, OSError):
+                    current_size = None
+
+            # History size: use index to find all blobs ever associated with this file
+            history_size = 0
+            hashes = self._index.get_blob_hashes_for_file(abs_path)
+            for h in hashes:
+                history_size += self._blob_store.get_size(h)
 
             statuses.append(
                 FileStatus(
-                    path=rel_path,
+                    path=abs_path,
                     current_size=current_size,
-                    history_size=0,
+                    history_size=history_size,
                 )
             )
         return statuses
 
-    def get_commit(self, commit_id: str) -> Commit:
-        """Load and return a commit by ID.
+    def get_memory(self, memory_id: str) -> Memory:
+        """Load and return a memory by ID.
 
         Raises:
-            KeyError: if the commit does not exist.
+            KeyError: if the memory does not exist.
         """
-        return self._load_commit(commit_id)
+        return self._load_memory(memory_id)
 
-    def get_log(self, limit: int = 20, offset: int = 0) -> list[Commit]:
-        """Return up to `limit` commits in reverse chronological order.
+    def get_log(self, limit: int = 20, offset: int = 0) -> list[Memory]:
+        """Return up to `limit` memories in reverse chronological order.
 
-        Traverses the commit chain via parent_id starting from HEAD.
-        Skips the first `offset` commits for pagination support.
+        Traverses the memory chain via parent_id starting from HEAD.
+        Skips the first `offset` memories for pagination support.
         """
         self._reload_state_if_needed()
-        commits: list[Commit] = []
+        memories: list[Memory] = []
         current_id = self._state["head_commit_id"]
         skipped = 0
-        while current_id is not None and len(commits) < limit:
-            commit = self._load_commit(current_id)
+        while current_id is not None and len(memories) < limit:
+            memory = self._load_memory(current_id)
             if skipped < offset:
                 skipped += 1
             else:
-                commits.append(commit)
-            current_id = commit.parent_id
-        return commits
+                memories.append(memory)
+            current_id = memory.parent_id
+        return memories
 
-    def find_child_commit(self, commit_id: str) -> Commit | None:
-        """Find the commit that has *commit_id* as its parent.
+    def find_child_memory(self, memory_id: str) -> Memory | None:
+        """Find the memory that has *memory_id* as its parent.
 
         Uses the index for O(1) lookup. Since AIVC maintains a linear chain, 
         there is at most one child.
         """
-        child_info = self._index.find_child(commit_id)
+        child_info = self._index.find_child(memory_id)
         if child_info:
             child_id, _ = child_info
-            return self._load_commit(child_id)
+            return self._load_memory(child_id)
         return None
 
-    def read_file_at_commit(self, file_path: str, commit_id: str) -> bytes:
-        """Read the content of a tracked file as it was at a specific commit.
+    def read_file_at_memory(self, file_path: str, memory_id: str) -> bytes:
+        """Read the content of a tracked file as it was at a specific memory.
 
-        Scans commit history to find the most recent blob for `file_path`
-        at or before `commit_id`.
+        Scans memory history to find the most recent blob for `file_path`
+        at or before `memory_id`.
 
         Raises:
-            KeyError: if the commit or file is not found in history.
+            KeyError: if the memory or file is not found in history.
         """
-        # Walk the chain from the target commit backwards.
-        current_id: str | None = commit_id
+        # Walk the chain from the target memory backwards.
+        current_id: str | None = memory_id
         while current_id is not None:
-            commit = self._load_commit(current_id)
-            for change in commit.changes:
+            memory = self._load_memory(current_id)
+            for change in memory.changes:
                 if change.path == file_path and change.blob_hash is not None:
                     return self._blob_store.retrieve(change.blob_hash)
-            current_id = commit.parent_id
+            current_id = memory.parent_id
 
         raise KeyError(
-            f"File {file_path!r} was not found in the history up to commit {commit_id!r}."
+            f"File {file_path!r} was not found in the history up to memory {memory_id!r}."
         )
 

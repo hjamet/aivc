@@ -10,18 +10,18 @@ from __future__ import annotations
 import pytest
 from pathlib import Path
 
-from aivc.core.commit import Commit, FileChange
+from aivc.core.memory import Memory, FileChange
 
 pytestmark = pytest.mark.requires_ml
 
 
-def _make_commit(
-    commit_id: str = "aaaa-0001",
-    title: str = "Test commit",
-    note: str = "This is a detailed note about the test commit.",
+def _make_memory(
+    memory_id: str = "aaaa-0001",
+    title: str = "Test memory",
+    note: str = "This is a detailed note about the test memory.",
     file_paths: list[str] | None = None,
-) -> Commit:
-    """Create a minimal Commit for testing."""
+) -> Memory:
+    """Create a minimal Memory for testing."""
     if file_paths is None:
         file_paths = ["src/foo.py"]
 
@@ -35,8 +35,8 @@ def _make_commit(
         )
         for fp in file_paths
     ]
-    return Commit(
-        id=commit_id,
+    return Memory(
+        id=memory_id,
         timestamp="2026-01-01T00:00:00+00:00",
         title=title,
         note=note,
@@ -53,50 +53,50 @@ def indexer(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# index_commit / is_indexed
+# index_memory / is_indexed
 # ---------------------------------------------------------------------------
 
-def test_index_commit_and_is_indexed(indexer) -> None:
-    commit = _make_commit()
-    assert not indexer.is_indexed(commit.id)
-    indexer.index_commit(commit)
-    assert indexer.is_indexed(commit.id)
+def test_index_memory_and_is_indexed(indexer) -> None:
+    memory = _make_memory()
+    assert not indexer.is_indexed(memory.id)
+    indexer.index_memory(memory)
+    assert indexer.is_indexed(memory.id)
 
 
-def test_index_commit_is_idempotent(indexer) -> None:
-    commit = _make_commit()
-    indexer.index_commit(commit)
+def test_index_memory_is_idempotent(indexer) -> None:
+    memory = _make_memory()
+    indexer.index_memory(memory)
     # Second call must not raise.
-    indexer.index_commit(commit)
-    assert indexer.is_indexed(commit.id)
+    indexer.index_memory(memory)
+    assert indexer.is_indexed(memory.id)
 
 
-def test_index_commit_raises_on_empty_note(indexer) -> None:
-    commit = _make_commit(note="   ")
+def test_index_memory_raises_on_empty_note(indexer) -> None:
+    memory = _make_memory(note="   ")
     with pytest.raises(ValueError, match="note is empty"):
-        indexer.index_commit(commit)
+        indexer.index_memory(memory)
 
 
-def test_index_commit_raises_on_empty_id(indexer) -> None:
-    commit = _make_commit(commit_id="")
+def test_index_memory_raises_on_empty_id(indexer) -> None:
+    memory = _make_memory(memory_id="")
     with pytest.raises(ValueError, match="empty id"):
-        indexer.index_commit(commit)
+        indexer.index_memory(memory)
 
 
 # ---------------------------------------------------------------------------
-# remove_commit
+# remove_memory
 # ---------------------------------------------------------------------------
 
-def test_remove_commit(indexer) -> None:
-    commit = _make_commit()
-    indexer.index_commit(commit)
-    indexer.remove_commit(commit.id)
-    assert not indexer.is_indexed(commit.id)
+def test_remove_memory(indexer) -> None:
+    memory = _make_memory()
+    indexer.index_memory(memory)
+    indexer.remove_memory(memory.id)
+    assert not indexer.is_indexed(memory.id)
 
 
-def test_remove_commit_raises_if_not_indexed(indexer) -> None:
+def test_remove_memory_raises_if_not_indexed(indexer) -> None:
     with pytest.raises(KeyError, match="not in the index"):
-        indexer.remove_commit("nonexistent-id")
+        indexer.remove_memory("nonexistent-id")
 
 
 # ---------------------------------------------------------------------------
@@ -104,13 +104,13 @@ def test_remove_commit_raises_if_not_indexed(indexer) -> None:
 # ---------------------------------------------------------------------------
 
 def test_reindex_all_replaces_collection(indexer) -> None:
-    c1 = _make_commit(commit_id="id-1", title="First")
-    c2 = _make_commit(commit_id="id-2", title="Second")
-    indexer.index_commit(c1)
-    indexer.index_commit(c2)
+    m1 = _make_memory(memory_id="id-1", title="First")
+    m2 = _make_memory(memory_id="id-2", title="Second")
+    indexer.index_memory(m1)
+    indexer.index_memory(m2)
 
-    c3 = _make_commit(commit_id="id-3", title="Third")
-    indexer.reindex_all([c3])
+    m3 = _make_memory(memory_id="id-3", title="Third")
+    indexer.reindex_all([m3])
 
     assert not indexer.is_indexed("id-1")
     assert not indexer.is_indexed("id-2")
@@ -122,13 +122,13 @@ def test_reindex_all_replaces_collection(indexer) -> None:
 # ---------------------------------------------------------------------------
 
 def test_query_returns_results(indexer) -> None:
-    commit = _make_commit(
+    memory = _make_memory(
         note="Implemented a fast sorting algorithm using quicksort.",
     )
-    indexer.index_commit(commit)
+    indexer.index_memory(memory)
     results = indexer.query("sorting algorithm", top_k=5)
     assert len(results) >= 1
-    assert results[0]["commit_id"] == commit.id
+    assert results[0]["memory_id"] == memory.id
 
 
 def test_query_raises_on_empty_index(indexer) -> None:
@@ -137,8 +137,8 @@ def test_query_raises_on_empty_index(indexer) -> None:
 
 
 def test_query_clamps_top_k_to_collection_size(indexer) -> None:
-    commit = _make_commit()
-    indexer.index_commit(commit)
+    memory = _make_memory()
+    indexer.index_memory(memory)
     # Asking for top_k=100 when only 1 doc exists must not raise.
     results = indexer.query("test", top_k=100)
     assert len(results) == 1
@@ -147,12 +147,12 @@ def test_query_clamps_top_k_to_collection_size(indexer) -> None:
 def test_query_handles_commas_in_file_paths(indexer) -> None:
     """Regression test: commas in filenames must not break parsing."""
     fp = "Notes, Highlights, and More - readwise.md"
-    commit = _make_commit(
-        commit_id="comma-id",
-        title="Commit with comma file",
+    memory = _make_memory(
+        memory_id="comma-id",
+        title="Memory with comma file",
         file_paths=[fp]
     )
-    indexer.index_commit(commit)
+    indexer.index_memory(memory)
     results = indexer.query("comma", top_k=5)
     
     assert len(results) == 1

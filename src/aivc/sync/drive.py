@@ -23,7 +23,7 @@ _ROOT_FOLDER_NAME = "AIVC_Sync"
 
 
 class NativeDriveSyncManager:
-    """Manages push/pull of commits and blobs to Google Drive natively."""
+    """Manages push/pull of memory metadata to Google Drive natively."""
 
     def __init__(self, storage_root: Path):
         self.storage_root = storage_root
@@ -122,15 +122,11 @@ class NativeDriveSyncManager:
         root_id = self._get_root_folder_id()
         return self._find_or_create_folder(self.machine_id, root_id)
 
-    def _get_commits_folder_id(self) -> str:
+    def _get_memories_folder_id(self) -> str:
         """Get (or create) the commits/ folder under the machine folder."""
         machine_id = self._get_machine_folder_id()
+        # We keep the folder name "commits" for backward compatibility on Drive
         return self._find_or_create_folder("commits", machine_id)
-
-    def _get_blobs_folder_id(self) -> str:
-        """Get (or create) the global blobs/ folder under AIVC_Sync."""
-        root_id = self._get_root_folder_id()
-        return self._find_or_create_folder("blobs", root_id)
 
     # ------------------------------------------------------------------
     # Upload helpers
@@ -183,69 +179,60 @@ class NativeDriveSyncManager:
     # Public API (same interface as old RcloneSyncManager)
     # ------------------------------------------------------------------
 
-    def push_commit(self, commit_id: str) -> None:
-        """Push a local commit JSON to Google Drive."""
+    def push_memory(self, memory_id: str) -> None:
+        """Push a local memory JSON to Google Drive."""
         if not self.enabled:
             return
 
-        local_path = self.storage_root / "commits" / f"{commit_id}.json"
+        local_path = self.storage_root / "commits" / f"{memory_id}.json"
         if not local_path.exists():
             return
 
-        folder_id = self._get_commits_folder_id()
+        folder_id = self._get_memories_folder_id()
         self._upload_file(local_path, folder_id)
 
-    def push_blob(self, blob_hash: str) -> None:
-        """Push a local blob to the global blob pool on Drive.
-        
-        DEPRECATED: Phase 29+ disables blob pushing to save Drive space 
-        and prevent machine-unauthorized data leaks.
-        """
-        return
-
     def push_missing(self) -> dict:
-        """Finds all local commits and pushes those missing from Google Drive.
+        """Finds all local memories and pushes those missing from Google Drive.
         
         Returns:
-            dict with 'commits_pushed' and 'blobs_pushed' counts.
+            dict with 'memories_pushed' count.
         """
         if not self.enabled:
-            return {"commits_pushed": 0, "blobs_pushed": 0}
+            return {"memories_pushed": 0}
 
         service = self._get_service()
-        commits_folder_id = self._get_commits_folder_id()
+        memories_folder_id = self._get_memories_folder_id()
 
-        # 1. Get all local commits
-        local_commits_dir = self.storage_root / "commits"
-        if not local_commits_dir.exists():
-            return {"commits_pushed": 0, "blobs_pushed": 0}
+        # 1. Get all local memories
+        local_memories_dir = self.storage_root / "commits"
+        if not local_memories_dir.exists():
+            return {"memories_pushed": 0}
             
-        local_commits = {f.name for f in local_commits_dir.iterdir() if f.suffix == ".json"}
+        local_memories = {f.name for f in local_memories_dir.iterdir() if f.suffix == ".json"}
         
-        # 2. Get remote commits for this machine
-        query = f"'{commits_folder_id}' in parents and trashed = false"
-        # We might need pagination if > 100 commits, but fine for MVP
+        # 2. Get remote memories for this machine
+        query = f"'{memories_folder_id}' in parents and trashed = false"
+        # We might need pagination if > 100 memories, but fine for MVP
         results = service.files().list(q=query, spaces="drive", fields="files(name)").execute()
-        remote_commits = {f["name"] for f in results.get("files", [])}
+        remote_memories = {f["name"] for f in results.get("files", [])}
         
-        missing_commits = local_commits - remote_commits
+        missing_memories = local_memories - remote_memories
         
-        commits_pushed = 0
-        blobs_pushed = 0
+        memories_pushed = 0
         
-        for commit_file in missing_commits:
-            commit_id = commit_file.replace(".json", "")
+        for memory_file in missing_memories:
+            memory_id = memory_file.replace(".json", "")
             
             # Blobs are no longer pushed as of Phase 29.
-            # We ONLY push the commit JSON (memory metadata).
+            # We ONLY push the memory JSON (metadata).
                 
-            self.push_commit(commit_id)
-            commits_pushed += 1
+            self.push_memory(memory_id)
+            memories_pushed += 1
             
-        return {"commits_pushed": commits_pushed, "blobs_attempted": blobs_pushed}
+        return {"memories_pushed": memories_pushed}
 
-    def pull_commits_from_others(self) -> None:
-        """Pull commits from other machines listed in config."""
+    def pull_memories_from_others(self) -> None:
+        """Pull memories from other machines listed in config."""
         if not self.enabled:
             return
 
@@ -257,51 +244,40 @@ class NativeDriveSyncManager:
         results = service.files().list(q=query, spaces="drive", fields="files(id, name)").execute()
         machine_folders = results.get("files", [])
 
-        local_commits_dir = self.storage_root / "commits"
-        local_commits_dir.mkdir(parents=True, exist_ok=True)
-        existing_commits = {f.name for f in local_commits_dir.iterdir() if f.suffix == ".json"}
+        local_memories_dir = self.storage_root / "commits"
+        local_memories_dir.mkdir(parents=True, exist_ok=True)
+        existing_memories = {f.name for f in local_memories_dir.iterdir() if f.suffix == ".json"}
 
         for mf in machine_folders:
             if mf["name"] == self.machine_id or mf["name"] == "blobs":
                 continue
 
-            # Find commits/ subfolder
-            commits_query = (
+            # Find commits/ subfolder (where memories are stored)
+            memories_query = (
                 f"name = 'commits' and '{mf['id']}' in parents "
                 f"and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
             )
-            commits_result = service.files().list(
-                q=commits_query, spaces="drive", fields="files(id)"
+            memories_result = service.files().list(
+                q=memories_query, spaces="drive", fields="files(id)"
             ).execute()
-            commits_folders = commits_result.get("files", [])
-            if not commits_folders:
+            memories_folders = memories_result.get("files", [])
+            if not memories_folders:
                 continue
 
-            commits_folder_id = commits_folders[0]["id"]
+            memories_folder_id = memories_folders[0]["id"]
 
-            # List commit files
-            files_query = f"'{commits_folder_id}' in parents and trashed = false"
+            # List memory files
+            files_query = f"'{memories_folder_id}' in parents and trashed = false"
             files_result = service.files().list(
                 q=files_query, spaces="drive", fields="files(id, name)"
             ).execute()
 
             for remote_file in files_result.get("files", []):
-                if remote_file["name"] in existing_commits:
+                if remote_file["name"] in existing_memories:
                     continue
-                self._download_file(remote_file["id"], local_commits_dir / remote_file["name"])
+                self._download_file(remote_file["id"], local_memories_dir / remote_file["name"])
 
-    def fetch_blob(self, blob_hash: str, machine_id: str | None = None) -> None:
-        """Fetch a missing blob from the global pool on Drive.
-        
-        DEPRECATED: Phase 29+ disables blob fetching. 
-        Files from other machines must be transferred manually (e.g. via git pull).
-        """
-        raise FileNotFoundError(
-            f"Blob {blob_hash} is not available locally. "
-            "Cloud blob syncing was disabled in Phase 29 for security and performance. "
-            "Please ensure you have synchronized your local files (e.g. git pull) "
-            "to access the content of this historical memory."
-        )
+    # Blob sync (push_blob, fetch_blob) has been purged in Phase 30.
 
     def list_remote_machines(self) -> list[str]:
         """List machine IDs found on the remote Drive."""

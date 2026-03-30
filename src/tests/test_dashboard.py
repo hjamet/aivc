@@ -24,7 +24,7 @@ def test_dashboard_api_graph():
 def test_dashboard_api_search():
     engine = MagicMock()
     mock_result = MagicMock()
-    mock_result.commit_id = "c1"
+    mock_result.memory_id = "c1"
     mock_result.title = "test title"
     mock_result.timestamp = "2024-01-01"
     mock_result.score = 0.95

@@ -96,7 +96,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         out = []
         for r in results:
             out.append({
-                "commit_id": r.commit_id,
+                "commit_id": r.memory_id,
                 "title": r.title,
                 "timestamp": r.timestamp,
                 "score": r.score,
@@ -108,7 +108,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def _api_commit(self, commit_id: str):
         """Return full commit details."""
         try:
-            commit = self.engine.get_commit(commit_id)
+            commit = self.engine.get_memory(commit_id)
+            if not commit:
+                return {"error": f"Memory {commit_id} not found"}
         except (KeyError, FileNotFoundError):
             return {"error": f"Commit {commit_id} not found"}
         return {

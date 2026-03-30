@@ -57,16 +57,16 @@ _track = _server.track
 # Helpers to build fake domain objects
 # ---------------------------------------------------------------------------
 
-def _make_commit(
-    commit_id="abc-123",
+def _make_memory(
+    memory_id="abc-123",
     title="Do something",
     note="Detailed note.",
     timestamp="2026-03-18T12:00:00+00:00",
     parent_id=None,
     changes=None,
 ):
-    """Build a minimal mock Commit."""
-    from aivc.core.commit import Commit, FileChange
+    """Build a minimal mock Memory."""
+    from aivc.core.memory import Memory, FileChange
     fc = FileChange(
         path="src/foo.py",
         action="modified",
@@ -74,8 +74,8 @@ def _make_commit(
         bytes_added=100,
         bytes_removed=50,
     )
-    return Commit(
-        id=commit_id,
+    return Memory(
+        id=memory_id,
         title=title,
         note=note,
         timestamp=timestamp,
@@ -84,11 +84,11 @@ def _make_commit(
     )
 
 
-def _make_search_result(commit_id="abc-123", title="Old commit", score=0.9):
+def _make_search_result(memory_id="abc-123", title="Old memory", score=0.9):
     """Build a minimal mock SearchResult."""
     from aivc.semantic.searcher import SearchResult
     return SearchResult(
-        commit_id=commit_id,
+        memory_id=memory_id,
         title=title,
         timestamp="2026-03-18T10:00:00+00:00",
         score=score,
@@ -112,7 +112,7 @@ class TestRemember(unittest.TestCase):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
 
     def test_returns_memory_id_and_files(self):
-        _mock_engine.create_commit.return_value = _make_commit()
+        _mock_engine.create_memory.return_value = _make_memory()
         result = _remember("Do something", "Detailed note.")
         self.assertIn("abc-123", result)
         self.assertIn("Do something", result)
@@ -120,26 +120,27 @@ class TestRemember(unittest.TestCase):
         self.assertIn("modified", result)
 
     def test_delegates_to_engine(self):
-        _mock_engine.create_commit.return_value = _make_commit()
+        _mock_engine.create_memory.return_value = _make_memory()
         _remember("T", "N")
-        _mock_engine.create_commit.assert_called_once_with("T", "N", consulted_files=[])
+        _mock_engine.create_memory.assert_called_once_with("T", "N", consulted_files=[])
 
     def test_delegates_to_engine_with_consulted(self):
-        _mock_engine.create_commit.return_value = _make_commit()
+        _mock_engine.create_memory.return_value = _make_memory()
         _remember("T", "N", consulted_files=["f1.py"])
-        _mock_engine.create_commit.assert_called_once_with("T", "N", consulted_files=["f1.py"])
+        _mock_engine.create_memory.assert_called_once_with("T", "N", consulted_files=["f1.py"])
 
     def test_runtime_error_propagates(self):
-        _mock_engine.create_commit.side_effect = RuntimeError("No changes detected")
+        _mock_engine.create_memory.side_effect = RuntimeError("No changes detected")
         with self.assertRaises(RuntimeError):
             _remember("T", "N")
 
     def test_empty_changes_handled(self):
-        _mock_engine.create_commit.return_value = _make_commit(changes=[])
+        _mock_engine.create_memory.return_value = _make_memory(changes=[])
         result = _remember("T", "N")
         self.assertIn("no tracked files changed", result)
 
 
+class TestRecall(unittest.TestCase):
     def setUp(self):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
         _mock_engine.get_index_queue_size.return_value = 0
@@ -148,15 +149,15 @@ class TestRemember(unittest.TestCase):
         _mock_engine.search.return_value = [_make_search_result()]
         result = _recall("find something")
         self.assertIn("abc-123", result)
-        self.assertIn("Old commit", result)
+        self.assertIn("Old memory", result)
         self.assertIn("> short snippet", result)
         # Must NOT contain the full note content
         self.assertNotIn("Detailed note", result)
 
     def test_includes_aggregated_files(self):
         results = [
-            _make_search_result("c1", "C1"),
-            _make_search_result("c2", "C2"),
+            _make_search_result("m1", "M1"),
+            _make_search_result("m2", "M2"),
         ]
         _mock_engine.search.return_value = results
         result = _recall("find")
@@ -178,68 +179,68 @@ class TestConsultMemory(unittest.TestCase):
     def setUp(self):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
         # Default: no child found
-        _mock_engine.find_child_commit.return_value = None
+        _mock_engine.find_child_memory.return_value = None
 
     def test_returns_full_note(self):
-        _mock_engine.get_commit.return_value = _make_commit(note="# My Work\n\nDetails here.")
+        _mock_engine.get_memory.return_value = _make_memory(note="# My Work\n\nDetails here.")
         result = _consult_memory("abc-123")
         self.assertIn("# My Work", result)
         self.assertIn("Details here", result)
 
     def test_renders_file_changes(self):
-        _mock_engine.get_commit.return_value = _make_commit()
+        _mock_engine.get_memory.return_value = _make_memory()
         result = _consult_memory("abc-123")
         self.assertIn("src/foo.py", result)
 
     def test_key_error_propagates(self):
-        _mock_engine.get_commit.side_effect = KeyError("Memory not found")
+        _mock_engine.get_memory.side_effect = KeyError("Memory not found")
         with self.assertRaises(KeyError):
             _consult_memory("bad-id")
 
     def test_shows_parent_context(self):
-        parent = _make_commit(commit_id="p-123", title="Parent commit")
-        child = _make_commit(commit_id="c-456", title="Child commit", parent_id="p-123")
+        parent = _make_memory(memory_id="p-123", title="Parent memory")
+        child = _make_memory(memory_id="c-456", title="Child memory", parent_id="p-123")
         
-        def side_effect(cid):
-            if cid == "p-123": return parent
-            if cid == "c-456": return child
-            raise KeyError(cid)
+        def side_effect(mid):
+            if mid == "p-123": return parent
+            if mid == "c-456": return child
+            raise KeyError(mid)
             
-        _mock_engine.get_commit.side_effect = side_effect
+        _mock_engine.get_memory.side_effect = side_effect
         
         result = _consult_memory("c-456")
-        self.assertIn("⬆️ **Prev** : Parent commit (ID: p-123)", result)
+        self.assertIn("⬆️ **Prev** : Parent memory (ID: p-123)", result)
 
     def test_shows_child_context(self):
-        commit = _make_commit(commit_id="c-123", title="My commit")
-        child = _make_commit(commit_id="next-456", title="Next commit")
+        memory = _make_memory(memory_id="c-123", title="My memory")
+        child = _make_memory(memory_id="next-456", title="Next memory")
         
-        _mock_engine.get_commit.return_value = commit
-        _mock_engine.find_child_commit.return_value = child
+        _mock_engine.get_memory.return_value = memory
+        _mock_engine.find_child_memory.return_value = child
         
         result = _consult_memory("c-123")
-        self.assertIn("⬇️ **Next** : Next commit (ID: next-456)", result)
+        self.assertIn("⬇️ **Next** : Next memory (ID: next-456)", result)
 
     def test_no_parent_no_child(self):
-        _mock_engine.get_commit.return_value = _make_commit(parent_id=None)
-        _mock_engine.find_child_commit.return_value = None
+        _mock_engine.get_memory.return_value = _make_memory(parent_id=None)
+        _mock_engine.find_child_memory.return_value = None
         
         result = _consult_memory("initial-id")
         self.assertNotIn("⬆️ **Prev**", result)
         self.assertNotIn("⬇️ **Next**", result)
 
     def test_both_parent_and_child(self):
-        parent = _make_commit(commit_id="p-1", title="P")
-        current = _make_commit(commit_id="curr", title="C", parent_id="p-1")
-        child = _make_commit(commit_id="next", title="N")
+        parent = _make_memory(memory_id="p-1", title="P")
+        current = _make_memory(memory_id="curr", title="C", parent_id="p-1")
+        child = _make_memory(memory_id="next", title="N")
 
-        def side_effect(cid):
-            if cid == "p-1": return parent
-            if cid == "curr": return current
-            raise KeyError(cid)
+        def side_effect(mid):
+            if mid == "p-1": return parent
+            if mid == "curr": return current
+            raise KeyError(mid)
 
-        _mock_engine.get_commit.side_effect = side_effect
-        _mock_engine.find_child_commit.return_value = child
+        _mock_engine.get_memory.side_effect = side_effect
+        _mock_engine.find_child_memory.return_value = child
 
         result = _consult_memory("curr")
         self.assertIn("⬆️ **Prev** : P (ID: p-1)", result)
@@ -251,13 +252,13 @@ class TestGetRecentMemories(unittest.TestCase):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
 
     def test_paginates_correctly(self):
-        commits = [_make_commit(commit_id=f"c{i}", title=f"Commit {i}") for i in range(15)]
-        _mock_engine.get_log.return_value = commits
-        _mock_engine.get_commit_files.return_value = ["src/foo.py"]
+        memories = [_make_memory(memory_id=f"m{i}", title=f"Memory {i}") for i in range(15)]
+        _mock_engine.get_log.return_value = memories
+        _mock_engine.get_memory_files.return_value = ["src/foo.py"]
 
         result = _get_recent_memories(limit=5, offset=5)
-        self.assertIn("Commit 5", result)
-        self.assertNotIn("Commit 0", result)
+        self.assertIn("Memory 5", result)
+        self.assertNotIn("Memory 0", result)
 
     def test_empty_range_returns_graceful_message(self):
         _mock_engine.get_log.return_value = []
@@ -275,22 +276,22 @@ class TestConsultFile(unittest.TestCase):
     def setUp(self):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
 
-    def test_returns_commit_history(self):
-        _mock_engine.get_file_commits.return_value = ["abc-123"]
-        _mock_engine.get_commit.return_value = _make_commit()
+    def test_returns_memory_history(self):
+        _mock_engine.get_file_memories.return_value = ["abc-123"]
+        _mock_engine.get_memory.return_value = _make_memory()
         result = _consult_file("src/foo.py")
         self.assertIn("src/foo.py", result)
         self.assertIn("Do something", result)
 
     def test_key_error_propagates(self):
-        _mock_engine.get_file_commits.side_effect = KeyError("File not in graph")
+        _mock_engine.get_file_memories.side_effect = KeyError("File not in graph")
         with self.assertRaises(KeyError):
             _consult_file("src/unknown.py")
 
-    def test_empty_commit_list(self):
-        _mock_engine.get_file_commits.return_value = []
+    def test_empty_memory_list(self):
+        _mock_engine.get_file_memories.return_value = []
         result = _consult_file("src/orphan.py")
-        self.assertIn("No commits found", result)
+        self.assertIn("No memories found", result)
 
 
 class TestReadHistoricalFile(unittest.TestCase):
@@ -298,14 +299,14 @@ class TestReadHistoricalFile(unittest.TestCase):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
 
     def test_returns_decoded_utf8(self):
-        _mock_engine.read_file_at_commit.return_value = b"# Hello World\n"
+        _mock_engine.read_file_at_memory.return_value = b"# Hello World\n"
         result = _read_hist("src/foo.py", "abc-123")
         self.assertEqual(result, "# Hello World\n")
 
     def test_key_error_propagates(self):
-        _mock_engine.read_file_at_commit.side_effect = KeyError("Not found")
+        _mock_engine.read_file_at_memory.side_effect = KeyError("Not found")
         with self.assertRaises(KeyError):
-            _read_hist("src/foo.py", "bad-commit")
+            _read_hist("src/foo.py", "bad-memory")
 
 
 class TestGetStatus(unittest.TestCase):

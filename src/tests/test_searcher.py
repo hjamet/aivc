@@ -10,17 +10,17 @@ from __future__ import annotations
 import pytest
 from pathlib import Path
 
-from aivc.core.commit import Commit, FileChange
+from aivc.core.memory import Memory, FileChange
 
 pytestmark = pytest.mark.requires_ml
 
 
-def _make_commit(
-    commit_id: str,
-    title: str = "Commit",
+def _make_memory(
+    memory_id: str,
+    title: str = "Memory",
     note: str = "A detailed note.",
     file_paths: list[str] | None = None,
-) -> Commit:
+) -> Memory:
     if file_paths is None:
         file_paths = ["src/main.py"]
     changes = [
@@ -29,8 +29,8 @@ def _make_commit(
         )
         for fp in file_paths
     ]
-    return Commit(
-        id=commit_id,
+    return Memory(
+        id=memory_id,
         timestamp="2026-01-01T00:00:00+00:00",
         title=title,
         note=note,
@@ -49,22 +49,22 @@ def searcher(tmp_path: Path):
 
 @pytest.fixture
 def loaded_searcher(tmp_path: Path):
-    """A searcher pre-populated with two commits."""
+    """A searcher pre-populated with two memories."""
     from aivc.semantic.indexer import Indexer
     from aivc.semantic.searcher import Searcher
     indexer = Indexer(tmp_path / "storage")
-    c1 = _make_commit(
+    m1 = _make_memory(
         "id-sorting",
         title="Implement quicksort",
         note="Implemented a fast in-place quicksort algorithm for numeric arrays.",
     )
-    c2 = _make_commit(
+    m2 = _make_memory(
         "id-database",
         title="Add database migrations",
         note="Added SQL migration scripts to create users and sessions tables.",
     )
-    indexer.index_commit(c1)
-    indexer.index_commit(c2)
+    indexer.index_memory(m1)
+    indexer.index_memory(m2)
     return Searcher(indexer)
 
 
@@ -82,7 +82,7 @@ def test_search_returns_search_result_instances(loaded_searcher) -> None:
 def test_search_result_has_all_fields(loaded_searcher) -> None:
     results = loaded_searcher.search("sorting algorithm", top_k=2, top_n=1)
     r = results[0]
-    assert r.commit_id
+    assert r.memory_id
     assert r.title
     assert r.timestamp
     assert isinstance(r.score, float)
@@ -118,17 +118,17 @@ def test_search_with_filter_ids_restricts_results(loaded_searcher) -> None:
     results = loaded_searcher.search("sql database", top_k=5, filter_ids=["id-sorting"])
     assert len(results) <= 1
     if results:
-        assert results[0].commit_id == "id-sorting"
+        assert results[0].memory_id == "id-sorting"
 
 def test_search_with_empty_filter_ids_returns_empty(loaded_searcher) -> None:
     results = loaded_searcher.search("sql database", top_k=5, filter_ids=[])
     assert results == []
 
 def test_search_snippet_sliding_window(loaded_searcher) -> None:
-    # Add a commit with a very long note and a specific keyword in the middle
+    # Add a memory with a very long note and a specific keyword in the middle
     note = "Start. " * 30 + "This is the highly relevant keyword abracadabra that we want to find. " + "End. " * 30
-    c3 = _make_commit("id-long", title="Long note", note=note)
-    loaded_searcher._indexer.index_commit(c3)
+    m3 = _make_memory("id-long", title="Long note", note=note)
+    loaded_searcher._indexer.index_memory(m3)
     
     results = loaded_searcher.search("abracadabra", top_k=5, top_n=1)
     assert len(results) == 1

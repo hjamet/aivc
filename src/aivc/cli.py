@@ -94,7 +94,7 @@ def cmd_log(args: argparse.Namespace) -> None:
     local_id = get_machine_id()
 
     for c in commits:
-        files = engine.get_commit_files(c.id)
+        files = engine.get_memory_files(c.id)
         files_str = ", ".join(files) if files else "—"
         
         m_id = c.machine_id or "unknown"
@@ -123,7 +123,7 @@ def cmd_search(args: argparse.Namespace) -> None:
     results = engine.search(args.query, top_n=args.top_n, filter_glob=args.glob)
     
     if not results:
-        print("No matching commits found.")
+        print("No matching memories found.")
         return
 
     from aivc.config import get_machine_id
@@ -134,7 +134,7 @@ def cmd_search(args: argparse.Namespace) -> None:
         machine_tag = f" {MAGENTA}[{m_id}]{RESET}" if m_id != local_id else ""
         
         print(f"{CYAN}{BOLD}{i}. {r.title}{RESET}{machine_tag} {DIM}(score: {r.score:.3f}){RESET}")
-        print(f"   {DIM}ID:{RESET}    {r.commit_id}")
+        print(f"   {DIM}ID:{RESET}    {r.memory_id}")
         print(f"   {DIM}Date:{RESET}  {r.timestamp}")
         print(f"   {DIM}Files:{RESET} {', '.join(r.file_paths) if r.file_paths else '—'}")
         print(f"\n      {r.snippet}\n")

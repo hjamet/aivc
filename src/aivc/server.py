@@ -218,14 +218,14 @@ def remember(title: str, note: str, consulted_files: list[str] = []) -> str:
     Raises:
         RuntimeError: If no tracked file has changed and no files were consulted.
     """
-    commit = _engine.create_commit(title, note, consulted_files=consulted_files)
-    files_summary = _format_changes_compressed(commit.changes)
+    memory = _engine.create_memory(title, note, consulted_files=consulted_files)
+    files_summary = _format_changes_compressed(memory.changes)
 
     return (
         f"✅ Memory created successfully.\n"
-        f"ID        : {commit.id}\n"
-        f"Timestamp : {commit.timestamp}\n"
-        f"Title     : {commit.title}\n"
+        f"ID        : {memory.id}\n"
+        f"Timestamp : {memory.timestamp}\n"
+        f"Title     : {memory.title}\n"
         f"Files     :\n{files_summary}"
     )
 
@@ -254,7 +254,7 @@ def recall(query: str, top_n: int = 5, filter_glob: str = "", only_local: bool =
     indexing_queue_size = _engine.get_index_queue_size()
     warning_header = ""
     if indexing_queue_size > 0:
-        warning_header = f"⚠️  Note: {indexing_queue_size} recent commit(s) are still being indexed and may be missing from search results.\n\n"
+        warning_header = f"⚠️  Note: {indexing_queue_size} recent memory(ies) are still being indexed and may be missing from search results.\n\n"
 
     results = _engine.search(query, top_n=top_n, filter_glob=filter_glob)
 
@@ -264,15 +264,15 @@ def recall(query: str, top_n: int = 5, filter_glob: str = "", only_local: bool =
     if not results:
         return warning_header + "No matching memories found."
 
-    # Build commit list
-    commit_lines = []
+    # Build memory list
+    memory_lines = []
     for i, r in enumerate(results, 1):
         m_id = getattr(r, 'machine_id', "")
         remote_tag = f" [Remote: {m_id}]" if m_id and m_id != _local_machine_id else ""
         
-        commit_lines.append(
+        memory_lines.append(
             f"{i}. [{r.timestamp[:10]}] {r.title}{remote_tag}\n"
-            f"   ID    : {r.commit_id}\n"
+            f"   ID    : {r.memory_id}\n"
             f"   Score : {r.score:.3f}\n"
             f"   > {r.snippet}"
         )
@@ -294,14 +294,14 @@ def recall(query: str, top_n: int = 5, filter_glob: str = "", only_local: bool =
         
         file_lines.append(f"  - {fp}{hint} (in {count}/{len(results)} results)")
 
-    output = warning_header + "## Matching Commits\n\n"
-    output += "\n".join(commit_lines)
+    output = warning_header + "## Matching Memories\n\n"
+    output += "\n".join(memory_lines)
 
     if file_lines:
         output += "\n\n## Most Relevant Files\n"
         output += "\n".join(file_lines)
     else:
-        output += "\n\n(No file associations found for these commits.)"
+        output += "\n\n(No file associations found for these memories.)"
 
     output += "\n\n💡 Use `consult_memory(memory_id)` to read a full note."
     return output
@@ -351,20 +351,20 @@ def consult_memory(memory_id: str) -> str:
     Raises:
         KeyError: If the memory_id does not exist.
     """
-    commit = _engine.get_commit(memory_id)
+    memory = _engine.get_memory(memory_id)
 
     # Context (Prev/Next)
     prev_str = ""
-    if commit.parent_id:
+    if memory.parent_id:
         try:
-            parent = _engine.get_commit(commit.parent_id)
+            parent = _engine.get_memory(memory.parent_id)
             prev_str = f"⬆️ **Prev** : {parent.title} (ID: {parent.id})\n"
         except KeyError:
-            prev_str = f"⬆️ **Prev** : (metadata not found) (ID: {commit.parent_id})\n"
+            prev_str = f"⬆️ **Prev** : (metadata not found) (ID: {memory.parent_id})\n"
 
     next_str = ""
     try:
-        child = _engine.find_child_commit(memory_id)
+        child = _engine.find_child_memory(memory_id)
         if child:
             next_str = f"⬇️ **Next** : {child.title} (ID: {child.id})\n"
     except Exception:
@@ -374,24 +374,24 @@ def consult_memory(memory_id: str) -> str:
     if prev_str or next_str:
         context_block = f"{prev_str}{next_str}\n"
 
-    changes_summary_str = _format_changes_compressed(commit.changes, commit.machine_id)
+    changes_summary_str = _format_changes_compressed(memory.changes, memory.machine_id)
 
     machine_line = ""
     remote_warning = ""
-    if commit.machine_id and commit.machine_id != _local_machine_id:
-        machine_line = f"**Machine**   : {commit.machine_id} (Distant)\n"
+    if memory.machine_id and memory.machine_id != _local_machine_id:
+        machine_line = f"**Machine**   : {memory.machine_id} (Distant)\n"
         remote_warning = "> [!WARNING]\n> This memory was created on a remote machine. Historical file contents may not be available.\n\n"
 
     return (
-        f"# Memory: {commit.title}\n\n"
+        f"# Memory: {memory.title}\n\n"
         f"{remote_warning}"
-        f"**ID**        : {commit.id}\n"
-        f"**Timestamp** : {commit.timestamp}\n"
-        f"**Parent**    : {commit.parent_id or 'none (initial memory)'}\n"
+        f"**ID**        : {memory.id}\n"
+        f"**Timestamp** : {memory.timestamp}\n"
+        f"**Parent**    : {memory.parent_id or 'none (initial memory)'}\n"
         f"{machine_line}\n"
         f"{context_block}"
         f"## Files Recorded\n{changes_summary_str}\n\n"
-        f"## Note\n\n{commit.note}"
+        f"## Note\n\n{memory.note}"
     )
 
 
@@ -411,11 +411,11 @@ def get_recent_memories(limit: int = 10, offset: int = 0, only_local: bool = Fal
     """
     limit = min(limit, 50)
 
-    # get_log fetches `offset + limit` commits and then slices.
+    # get_log fetches `offset + limit` memories and then slices.
     all_recent = _engine.get_log(limit=offset + limit)
     
     if only_local:
-        all_recent = [c for c in all_recent if c.machine_id == _local_machine_id]
+        all_recent = [m for m in all_recent if m.machine_id == _local_machine_id]
 
     page = all_recent[offset : offset + limit]
 
@@ -423,12 +423,12 @@ def get_recent_memories(limit: int = 10, offset: int = 0, only_local: bool = Fal
         return "No memories found in this range."
 
     lines = [f"Showing memories {offset + 1}–{offset + len(page)} (newest first)\n"]
-    for i, commit in enumerate(page, offset + 1):
+    for i, memory in enumerate(page, offset + 1):
         try:
-            files = _engine.get_commit_files(commit.id)
+            files = _engine.get_memory_files(memory.id)
             formatted_files = []
             for f in files:
-                if commit.machine_id and commit.machine_id != _local_machine_id:
+                if memory.machine_id and memory.machine_id != _local_machine_id:
                     local_match = _engine.find_local_equivalent(f)
                     if local_match:
                         formatted_files.append(f"{f} (local: {Path(local_match).name})")
@@ -438,10 +438,10 @@ def get_recent_memories(limit: int = 10, offset: int = 0, only_local: bool = Fal
         except KeyError:
             files_str = "—"
 
-        m_tag = f" [Remote: {commit.machine_id}]" if commit.machine_id and commit.machine_id != _local_machine_id else ""
+        m_tag = f" [Remote: {memory.machine_id}]" if memory.machine_id and memory.machine_id != _local_machine_id else ""
         lines.append(
-            f"{i:>3}. [{commit.timestamp[:10]}] {commit.title}{m_tag}\n"
-            f"      ID    : {commit.id}\n"
+            f"{i:>3}. [{memory.timestamp[:10]}] {memory.title}{m_tag}\n"
+            f"      ID    : {memory.id}\n"
             f"      Files : {files_str}"
         )
 
@@ -467,27 +467,27 @@ def consult_file(file_path: str) -> str:
     Raises:
         KeyError: If the file is not in the AIVC co-occurrence graph.
     """
-    commit_ids = _engine.get_file_commits(file_path)
+    memory_ids = _engine.get_file_memories(file_path)
 
-    if not commit_ids:
-        return f"No commits found for file: {file_path}"
+    if not memory_ids:
+        return f"No memories found for file: {file_path}"
 
     lines = [f"## AIVC History for: `{file_path}`\n"]
-    lines.append(f"{len(commit_ids)} commit(s) have touched this file:\n")
+    lines.append(f"{len(memory_ids)} memory(ies) have touched this file:\n")
 
-    for cid in commit_ids:
+    for mid in memory_ids:
         try:
-            commit = _engine.get_commit(cid)
+            memory = _engine.get_memory(mid)
             lines.append(
-                f"  - [{commit.timestamp[:10]}] {commit.title}\n"
-                f"    ID: {commit.id}"
+                f"  - [{memory.timestamp[:10]}] {memory.title}\n"
+                f"    ID: {memory.id}"
             )
         except KeyError:
-            lines.append(f"  - [unknown date] Commit {cid} (metadata not found)")
+            lines.append(f"  - [unknown date] Memory {mid} (metadata not found)")
 
     lines.append(
-        "\n💡 Use `consult_commit(commit_id)` to read the full note of a specific commit."
-        "\n💡 Use `read_historical_file(file_path, commit_id)` to read the file content at that commit."
+        "\n💡 Use `consult_memory(memory_id)` to read the full note of a specific memory."
+        "\n💡 Use `read_historical_file(file_path, memory_id)` to read the file content at that memory."
     )
     return "\n".join(lines)
 
@@ -507,21 +507,21 @@ def read_historical_file(file_path: str, memory_id: str) -> str:
         memory_id: The UUID of the memory at which to read the file.
     """
     try:
-        raw: bytes = _engine.read_file_at_commit(file_path, memory_id)
+        raw: bytes = _engine.read_file_at_memory(file_path, memory_id)
         return raw.decode("utf-8")
     except (KeyError, FileNotFoundError):
         # Find which memory exactly has this blob to provide context
         target_memory = None
-        cid = memory_id
-        while cid:
+        mid = memory_id
+        while mid:
             try:
-                c = _engine.get_commit(cid)
-                for change in c.changes:
+                m = _engine.get_memory(mid)
+                for change in m.changes:
                     if change.path == file_path and change.blob_hash:
-                        target_memory = c
+                        target_memory = m
                         break
                 if target_memory: break
-                cid = c.parent_id
+                mid = m.parent_id
             except KeyError:
                 break
             

@@ -2,7 +2,7 @@
 Searcher: Bi-Encoder → Cross-Encoder reranking pipeline.
 
 Stage 1 (Bi-Encoder): ChromaDB retrieves the top-K semantically close
-commits using the SentenceTransformer embeddings already stored by the Indexer.
+memories using the SentenceTransformer embeddings already stored by the Indexer.
 
 Stage 2 (Cross-Encoder): the top-K candidates are re-ranked by the Cross-Encoder
 for more precise relevance scoring.  Only top-K candidates are passed to the
@@ -30,11 +30,11 @@ _MAX_CROSS_ENCODER_INPUTS = 50  # hard ceiling to keep latency under control
 class SearchResult:
     """A single result from the semantic search pipeline."""
 
-    commit_id: str
-    """UUID of the matching commit."""
+    memory_id: str
+    """UUID of the matching memory."""
 
     title: str
-    """Short commit title."""
+    """Short memory title."""
 
     timestamp: str
     """ISO 8601 UTC creation timestamp."""
@@ -43,13 +43,13 @@ class SearchResult:
     """Cross-Encoder relevance score (higher is better)."""
 
     snippet: str
-    """First ~200 characters of the commit note (for preview)."""
+    """First ~200 characters of the memory note (for preview)."""
 
     file_paths: list[str]
-    """Files that were changed in this commit (excluding deleted files)."""
+    """Files that were changed in this memory (excluding deleted files)."""
 
     machine_id: str = ""
-    """ID of the machine where the commit was created."""
+    """ID of the machine where the memory was created."""
 
 
 class Searcher:
@@ -80,14 +80,14 @@ class Searcher:
         top_n: int = 5,
         filter_ids: list[str] | None = None,
     ) -> list[SearchResult]:
-        """Search for commits semantically similar to *query*.
+        """Search for memories semantically similar to *query*.
 
         Args:
             query: Free-text search query.
             top_k: Number of candidates retrieved by the Bi-Encoder stage.
                    Capped internally at ``_MAX_CROSS_ENCODER_INPUTS`` (50).
             top_n: Number of results returned after Cross-Encoder reranking.
-            filter_ids: Optional list of commit IDs to restrict the search to.
+            filter_ids: Optional list of memory IDs to restrict the search to.
 
         Returns:
             A list of at most *top_n* :class:`SearchResult` objects sorted
@@ -162,7 +162,7 @@ class Searcher:
 
             results.append(
                 SearchResult(
-                    commit_id=hit["commit_id"],
+                    memory_id=hit["memory_id"],
                     title=hit["title"],
                     timestamp=hit["timestamp"],
                     score=score,

@@ -21,7 +21,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from aivc.core.commit import Commit
+from aivc.core.memory import Memory
 from aivc.core.workspace import FileStatus, Workspace
 from aivc.semantic.graph import CooccurrenceGraph
 from aivc.config import get_machine_id
@@ -81,42 +81,42 @@ class SemanticEngine:
         self._workspace.register_reload_callback(self._on_workspace_reload)
 
     def _indexing_worker_loop(self):
-        """Background worker thread to index commits from the queue."""
+        """Background worker thread to index memories from the queue."""
         while True:
-            commit = self._index_queue.get()
-            if commit is None: # Shutdown signal
+            memory = self._index_queue.get()
+            if memory is None: # Shutdown signal
                 break
             try:
                 # 1. Semantic indexing (triggers lazy load of indexer if needed)
                 indexer = self._indexer
                 if indexer is not None:
-                    indexer.index_commit(commit)
+                    indexer.index_memory(memory)
                 
                 # 2. Forward to sync queue if enabled
                 if self._sync_manager.enabled:
-                    self._sync_queue.put(commit)
+                    self._sync_queue.put(memory)
             except Exception as e:
                 # If we catch a late 'atexit' error here despite the property check
                 if "atexit" in str(e):
                     pass
                 else:
                     import sys
-                    print(f"Error in async indexing for commit {commit.id}: {e}", file=sys.stderr)
+                    print(f"Error in async indexing for memory {memory.id}: {e}", file=sys.stderr)
             finally:
                 self._index_queue.task_done()
 
     def _sync_worker_loop(self):
-        """Background worker thread to push commits/blobs to cloud."""
+        """Background worker thread to push memories/blobs to cloud."""
         while True:
-            commit = self._sync_queue.get()
-            if commit is None: # Shutdown signal
+            memory = self._sync_queue.get()
+            if memory is None: # Shutdown signal
                 break
             try:
-                # Cloud Sync push (Commit JSON only)
-                self._sync_manager.push_commit(commit.id)
+                # Cloud Sync push (Memory JSON only)
+                self._sync_manager.push_memory(memory.id)
             except Exception as e:
                 import sys
-                print(f"Error in async sync for commit {commit.id}: {e}", file=sys.stderr)
+                print(f"Error in async sync for memory {memory.id}: {e}", file=sys.stderr)
             finally:
                 self._sync_queue.task_done()
 
@@ -133,8 +133,8 @@ class SemanticEngine:
         self._sync_thread.join(timeout=timeout/2)
 
     def get_index_queue_size(self) -> int:
-        """Return the number of commits waiting to be indexed or synced."""
-        return self._index_queue.qsize() + self._sync_queue.qsize()
+        """Return the number of unfinished tasks (waiting + processing)."""
+        return self._index_queue.unfinished_tasks + self._sync_queue.unfinished_tasks
 
     def wait_until_indexed(self, timeout: float = 30.0) -> bool:
         """Wait until all background tasks (indexing/sync) are complete.
@@ -169,31 +169,31 @@ class SemanticEngine:
         _ = self._indexer._collection
         _ = self._searcher._cross_encoder
 
-        # Step 2: Reindex orphaned commits (on-disk JSON but not in ChromaDB)
-        all_commits = self._workspace.get_log(limit=999999)
+        # Step 2: Reindex orphaned memories (on-disk JSON but not in ChromaDB)
+        all_memories = self._workspace.get_log(limit=999999)
         indexed_count = self._indexer._collection.count()
 
-        if len(all_commits) > indexed_count:
+        if len(all_memories) > indexed_count:
             missing = []
-            for commit in all_commits:
-                if not self._indexer.is_indexed(commit.id):
-                    missing.append(commit)
+            for memory in all_memories:
+                if not self._indexer.is_indexed(memory.id):
+                    missing.append(memory)
 
             if missing:
                 print(
-                    f"[aivc] Reindexing {len(missing)} orphaned commit(s)...",
+                    f"[aivc] Reindexing {len(missing)} orphaned memory(ies)...",
                     file=sys.stderr,
                 )
-                for commit in missing:
+                for memory in missing:
                     try:
-                        self._indexer.index_commit(commit)
+                        self._indexer.index_memory(memory)
                     except Exception as e:
                         print(
-                            f"[aivc] Failed to reindex {commit.id}: {e}",
+                            f"[aivc] Failed to reindex {memory.id}: {e}",
                             file=sys.stderr,
                         )
                 print(
-                    f"[aivc] Warmup complete. Index now has {self._indexer._collection.count()} commit(s).",
+                    f"[aivc] Warmup complete. Index now has {self._indexer._collection.count()} memory(ies).",
                     file=sys.stderr,
                 )
 
@@ -252,26 +252,26 @@ class SemanticEngine:
     # Commit lifecycle
     # ------------------------------------------------------------------
 
-    def create_commit(
+    def create_memory(
         self,
         title: str,
         note: str,
         consulted_files: list[str] | None = None
-    ) -> Commit:
-        """Create a versioning commit and index it semantically (asynchronously).
+    ) -> Memory:
+        """Create a versioning memory and index it semantically (asynchronously).
 
-        1. Delegates to :meth:`Workspace.create_commit` (which detects diffs,
-           stores blobs, and persists the commit JSON).
+        1. Delegates to :meth:`Workspace.create_memory` (which detects diffs,
+           stores blobs, and persists the memory JSON).
         2. Updates the co-occurrence graph.
-        3. Pushes the commit to the background worker queue for semantic indexing.
+        3. Pushes the memory to the background worker queue for semantic indexing.
 
         Args:
-            title: Short commit title.
+            title: Short memory title.
             note: Detailed Markdown note (the 'memory').
             consulted_files: Optional list of file paths consulted.
 
         Returns:
-            The newly created :class:`~aivc.core.commit.Commit`.
+            The newly created :class:`~aivc.core.memory.Memory`.
 
         Raises:
             RuntimeError: if no changes detected and no files consulted.
@@ -279,20 +279,20 @@ class SemanticEngine:
         # Step 1: core versioning (may raise RuntimeError if no changes)
         # Inject machine_id
         machine_id = get_machine_id()
-        commit = self._workspace.create_commit(
+        memory = self._workspace.create_memory(
             title, note, consulted_files=consulted_files, machine_id=machine_id
         )
 
         # Step 2: graph update (SQLite, always fast)
-        self._graph.add_commit(commit)
+        self._graph.add_memory(memory)
 
         # Step 3: async semantic indexing
-        self._index_queue.put(commit)
+        self._index_queue.put(memory)
 
         # Step 4: Invalidate hints cache (new files might have been auto-tracked)
         self._local_hints_index = None
 
-        return commit
+        return memory
 
     # ------------------------------------------------------------------
     # Search
@@ -305,24 +305,24 @@ class SemanticEngine:
         top_n: int = 5,
         filter_glob: str = "",
     ) -> list:
-        """Semantic search over commit notes.
+        """Semantic search over memory notes.
 
         Args:
             query: Free-text search query.
             top_k: Bi-Encoder recall breadth (capped at 50).
             top_n: Cross-Encoder reranked results to return.
             filter_glob: Optional glob pattern. If provided, restricts results
-                         to commits that touch at least one matching file.
+                         to memories that touch at least one matching file.
 
         Returns:
             A list of :class:`~aivc.semantic.searcher.SearchResult` sorted by
             relevance (descending).
         """
         if filter_glob:
-            commit_ids = self._graph.get_commits_by_glob(filter_glob)
-            if not commit_ids:
+            memory_ids = self._graph.get_memories_by_glob(filter_glob)
+            if not memory_ids:
                 return []
-            return self._searcher.search(query, top_k=top_k, top_n=top_n, filter_ids=commit_ids)
+            return self._searcher.search(query, top_k=top_k, top_n=top_n, filter_ids=memory_ids)
         
         return self._searcher.search(query, top_k=top_k, top_n=top_n)
 
@@ -411,13 +411,13 @@ class SemanticEngine:
         """
         return self._graph.get_related_files(file_path, top_n=top_n)
 
-    def get_commit_files(self, commit_id: str) -> list[str]:
-        """Return file paths that were changed in a given commit."""
-        return self._graph.get_commit_files(commit_id)
+    def get_memory_files(self, memory_id: str) -> list[str]:
+        """Return file paths that were changed in a given memory."""
+        return self._graph.get_memory_files(memory_id)
 
-    def get_file_commits(self, file_path: str) -> list[str]:
-        """Return commit IDs that have ever touched *file_path*."""
-        return self._graph.get_file_commits(file_path)
+    def get_file_memories(self, file_path: str) -> list[str]:
+        """Return memory IDs that have ever touched *file_path*."""
+        return self._graph.get_file_memories(file_path)
 
     def graph_vis_data(self) -> dict:
         """Return the graph in visualisation format (nodes + edges)."""
@@ -453,33 +453,33 @@ class SemanticEngine:
         """Return status of all tracked files. See :meth:`Workspace.get_status`."""
         return self._workspace.get_status()
 
-    def get_log(self, limit: int = 20, offset: int = 0) -> list[Commit]:
-        """Return up to *limit* commits in reverse chronological order."""
+    def get_log(self, limit: int = 20, offset: int = 0) -> list[Memory]:
+        """Return up to *limit* memories in reverse chronological order."""
         return self._workspace.get_log(limit, offset)
 
     def get_file_history(self, file_path: str) -> list[dict]:
-        """Return commits that touched *file_path* with metadata.
+        """Return memories that touched *file_path* with metadata.
 
         Returns:
-            List of ``{"commit_id": str, "title": str, "timestamp": str}``
+            List of ``{"memory_id": str, "title": str, "timestamp": str}``
             sorted by timestamp descending.
         """
-        return self._graph.get_file_commits_with_metadata(file_path)
+        return self._graph.get_file_memories_with_metadata(file_path)
 
-    def get_commit(self, commit_id: str) -> Commit:
-        """Load a single commit by ID."""
-        return self._workspace.get_commit(commit_id)
+    def get_memory(self, memory_id: str) -> Memory:
+        """Load a single memory by ID."""
+        return self._workspace.get_memory(memory_id)
 
-    def find_child_commit(self, commit_id: str) -> Commit | None:
-        """Find the commit that has *commit_id* as its parent."""
-        return self._workspace.find_child_commit(commit_id)
+    def find_child_memory(self, memory_id: str) -> Memory | None:
+        """Find the memory that has *memory_id* as its parent."""
+        return self._workspace.find_child_memory(memory_id)
 
-    def read_file_at_commit(self, file_path: str, commit_id: str) -> bytes:
-        """Read a tracked file as it was at a specific commit."""
-        return self._workspace.read_file_at_commit(file_path, commit_id)
+    def read_file_at_memory(self, file_path: str, memory_id: str) -> bytes:
+        """Read a tracked file as it was at a specific memory."""
+        return self._workspace.read_file_at_memory(file_path, memory_id)
     
     def migrate_index(self) -> None:
-        """Explicitly migrate JSON commits to SQLite index."""
+        """Explicitly migrate JSON memories to SQLite index."""
         self._workspace.migrate_index()
 
     def _get_local_hints_index(self) -> dict[str, list[str]]:

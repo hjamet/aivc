@@ -28,13 +28,13 @@ class BackgroundSyncer:
         """Sync pulls and pushes at startup."""
         try:
             # 1. Pull from others
-            self.manager.pull_commits_from_others()
+            self.manager.pull_memories_from_others()
 
-            # 2. Push missing local commits
+            # 2. Push missing local memories
             stats = self.manager.push_missing()
-            pushed = stats.get("commits_pushed", 0)
+            pushed = stats.get("memories_pushed", 0)
             if pushed > 0:
-                print(f"[AIVC Sync] Auto-pushed {pushed} local commits to Drive.", file=sys.stderr)
+                print(f"[AIVC Sync] Auto-pushed {pushed} local memories to Drive.", file=sys.stderr)
 
         except Exception as e:
             import sys

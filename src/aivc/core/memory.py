@@ -1,7 +1,7 @@
 """
-Commit data structures for AIVC.
+Memory data structures for AIVC.
 
-A Commit is the atomic unit of memory: a short title + a detailed Markdown note
+A Memory is the atomic unit of memory: a short title + a detailed Markdown note
 that will later be vectorized for semantic search.
 """
 
@@ -15,7 +15,7 @@ from typing import Any
 
 @dataclass
 class FileChange:
-    """Represents the state change of a single tracked file in a commit."""
+    """Represents the state change of a single tracked file in a memory."""
 
     path: str
     """Relative path of the file."""
@@ -59,8 +59,8 @@ class FileChange:
 
 
 @dataclass
-class Commit:
-    """A versioning commit — the atomic unit of LLM memory."""
+class Memory:
+    """A versioning memory — the atomic unit of LLM memory."""
 
     id: str
     """UUID v4 unique identifier."""
@@ -75,13 +75,13 @@ class Commit:
     """Detailed Markdown note — the full 'memory' to be vectorised later."""
 
     parent_id: str | None
-    """ID of the parent commit, or None for the initial commit."""
+    """ID of the parent memory, or None for the initial memory."""
 
     changes: list[FileChange] = field(default_factory=list)
-    """List of file changes recorded in this commit."""
+    """List of file changes recorded in this memory."""
 
     machine_id: str = ""
-    """ID of the machine where the commit was created (empty for local/legacy)."""
+    """ID of the machine where the memory was created (empty for local/legacy)."""
 
     @classmethod
     def create(
@@ -91,12 +91,12 @@ class Commit:
         parent_id: str | None,
         changes: list[FileChange],
         machine_id: str = "",
-    ) -> "Commit":
-        """Factory: create a new Commit with a fresh UUID and current UTC timestamp."""
+    ) -> "Memory":
+        """Factory: create a new Memory with a fresh UUID and current UTC timestamp."""
         if not title.strip():
-            raise ValueError("Commit title cannot be empty.")
+            raise ValueError("Memory title cannot be empty.")
         if not note.strip():
-            raise ValueError("Commit note cannot be empty.")
+            raise ValueError("Memory note cannot be empty.")
         return cls(
             id=str(uuid.uuid4()),
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -112,15 +112,15 @@ class Commit:
 # Serialisation helpers
 # ---------------------------------------------------------------------------
 
-def commit_to_dict(commit: Commit) -> dict[str, Any]:
-    """Serialise a Commit to a JSON-compatible dict."""
+def memory_to_dict(memory: Memory) -> dict[str, Any]:
+    """Serialise a Memory to a JSON-compatible dict."""
     return {
-        "id": commit.id,
-        "timestamp": commit.timestamp,
-        "title": commit.title,
-        "note": commit.note,
-        "parent_id": commit.parent_id,
-        "machine_id": commit.machine_id,
+        "id": memory.id,
+        "timestamp": memory.timestamp,
+        "title": memory.title,
+        "note": memory.note,
+        "parent_id": memory.parent_id,
+        "machine_id": memory.machine_id,
         "changes": [
             {
                 "path": c.path,
@@ -129,18 +129,18 @@ def commit_to_dict(commit: Commit) -> dict[str, Any]:
                 "bytes_added": c.bytes_added,
                 "bytes_removed": c.bytes_removed,
             }
-            for c in commit.changes
+            for c in memory.changes
         ],
     }
 
 
-def commit_from_dict(data: dict[str, Any]) -> Commit:
-    """Deserialise a Commit from a dict. Crashes on any missing or invalid field."""
+def memory_from_dict(data: dict[str, Any]) -> Memory:
+    """Deserialise a Memory from a dict. Crashes on any missing or invalid field."""
     _required = {"id", "timestamp", "title", "note", "parent_id", "changes"}
     _missing = _required - data.keys()
     if _missing:
         raise ValueError(
-            f"Cannot deserialise Commit — missing fields: {_missing}. "
+            f"Cannot deserialise Memory — missing fields: {_missing}. "
             f"Got keys: {set(data.keys())}."
         )
 
@@ -163,7 +163,7 @@ def commit_from_dict(data: dict[str, Any]) -> Commit:
             )
         )
 
-    return Commit(
+    return Memory(
         id=data["id"],
         timestamp=data["timestamp"],
         title=data["title"],

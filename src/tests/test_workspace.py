@@ -110,46 +110,46 @@ def test_untrack_removes_directory_from_surveillance(tmp_path: Path, ws: Workspa
 
 
 # ---------------------------------------------------------------------------
-# create_commit()
+# create_memory()
 # ---------------------------------------------------------------------------
 
-def test_create_commit_basic_cycle(tmp_path: Path, ws: Workspace) -> None:
+def test_create_memory_basic_cycle(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "app.py", b"v1")
     ws.track(str(f))
-    commit = ws.create_commit("Initial", "## v1\n\nFirst commit.")
-    assert commit.title == "Initial"
-    assert len(commit.changes) == 1
-    assert commit.changes[0].action == "added"
-    assert commit.parent_id is None
+    memory = ws.create_memory("Initial", "## v1\n\nFirst memory.")
+    assert memory.title == "Initial"
+    assert len(memory.changes) == 1
+    assert memory.changes[0].action == "added"
+    assert memory.parent_id is None
 
 
-def test_create_commit_second_links_to_first(tmp_path: Path, ws: Workspace) -> None:
+def test_create_memory_second_links_to_first(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "app.py", b"v1")
     ws.track(str(f))
-    c1 = ws.create_commit("v1", "First.")
+    m1 = ws.create_memory("v1", "First.")
     f.write_bytes(b"v2")
-    c2 = ws.create_commit("v2", "Second.")
-    assert c2.parent_id == c1.id
+    m2 = ws.create_memory("v2", "Second.")
+    assert m2.parent_id == m1.id
 
 
-def test_create_commit_no_changes_crashes(tmp_path: Path, ws: Workspace) -> None:
+def test_create_memory_no_changes_crashes(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "app.py", b"stable")
     ws.track(str(f))
-    ws.create_commit("Initial", "First commit.")
-    # Nothing changed — second commit must crash.
+    ws.create_memory("Initial", "First memory.")
+    # Nothing changed — second memory must crash.
     with pytest.raises(RuntimeError, match="No changes detected"):
-        ws.create_commit("Empty", "Nothing to save.")
+        ws.create_memory("Empty", "Nothing to save.")
 
 
-def test_create_commit_modified_file(tmp_path: Path, ws: Workspace) -> None:
+def test_create_memory_modified_file(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "app.py", b"v1")
     ws.track(str(f))
-    ws.create_commit("v1", "First.")
+    ws.create_memory("v1", "First.")
     f.write_bytes(b"v2 - much longer content here")
-    commit = ws.create_commit("v2", "Modified.")
-    assert commit.changes[0].action == "modified"
-    assert commit.changes[0].bytes_added > 0
-    assert commit.changes[0].bytes_removed > 0
+    memory = ws.create_memory("v2", "Modified.")
+    assert memory.changes[0].action == "modified"
+    assert memory.changes[0].bytes_added > 0
+    assert memory.changes[0].bytes_removed > 0
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ def test_create_commit_modified_file(tmp_path: Path, ws: Workspace) -> None:
 def test_untrack_removes_file_from_tracking(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "a.py", b"content")
     ws.track(str(f))
-    ws.create_commit("add a", "note")
+    ws.create_memory("add a", "note")
     ws.untrack(str(f))
     statuses = ws.get_status()
     assert all(s.path != str(f) for s in statuses)
@@ -174,8 +174,8 @@ def test_untrack_gc_exclusive_blob(tmp_path: Path, ws: Workspace) -> None:
     """Untracking a file with a unique blob must delete that blob from disk."""
     f = _write(tmp_path / "solo.py", b"unique content abc")
     ws.track(str(f))
-    commit = ws.create_commit("add solo", "note")
-    blob_hash = commit.changes[0].blob_hash
+    memory = ws.create_memory("add solo", "note")
+    blob_hash = memory.changes[0].blob_hash
     blob_path = (ws._root / "blobs" / blob_hash)
     assert blob_path.exists()
 
@@ -190,9 +190,9 @@ def test_untrack_gc_shared_blob_preserved(tmp_path: Path, ws: Workspace) -> None
     fb = _write(tmp_path / "b.py", content)
     ws.track(str(fa))
     ws.track(str(fb))
-    commit = ws.create_commit("add both", "note")
+    memory = ws.create_memory("add both", "note")
 
-    hashes = {c.path: c.blob_hash for c in commit.changes}
+    hashes = {m.path: m.blob_hash for m in memory.changes}
     assert hashes[str(fa)] == hashes[str(fb)], "Shared content must yield the same blob hash"
     shared_hash = hashes[str(fa)]
 
@@ -208,9 +208,9 @@ def test_untrack_gc_shared_blob_preserved(tmp_path: Path, ws: Workspace) -> None
 def test_get_status_reports_current_and_history_sizes(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "size.py", b"x" * 100)
     ws.track(str(f))
-    ws.create_commit("v1", "note")
+    ws.create_memory("v1", "note")
     f.write_bytes(b"y" * 200)
-    ws.create_commit("v2", "note")
+    ws.create_memory("v2", "note")
 
     statuses = ws.get_status()
     st = next(s for s in statuses if s.path == str(f))
@@ -221,7 +221,7 @@ def test_get_status_reports_current_and_history_sizes(tmp_path: Path, ws: Worksp
 def test_get_status_none_for_deleted_file(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "gone.py", b"content")
     ws.track(str(f))
-    ws.create_commit("add", "note")
+    ws.create_memory("add", "note")
     f.unlink()
     statuses = ws.get_status()
     st = next(s for s in statuses if s.path == str(f))
@@ -229,77 +229,77 @@ def test_get_status_none_for_deleted_file(tmp_path: Path, ws: Workspace) -> None
 
 
 # ---------------------------------------------------------------------------
-# get_log() & get_commit()
+# get_log() & get_memory()
 # ---------------------------------------------------------------------------
 
-def test_get_log_returns_commits_in_reverse_order(tmp_path: Path, ws: Workspace) -> None:
+def test_get_log_returns_memories_in_reverse_order(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "log.py", b"v1")
     ws.track(str(f))
-    c1 = ws.create_commit("c1", "note")
+    m1 = ws.create_memory("m1", "note")
     f.write_bytes(b"v2")
-    c2 = ws.create_commit("c2", "note")
+    m2 = ws.create_memory("m2", "note")
     f.write_bytes(b"v3")
-    c3 = ws.create_commit("c3", "note")
+    m3 = ws.create_memory("m3", "note")
 
     log = ws.get_log()
-    assert [c.id for c in log] == [c3.id, c2.id, c1.id]
+    assert [m.id for m in log] == [m3.id, m2.id, m1.id]
 
 
-def test_get_commit_crashes_on_unknown_id(ws: Workspace) -> None:
+def test_get_memory_crashes_on_unknown_id(ws: Workspace) -> None:
     with pytest.raises(KeyError):
-        ws.get_commit("00000000-0000-0000-0000-000000000000")
+        ws.get_memory("00000000-0000-0000-0000-000000000000")
 
 
 # ---------------------------------------------------------------------------
-# find_child_commit()
+# find_child_memory()
 # ---------------------------------------------------------------------------
 
-def test_find_child_commit_returns_correct_child(tmp_path: Path, ws: Workspace) -> None:
+def test_find_child_memory_returns_correct_child(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "child.py", b"v1")
     ws.track(str(f))
-    c1 = ws.create_commit("v1", "note")
+    m1 = ws.create_memory("v1", "note")
     f.write_bytes(b"v2")
-    c2 = ws.create_commit("v2", "note")
+    m2 = ws.create_memory("v2", "note")
     f.write_bytes(b"v3")
-    c3 = ws.create_commit("v3", "note")
+    m3 = ws.create_memory("v3", "note")
 
-    child1 = ws.find_child_commit(c1.id)
+    child1 = ws.find_child_memory(m1.id)
     assert child1 is not None
-    assert child1.id == c2.id
+    assert child1.id == m2.id
     
-    child2 = ws.find_child_commit(c2.id)
+    child2 = ws.find_child_memory(m2.id)
     assert child2 is not None
-    assert child2.id == c3.id
+    assert child2.id == m3.id
 
 
-def test_find_child_commit_head_returns_none(tmp_path: Path, ws: Workspace) -> None:
+def test_find_child_memory_head_returns_none(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "head.py", b"v1")
     ws.track(str(f))
-    c = ws.create_commit("v1", "note")
-    assert ws.find_child_commit(c.id) is None
+    m = ws.create_memory("v1", "note")
+    assert ws.find_child_memory(m.id) is None
 
 
 # ---------------------------------------------------------------------------
-# read_file_at_commit()
+# read_file_at_memory()
 # ---------------------------------------------------------------------------
 
-def test_read_file_at_commit_returns_correct_content(tmp_path: Path, ws: Workspace) -> None:
+def test_read_file_at_memory_returns_correct_content(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "hist.py", b"version 1")
     ws.track(str(f))
-    c1 = ws.create_commit("v1", "note")
+    m1 = ws.create_memory("v1", "note")
     f.write_bytes(b"version 2")
-    ws.create_commit("v2", "note")
+    ws.create_memory("v2", "note")
 
-    content_at_c1 = ws.read_file_at_commit(str(f), c1.id)
-    assert content_at_c1 == b"version 1"
+    content_at_m1 = ws.read_file_at_memory(str(f), m1.id)
+    assert content_at_m1 == b"version 1"
 
 
-def test_read_file_at_commit_crashes_if_not_found(tmp_path: Path, ws: Workspace) -> None:
+def test_read_file_at_memory_crashes_if_not_found(tmp_path: Path, ws: Workspace) -> None:
     f = _write(tmp_path / "other.py", b"content")
     ws.track(str(f))
-    c = ws.create_commit("add", "note")
+    m = ws.create_memory("add", "note")
     with pytest.raises(KeyError):
-        ws.read_file_at_commit("nonexistent.py", c.id)
+        ws.read_file_at_memory("nonexistent.py", m.id)
 
 
 # ---------------------------------------------------------------------------
@@ -312,9 +312,9 @@ def test_workspace_persists_and_reloads(tmp_path: Path) -> None:
     ws1 = Workspace(storage)
     f = _write(tmp_path / "persist.py", b"data")
     ws1.track(str(f))
-    c = ws1.create_commit("Initial", "note")
+    m = ws1.create_memory("Initial", "note")
 
     ws2 = Workspace(storage)
     log = ws2.get_log()
     assert len(log) == 1
-    assert log[0].id == c.id
+    assert log[0].id == m.id

@@ -8,7 +8,7 @@ import hashlib
 from pathlib import Path
 
 from aivc.core.blob_store import BlobStore
-from aivc.core.commit import FileChange
+from aivc.core.memory import FileChange
 
 
 def _hash_file(path: Path) -> str:

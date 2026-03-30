@@ -1,7 +1,7 @@
 """
-Indexer: vectorises commit notes and persists them in a local ChromaDB collection.
+Indexer: vectorises memory notes and persists them in a local ChromaDB collection.
 
-The text indexed per commit is: ``f"{commit.title}\\n\\n{commit.note}"`` so
+The text indexed per memory is: ``f"{memory.title}\\n\\n{memory.note}"`` so
 that semantic search captures both the short title and the detailed Markdown note.
 
 ChromaDB is initialised with a custom SentenceTransformer embedding function so
@@ -19,11 +19,11 @@ from chromadb import EmbeddingFunction, Documents, Embeddings
 from sentence_transformers import SentenceTransformer
 
 if TYPE_CHECKING:
-    from aivc.core.commit import Commit
+    from aivc.core.memory import Memory
 
 from aivc.config import BI_ENCODER_MODEL
 
-_COLLECTION_NAME = "aivc_commits"
+_COLLECTION_NAME = "aivc_memories"
 
 # Module-level singleton to prevent ChromaDB's build_from_config from
 # loading the model a second time (~5s wasted on Windows NTFS).
@@ -61,7 +61,7 @@ class _SentenceTransformerEF(EmbeddingFunction):
 
 
 class Indexer:
-    """Manages the ChromaDB collection for AIVC commit notes.
+    """Manages the ChromaDB collection for AIVC memory notes.
 
     Disk layout under ``storage_root``:
         chromadb/      — ChromaDB persistent database directory
@@ -97,19 +97,19 @@ class Indexer:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _commit_text(commit: "Commit") -> str:
-        """Build the text to be vectorised for a given commit."""
-        return f"{commit.title}\n\n{commit.note}"
+    def _memory_text(memory: "Memory") -> str:
+        """Build the text to be vectorised for a given memory."""
+        return f"{memory.title}\n\n{memory.note}"
 
     @staticmethod
-    def _commit_metadata(commit: "Commit") -> dict:
+    def _memory_metadata(memory: "Memory") -> dict:
         """Build the metadata dict stored alongside the vector."""
-        file_paths = [c.path for c in commit.changes if c.action != "deleted"]
+        file_paths = [c.path for c in memory.changes if c.action != "deleted"]
         return {
-            "commit_id": commit.id,
-            "title": commit.title,
-            "timestamp": commit.timestamp,
-            "machine_id": commit.machine_id,
+            "memory_id": memory.id,
+            "title": memory.title,
+            "timestamp": memory.timestamp,
+            "machine_id": memory.machine_id,
             # ChromaDB metadata values must be str/int/float/bool.
             # Store file paths as a comma-joined string.
             "file_paths": "\n".join(file_paths),
@@ -119,64 +119,64 @@ class Indexer:
     # Public API
     # ------------------------------------------------------------------
 
-    def index_commit(self, commit: "Commit") -> None:
-        """Upsert a commit into the vector index.
+    def index_memory(self, memory: "Memory") -> None:
+        """Upsert a memory into the vector index.
 
-        Idempotent: calling with the same commit twice is safe.
+        Idempotent: calling with the same memory twice is safe.
 
         Args:
-            commit: The commit to index.
+            memory: The memory to index.
 
         Raises:
-            ValueError: if the commit has no id or note.
+            ValueError: if the memory has no id or note.
         """
-        if not commit.id:
-            raise ValueError("Cannot index a commit with an empty id.")
-        if not commit.note.strip():
-            raise ValueError(f"Cannot index commit {commit.id!r}: note is empty.")
+        if not memory.id:
+            raise ValueError("Cannot index a memory with an empty id.")
+        if not memory.note.strip():
+            raise ValueError(f"Cannot index memory {memory.id!r}: note is empty.")
 
-        text = self._commit_text(commit)
-        metadata = self._commit_metadata(commit)
+        text = self._memory_text(memory)
+        metadata = self._memory_metadata(memory)
 
         self._collection.upsert(
-            ids=[commit.id],
+            ids=[memory.id],
             documents=[text],
             metadatas=[metadata],
         )
 
-    def remove_commit(self, commit_id: str) -> None:
-        """Remove a commit from the index.
+    def remove_memory(self, memory_id: str) -> None:
+        """Remove a memory from the index.
 
         Args:
-            commit_id: UUID of the commit to remove.
+            memory_id: UUID of the memory to remove.
 
         Raises:
-            KeyError: if the commit is not found in the index.
+            KeyError: if the memory is not found in the index.
         """
-        if not self.is_indexed(commit_id):
-            raise KeyError(f"Commit {commit_id!r} is not in the index.")
-        self._collection.delete(ids=[commit_id])
+        if not self.is_indexed(memory_id):
+            raise KeyError(f"Memory {memory_id!r} is not in the index.")
+        self._collection.delete(ids=[memory_id])
 
-    def is_indexed(self, commit_id: str) -> bool:
-        """Return True if the commit is already in the index."""
-        result = self._collection.get(ids=[commit_id])
+    def is_indexed(self, memory_id: str) -> bool:
+        """Return True if the memory is already in the index."""
+        result = self._collection.get(ids=[memory_id])
         return len(result["ids"]) > 0
 
-    def reindex_all(self, commits: list["Commit"]) -> None:
-        """Clear the collection and re-index all provided commits.
+    def reindex_all(self, memories: list["Memory"]) -> None:
+        """Clear the collection and re-index all provided memories.
 
         Useful after a migration or if the index becomes stale.
 
         Args:
-            commits: All commits to (re-)index.
+            memories: All memories to (re-)index.
         """
         # Wipe the collection by deleting all existing IDs.
         existing = self._collection.get()
         if existing["ids"]:
             self._collection.delete(ids=existing["ids"])
 
-        for commit in commits:
-            self.index_commit(commit)
+        for memory in memories:
+            self.index_memory(memory)
 
     def query(
         self,
@@ -189,7 +189,7 @@ class Indexer:
         Args:
             query_text: The search query.
             top_k: Number of results to retrieve.
-            filter_ids: Optional list of commit IDs to restrict the search to.
+            filter_ids: Optional list of memory IDs to restrict the search to.
 
         Returns:
             A list of dicts with keys: ``commit_id``, ``title``,
@@ -200,7 +200,7 @@ class Indexer:
         """
         count = self._collection.count()
         if count == 0:
-            raise ValueError("The index is empty — no commits have been indexed yet.")
+            raise ValueError("The index is empty — no memories have been indexed yet.")
 
         if filter_ids is not None:
             if not filter_ids:
@@ -216,7 +216,7 @@ class Indexer:
         }
 
         if filter_ids is not None:
-            kwargs["where"] = {"commit_id": {"$in": filter_ids}}
+            kwargs["where"] = {"memory_id": {"$in": filter_ids}}
 
         results = self._collection.query(**kwargs)
 
@@ -228,7 +228,7 @@ class Indexer:
             file_paths_str = meta.get("file_paths", "")
             hits.append(
                 {
-                    "commit_id": meta["commit_id"],
+                    "memory_id": meta["memory_id"],
                     "title": meta["title"],
                     "timestamp": meta["timestamp"],
                     "machine_id": meta.get("machine_id", ""),

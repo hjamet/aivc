@@ -21,59 +21,63 @@ def _write(path: Path, content: str) -> None:
 @pytest.fixture
 def engine(tmp_path: Path):
     from aivc.semantic.engine import SemanticEngine
-    return SemanticEngine(tmp_path / "storage")
+    e = SemanticEngine(tmp_path / "storage")
+    yield e
+    e.shutdown()
 
 
 # ---------------------------------------------------------------------------
-# create_commit → indexes + updates graph
+# create_memory → indexes + updates graph
 # ---------------------------------------------------------------------------
 
-def test_create_commit_returns_commit(engine, tmp_path) -> None:
+def test_create_memory_returns_memory(engine, tmp_path) -> None:
     f = tmp_path / "test.py"
     _write(f, "x = 1")
     engine.track(str(f))
-    commit = engine.create_commit("First commit", "Initialised x to 1.")
-    assert commit.id
-    assert commit.title == "First commit"
+    memory = engine.create_memory("First memory", "Initialised x to 1.")
+    assert memory.id
+    assert memory.title == "First memory"
 
 
-def test_create_commit_is_indexed(engine, tmp_path) -> None:
+def test_create_memory_is_indexed(engine, tmp_path) -> None:
     f = tmp_path / "test.py"
     _write(f, "x = 1")
     engine.track(str(f))
-    commit = engine.create_commit("Indexed commit", "This note should be vectorised.")
-    assert engine._indexer.is_indexed(commit.id)
+    memory = engine.create_memory("Indexed memory", "This note should be vectorised.")
+    assert engine.wait_until_indexed()
+    assert engine._indexer.is_indexed(memory.id)
 
 
-def test_create_commit_updates_graph(engine, tmp_path) -> None:
+def test_create_memory_updates_graph(engine, tmp_path) -> None:
     f = tmp_path / "test.py"
     _write(f, "x = 1")
     engine.track(str(f))
-    commit = engine.create_commit("Graph commit", "This should appear in the graph.")
-    assert str(f) in engine._graph.get_commit_files(commit.id)
+    memory = engine.create_memory("Graph memory", "This should appear in the graph.")
+    assert str(f) in engine._graph.get_memory_files(memory.id)
 
 
-def test_create_commit_raises_if_no_changes(engine, tmp_path) -> None:
+def test_create_memory_raises_if_no_changes(engine, tmp_path) -> None:
     f = tmp_path / "test.py"
     _write(f, "x = 1")
     engine.track(str(f))
-    engine.create_commit("First", "Initial note.")
+    engine.create_memory("First", "Initial note.")
     with pytest.raises(RuntimeError, match="No changes detected"):
-        engine.create_commit("Second", "Should fail — nothing changed.")
+        engine.create_memory("Second", "Should fail — nothing changed.")
 
 
 # ---------------------------------------------------------------------------
 # search
 # ---------------------------------------------------------------------------
 
-def test_search_finds_relevant_commit(engine, tmp_path) -> None:
+def test_search_finds_relevant_memory(engine, tmp_path) -> None:
     f = tmp_path / "sort.py"
     _write(f, "def quicksort(arr): pass")
     engine.track(str(f))
-    engine.create_commit(
+    engine.create_memory(
         "Implement quicksort",
         "Implemented an in-place quicksort algorithm for sorting integer arrays.",
     )
+    assert engine.wait_until_indexed()
     results = engine.search("sorting algorithm", top_k=10, top_n=1)
     assert len(results) == 1
     assert "sort" in results[0].title.lower() or results[0].score > 0
@@ -90,7 +94,7 @@ def test_get_related_files(engine, tmp_path) -> None:
     _write(fb, "b = 2")
     engine.track(str(fa))
     engine.track(str(fb))
-    engine.create_commit("Co-occur commit", "Both a and b changed.")
+    engine.create_memory("Co-occur memory", "Both a and b changed.")
     related = dict(engine.get_related_files(str(fa)))
     assert str(fb) in related
 
@@ -107,11 +111,11 @@ def test_track_and_get_status(engine, tmp_path) -> None:
     assert any(s.path == str(f) for s in statuses)
 
 
-def test_get_log_returns_commits(engine, tmp_path) -> None:
+def test_get_log_returns_memories(engine, tmp_path) -> None:
     f = tmp_path / "x.py"
     _write(f, "x = 1")
     engine.track(str(f))
-    engine.create_commit("Log test", "First entry in log.")
+    engine.create_memory("Log test", "First entry in log.")
     log = engine.get_log()
     assert len(log) == 1
     assert log[0].title == "Log test"

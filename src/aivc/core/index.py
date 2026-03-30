@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from aivc.core.commit import Commit
+    from aivc.core.memory import Memory
 
 _DB_FILE = "core_index.db"
 
@@ -43,7 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_fc_commit ON file_changes(commit_id);
 
 
 class CoreIndex:
-    """Fast index for commit metadata and file changes.
+    """Fast index for memory metadata and file changes.
 
     Persisted as ``{storage_root}/core_index.db`` (SQLite).
     """
@@ -65,21 +65,21 @@ class CoreIndex:
     def _execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
         return self._conn.execute(sql, params)
 
-    def add_commit(self, commit: Commit) -> None:
-        """Index a commit and its file changes.
+    def add_memory(self, memory: Memory) -> None:
+        """Index a memory and its file changes.
 
         Idempotent: uses INSERT OR REPLACE.
         """
         self._execute(
             "INSERT OR REPLACE INTO commits (commit_id, parent_id, timestamp, title) VALUES (?, ?, ?, ?)",
-            (commit.id, commit.parent_id, commit.timestamp, commit.title),
+            (memory.id, memory.parent_id, memory.timestamp, memory.title),
         )
 
-        for fc in commit.changes:
+        for fc in memory.changes:
             self._execute(
                 "INSERT OR REPLACE INTO file_changes (commit_id, path, action, blob_hash, bytes_added, bytes_removed) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                (commit.id, fc.path, fc.action, fc.blob_hash, fc.bytes_added, fc.bytes_removed),
+                (memory.id, fc.path, fc.action, fc.blob_hash, fc.bytes_added, fc.bytes_removed),
             )
         self._conn.commit()
 
@@ -96,42 +96,42 @@ class CoreIndex:
         ).fetchall()
         return {r[0] for r in rows}
 
-    def find_child(self, commit_id: str) -> tuple[str, str] | None:
-        """Find the child commit ID and title for a given parent ID."""
+    def find_child(self, memory_id: str) -> tuple[str, str] | None:
+        """Find the child memory ID and title for a given parent ID."""
         row = self._execute(
-            "SELECT commit_id, title FROM commits WHERE parent_id = ?", (commit_id,)
+            "SELECT commit_id, title FROM commits WHERE parent_id = ?", (memory_id,)
         ).fetchone()
         return (row[0], row[1]) if row else None
 
-    def get_commits_touching_file(self, file_path: str) -> list[str]:
-        """Return all commit IDs that recorded a change for this file."""
+    def get_memories_touching_file(self, file_path: str) -> list[str]:
+        """Return all memory IDs that recorded a change for this file."""
         rows = self._execute(
             "SELECT DISTINCT commit_id FROM file_changes WHERE path = ?", (file_path,)
         ).fetchall()
         return [r[0] for r in rows]
 
-    def migrate_from_json(self, commits_dir: Path) -> int:
-        """Load all JSON commits from commits_dir and index them if not already present.
+    def migrate_from_json(self, memories_dir: Path) -> int:
+        """Load all JSON memories from memories_dir and index them if not already present.
 
         Returns:
-            The number of newly indexed commits.
+            The number of newly indexed memories.
         """
-        from aivc.core.commit import commit_from_dict
+        from aivc.core.memory import memory_from_dict
 
         new_count = 0
-        for p in commits_dir.glob("*.json"):
-            commit_id = p.stem
+        for p in memories_dir.glob("*.json"):
+            memory_id = p.stem
             # Quick check if already indexed
             exists = self._execute(
-                "SELECT 1 FROM commits WHERE commit_id = ?", (commit_id,)
+                "SELECT 1 FROM commits WHERE commit_id = ?", (memory_id,)
             ).fetchone()
             if not exists:
                 try:
-                    commit = commit_from_dict(json.loads(p.read_text(encoding="utf-8")))
-                    self.add_commit(commit)
+                    memory = memory_from_dict(json.loads(p.read_text(encoding="utf-8")))
+                    self.add_memory(memory)
                     new_count += 1
                 except Exception:
-                    # Skip corrupted or invalid commits during migration
+                    # Skip corrupted or invalid memories during migration
                     continue
         return new_count
 

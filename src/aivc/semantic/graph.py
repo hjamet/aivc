@@ -1,5 +1,5 @@
 """
-CooccurrenceGraph: bipartite graph tracking file ↔ commit relationships.
+CooccurrenceGraph: bipartite graph tracking file ↔ memory relationships.
 
 Persisted in an SQLite database for O(1) inserts and efficient queries,
 eliminating the full-JSON-rewrite bottleneck of the original design.
@@ -9,7 +9,7 @@ Schema:
     file_nodes(file_path TEXT PK)
     edges(commit_id TEXT, file_path TEXT, UNIQUE(commit_id, file_path))
 
-Edges are explicit rows: an edge exists between a file and a commit iff
+Edges are explicit rows: an edge exists between a file and a memory iff
 a row appears in the ``edges`` table.
 """
 
@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from aivc.core.commit import Commit
+    from aivc.core.memory import Memory
 
 _DB_FILE = "cooccurrence_graph.db"
 
@@ -49,7 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_edges_file   ON edges(file_path);
 
 
 class CooccurrenceGraph:
-    """Bipartite graph of file nodes ↔ commit nodes.
+    """Bipartite graph of file nodes ↔ memory nodes.
 
     Persisted as ``{storage_root}/cooccurrence_graph.db`` (SQLite).
     """
@@ -82,19 +82,19 @@ class CooccurrenceGraph:
     # Public API — Mutation
     # ------------------------------------------------------------------
 
-    def add_commit(self, commit: "Commit") -> None:
-        """Register a commit and its file edges in the graph.
+    def add_memory(self, memory: "Memory") -> None:
+        """Register a memory and its file edges in the graph.
 
-        Idempotent: calling with the same commit twice is safe.
+        Idempotent: calling with the same memory twice is safe.
 
         Args:
-            commit: The commit to add.
+            memory: The memory to add.
         """
-        file_paths = [c.path for c in commit.changes]
+        file_paths = [c.path for c in memory.changes]
 
         self._execute(
             "INSERT OR REPLACE INTO commit_nodes (commit_id, title, timestamp) VALUES (?, ?, ?)",
-            (commit.id, commit.title, commit.timestamp),
+            (memory.id, memory.title, memory.timestamp),
         )
 
         for fp in file_paths:
@@ -104,39 +104,39 @@ class CooccurrenceGraph:
             )
             self._execute(
                 "INSERT OR IGNORE INTO edges (commit_id, file_path) VALUES (?, ?)",
-                (commit.id, fp),
+                (memory.id, fp),
             )
 
         self._conn.commit()
 
-    def remove_commit(self, commit_id: str) -> None:
-        """Remove a commit and all its edges from the graph.
+    def remove_memory(self, memory_id: str) -> None:
+        """Remove a memory and all its edges from the graph.
 
         Args:
-            commit_id: UUID of the commit to remove.
+            memory_id: UUID of the memory to remove.
 
         Raises:
-            KeyError: if the commit_id is not in the graph.
+            KeyError: if the memory_id is not in the graph.
         """
         row = self._execute(
-            "SELECT 1 FROM commit_nodes WHERE commit_id = ?", (commit_id,)
+            "SELECT 1 FROM commit_nodes WHERE commit_id = ?", (memory_id,)
         ).fetchone()
         if row is None:
-            raise KeyError(f"Commit {commit_id!r} is not in the graph.")
+            raise KeyError(f"Memory {memory_id!r} is not in the graph.")
 
-        # Get files associated with this commit BEFORE deleting edges.
+        # Get files associated with this memory BEFORE deleting edges.
         file_paths = [
             r[0]
             for r in self._execute(
-                "SELECT file_path FROM edges WHERE commit_id = ?", (commit_id,)
+                "SELECT file_path FROM edges WHERE commit_id = ?", (memory_id,)
             ).fetchall()
         ]
 
-        # Remove all edges for this commit.
-        self._execute("DELETE FROM edges WHERE commit_id = ?", (commit_id,))
+        # Remove all edges for this memory.
+        self._execute("DELETE FROM edges WHERE commit_id = ?", (memory_id,))
 
-        # Remove the commit node.
-        self._execute("DELETE FROM commit_nodes WHERE commit_id = ?", (commit_id,))
+        # Remove the memory node.
+        self._execute("DELETE FROM commit_nodes WHERE commit_id = ?", (memory_id,))
 
         # Clean up orphan file nodes (files that no longer have any edges).
         for fp in file_paths:
@@ -152,30 +152,30 @@ class CooccurrenceGraph:
     # Public API — Queries
     # ------------------------------------------------------------------
 
-    def get_commit_files(self, commit_id: str) -> list[str]:
-        """Return the file paths associated with a commit.
+    def get_memory_files(self, memory_id: str) -> list[str]:
+        """Return the file paths associated with a memory.
 
         Args:
-            commit_id: UUID of the commit.
+            memory_id: UUID of the memory.
 
         Raises:
-            KeyError: if the commit is not in the graph.
+            KeyError: if the memory is not in the graph.
         """
         row = self._execute(
-            "SELECT 1 FROM commit_nodes WHERE commit_id = ?", (commit_id,)
+            "SELECT 1 FROM commit_nodes WHERE commit_id = ?", (memory_id,)
         ).fetchone()
         if row is None:
-            raise KeyError(f"Commit {commit_id!r} is not in the graph.")
+            raise KeyError(f"Memory {memory_id!r} is not in the graph.")
 
         return [
             r[0]
             for r in self._execute(
-                "SELECT file_path FROM edges WHERE commit_id = ?", (commit_id,)
+                "SELECT file_path FROM edges WHERE commit_id = ?", (memory_id,)
             ).fetchall()
         ]
 
-    def get_file_commits(self, file_path: str) -> list[str]:
-        """Return the commit IDs that touched a given file.
+    def get_file_memories(self, file_path: str) -> list[str]:
+        """Return the memory IDs that touched a given file.
 
         Args:
             file_path: Relative path of the file.
@@ -196,14 +196,14 @@ class CooccurrenceGraph:
             ).fetchall()
         ]
 
-    def get_file_commits_with_metadata(self, file_path: str) -> list[dict]:
-        """Return commits that touched a file, with full metadata.
+    def get_file_memories_with_metadata(self, file_path: str) -> list[dict]:
+        """Return memories that touched a file, with full metadata.
 
         Args:
             file_path: Absolute path of the file.
 
         Returns:
-            List of ``{"commit_id": str, "title": str, "timestamp": str}``
+            List of ``{"memory_id": str, "title": str, "timestamp": str}``
             ordered by timestamp descending (newest first).
 
         Raises:
@@ -227,12 +227,12 @@ class CooccurrenceGraph:
         ).fetchall()
 
         return [
-            {"commit_id": r[0], "title": r[1], "timestamp": r[2]}
+            {"memory_id": r[0], "title": r[1], "timestamp": r[2]}
             for r in rows
         ]
 
-    def get_commits_by_glob(self, pattern: str) -> list[str]:
-        """Return commit IDs that touched any file matching a glob pattern.
+    def get_memories_by_glob(self, pattern: str) -> list[str]:
+        """Return memory IDs that touched any file matching a glob pattern.
 
         Matches the absolute file paths in the graph against the given glob pattern.
 
@@ -240,7 +240,7 @@ class CooccurrenceGraph:
             pattern: A glob pattern (e.g. "*/tests/*.py").
 
         Returns:
-            A list of unique commit IDs.
+            A list of unique memory IDs.
         """
         all_files = [
             r[0] for r in self._execute("SELECT file_path FROM file_nodes").fetchall()
@@ -251,7 +251,7 @@ class CooccurrenceGraph:
         if not matched_files:
             return []
 
-        commit_ids = set()
+        memory_ids = set()
         chunk_size = 900  # Safe limit for SQLite `IN` clause parameters
 
         for i in range(0, len(matched_files), chunk_size):
@@ -262,17 +262,17 @@ class CooccurrenceGraph:
                 chunk,
             ).fetchall()
             for r in rows:
-                commit_ids.add(r[0])
+                memory_ids.add(r[0])
 
-        return list(commit_ids)
+        return list(memory_ids)
 
     def get_related_files(
         self, file_path: str, top_n: int = 10
     ) -> list[tuple[str, int]]:
         """Return the files most frequently committed alongside ``file_path``.
 
-        Co-occurrence count: for each commit that touches ``file_path``, count
-        every other file that appears in the same commit.
+        Co-occurrence count: for each memory that touches ``file_path``, count
+        every other file that appears in the same memory.
 
         Args:
             file_path: The reference file.
@@ -312,9 +312,9 @@ class CooccurrenceGraph:
 
         Returns:
             A dict with two lists:
-            - ``nodes``: each node has ``id``, ``label``, ``type`` (``"commit"``
+            - ``nodes``: each node has ``id``, ``label``, ``type`` (``"memory"``
               or ``"file"``).
-            - ``edges``: each edge has ``source`` (commit_id) and
+            - ``edges``: each edge has ``source`` (memory_id) and
               ``target`` (file_path).
         """
         nodes = []
@@ -327,7 +327,7 @@ class CooccurrenceGraph:
                 {
                     "id": row[0],
                     "label": row[1],
-                    "type": "commit",
+                    "type": "memory",
                     "timestamp": row[2],
                 }
             )
@@ -346,7 +346,7 @@ class CooccurrenceGraph:
         """Return enriched data for file nodes (documents) for visualisation.
 
         Returns:
-            A list of dicts: ``{"id": file_path, "label": file_name, "full_path": file_path, "commit_count": int, "directory": str}``
+            A list of dicts: ``{"id": file_path, "label": file_name, "full_path": file_path, "memory_count": int, "directory": str}``
         """
         nodes = []
         rows = self._execute(
@@ -366,7 +366,7 @@ class CooccurrenceGraph:
                 "id": file_path,
                 "label": Path(file_path).name,
                 "full_path": file_path,
-                "commit_count": count,
+                "memory_count": count,
                 "directory": directory,
             })
         return nodes

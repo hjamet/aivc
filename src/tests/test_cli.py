@@ -38,7 +38,7 @@ def test_cli_log(mock_engine, capsys):
     with patch("sys.argv", ["aivc", "log"]):
         main()
     captured = capsys.readouterr()
-    assert "No commits found" in captured.out
+    assert "No memories found" in captured.out
 
 
 def test_cli_search(mock_engine, capsys):
@@ -46,7 +46,7 @@ def test_cli_search(mock_engine, capsys):
     with patch("sys.argv", ["aivc", "search", "test query"]):
         main()
     captured = capsys.readouterr()
-    assert "No matching commits found" in captured.out
+    assert "No matching memories found" in captured.out
 
 
 def test_cli_track_single_file(mock_engine, capsys):
