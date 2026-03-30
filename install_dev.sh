@@ -78,18 +78,18 @@ preserve context beyond a single conversation.
 
 ## CRITICAL: Memory Discipline
 
-### 1. Commit After EVERY Modification
-- Call \`create_commit\` (the MCP tool, NOT git) after **every meaningful step**.
-- A commit is required after: completing a sub-task, creating/modifying any file,
+### 1. Remember After EVERY Modification
+- Call \`remember\` (the MCP tool, NOT git) after **every meaningful step**.
+- A memory is required after: completing a sub-task, creating/modifying any file,
   making a decision, discovering something, encountering an error, or any checkpoint.
 - **If you did something worth remembering, commit it NOW.**
 
 ### 2. Start Every Session with Context Recovery
 Before doing ANY work, you MUST reconstruct your working context:
-1. Call \`get_recent_commits\` to see what was done recently.
-2. Perform **at least 5 \`search_memory\` calls** with varied queries to explore
-   relevant past work (e.g. the current topic, related files, similar problems).
-3. Use \`consult_commit\` on the most relevant results to read the full details.
+1. Call \`get_recent_memories\` to see what was done recently.
+2. Perform **at least 5 \`recall\` calls** with varied queries to explore
+   relevant past memories (e.g. the current topic, related files, similar problems).
+3. Use \`consult_memory\` on the most relevant results to read the full details.
 4. Use \`consult_file\` to understand the history of files you will modify.
 
 ### 3. Explore Before You Act
@@ -98,16 +98,16 @@ Before doing ANY work, you MUST reconstruct your working context:
 - Understand the links between files and their shared history.
 - Explore broadly — your memory contains solutions, patterns, and lessons learned.
 
-### 4. Write Extremely Detailed Commit Messages
-Your commit notes are your future self's lifeline. They must include:
+### 4. Write Extremely Detailed Memory Notes
+Your memory notes are your future self's lifeline. They must include:
 - **What was done** and why
 - **Errors encountered** and how they were resolved
 - **Decisions made** and the reasoning behind them
 - **Observations and surprises** discovered during the work
 - **Recommendations for the future** — what should be done next, what to watch out for
-- **Links to related commits or files** when relevant
+- **Links to related memories or files** when relevant
 
-> A one-liner commit message is a **failure**. Write as if briefing a colleague
+> A one-liner memory note is a **failure**. Write as if briefing a colleague
 > who has zero context but needs to continue your work tomorrow.
 ${MARKER_END}"
 

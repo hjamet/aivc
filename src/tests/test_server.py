@@ -42,10 +42,10 @@ def _import_server():
 _server = _import_server()
 
 # Grab the tool functions directly from the server module.
-_create_commit = _server.create_commit
-_search_memory = _server.search_memory
-_consult_commit = _server.consult_commit
-_get_recent = _server.get_recent_commits
+_remember = _server.remember
+_recall = _server.recall
+_consult_memory = _server.consult_memory
+_get_recent_memories = _server.get_recent_memories
 _consult_file = _server.consult_file
 _read_hist = _server.read_historical_file
 _get_status = _server.get_status
@@ -107,13 +107,13 @@ def _make_file_status(path="src/foo.py", current_size=1024, history_size=4096):
 # Tests
 # ---------------------------------------------------------------------------
 
-class TestCreateCommit(unittest.TestCase):
+class TestRemember(unittest.TestCase):
     def setUp(self):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
 
-    def test_returns_commit_id_and_files(self):
+    def test_returns_memory_id_and_files(self):
         _mock_engine.create_commit.return_value = _make_commit()
-        result = _create_commit("Do something", "Detailed note.")
+        result = _remember("Do something", "Detailed note.")
         self.assertIn("abc-123", result)
         self.assertIn("Do something", result)
         self.assertIn("src/foo.py", result)
@@ -121,22 +121,22 @@ class TestCreateCommit(unittest.TestCase):
 
     def test_delegates_to_engine(self):
         _mock_engine.create_commit.return_value = _make_commit()
-        _create_commit("T", "N")
+        _remember("T", "N")
         _mock_engine.create_commit.assert_called_once_with("T", "N", consulted_files=[])
 
     def test_delegates_to_engine_with_consulted(self):
         _mock_engine.create_commit.return_value = _make_commit()
-        _create_commit("T", "N", consulted_files=["f1.py"])
+        _remember("T", "N", consulted_files=["f1.py"])
         _mock_engine.create_commit.assert_called_once_with("T", "N", consulted_files=["f1.py"])
 
     def test_runtime_error_propagates(self):
         _mock_engine.create_commit.side_effect = RuntimeError("No changes detected")
         with self.assertRaises(RuntimeError):
-            _create_commit("T", "N")
+            _remember("T", "N")
 
     def test_empty_changes_handled(self):
         _mock_engine.create_commit.return_value = _make_commit(changes=[])
-        result = _create_commit("T", "N")
+        result = _remember("T", "N")
         self.assertIn("no tracked files changed", result)
 
 
@@ -144,9 +144,9 @@ class TestCreateCommit(unittest.TestCase):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
         _mock_engine.get_index_queue_size.return_value = 0
 
-    def test_returns_commit_list_without_note(self):
+    def test_returns_memory_list_without_note(self):
         _mock_engine.search.return_value = [_make_search_result()]
-        result = _search_memory("find something")
+        result = _recall("find something")
         self.assertIn("abc-123", result)
         self.assertIn("Old commit", result)
         self.assertIn("> short snippet", result)
@@ -159,22 +159,22 @@ class TestCreateCommit(unittest.TestCase):
             _make_search_result("c2", "C2"),
         ]
         _mock_engine.search.return_value = results
-        result = _search_memory("find")
+        result = _recall("find")
         self.assertIn("src/foo.py", result)
 
     def test_no_results_returns_graceful_message(self):
         _mock_engine.search.return_value = []
-        result = _search_memory("nothing")
-        self.assertIn("No matching commits", result)
+        result = _recall("nothing")
+        self.assertIn("No matching memories", result)
 
     def test_top_n_capped_at_20(self):
         _mock_engine.search.return_value = []
-        _search_memory("x", top_n=100)
+        _recall("x", top_n=100)
         # top_n is capped to 20 before passing to engine
         _mock_engine.search.assert_called_once_with("x", top_n=20, filter_glob="")
 
 
-class TestConsultCommit(unittest.TestCase):
+class TestConsultMemory(unittest.TestCase):
     def setUp(self):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
         # Default: no child found
@@ -182,19 +182,19 @@ class TestConsultCommit(unittest.TestCase):
 
     def test_returns_full_note(self):
         _mock_engine.get_commit.return_value = _make_commit(note="# My Work\n\nDetails here.")
-        result = _consult_commit("abc-123")
+        result = _consult_memory("abc-123")
         self.assertIn("# My Work", result)
         self.assertIn("Details here", result)
 
     def test_renders_file_changes(self):
         _mock_engine.get_commit.return_value = _make_commit()
-        result = _consult_commit("abc-123")
+        result = _consult_memory("abc-123")
         self.assertIn("src/foo.py", result)
 
     def test_key_error_propagates(self):
-        _mock_engine.get_commit.side_effect = KeyError("Commit not found")
+        _mock_engine.get_commit.side_effect = KeyError("Memory not found")
         with self.assertRaises(KeyError):
-            _consult_commit("bad-id")
+            _consult_memory("bad-id")
 
     def test_shows_parent_context(self):
         parent = _make_commit(commit_id="p-123", title="Parent commit")
@@ -207,7 +207,7 @@ class TestConsultCommit(unittest.TestCase):
             
         _mock_engine.get_commit.side_effect = side_effect
         
-        result = _consult_commit("c-456")
+        result = _consult_memory("c-456")
         self.assertIn("⬆️ **Prev** : Parent commit (ID: p-123)", result)
 
     def test_shows_child_context(self):
@@ -217,14 +217,14 @@ class TestConsultCommit(unittest.TestCase):
         _mock_engine.get_commit.return_value = commit
         _mock_engine.find_child_commit.return_value = child
         
-        result = _consult_commit("c-123")
+        result = _consult_memory("c-123")
         self.assertIn("⬇️ **Next** : Next commit (ID: next-456)", result)
 
     def test_no_parent_no_child(self):
         _mock_engine.get_commit.return_value = _make_commit(parent_id=None)
         _mock_engine.find_child_commit.return_value = None
         
-        result = _consult_commit("initial-id")
+        result = _consult_memory("initial-id")
         self.assertNotIn("⬆️ **Prev**", result)
         self.assertNotIn("⬇️ **Next**", result)
 
@@ -241,12 +241,12 @@ class TestConsultCommit(unittest.TestCase):
         _mock_engine.get_commit.side_effect = side_effect
         _mock_engine.find_child_commit.return_value = child
 
-        result = _consult_commit("curr")
+        result = _consult_memory("curr")
         self.assertIn("⬆️ **Prev** : P (ID: p-1)", result)
         self.assertIn("⬇️ **Next** : N (ID: next)", result)
 
 
-class TestGetRecentCommits(unittest.TestCase):
+class TestGetRecentMemories(unittest.TestCase):
     def setUp(self):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
 
@@ -255,18 +255,18 @@ class TestGetRecentCommits(unittest.TestCase):
         _mock_engine.get_log.return_value = commits
         _mock_engine.get_commit_files.return_value = ["src/foo.py"]
 
-        result = _get_recent(limit=5, offset=5)
+        result = _get_recent_memories(limit=5, offset=5)
         self.assertIn("Commit 5", result)
         self.assertNotIn("Commit 0", result)
 
     def test_empty_range_returns_graceful_message(self):
         _mock_engine.get_log.return_value = []
-        result = _get_recent()
-        self.assertIn("No commits found", result)
+        result = _get_recent_memories()
+        self.assertIn("No memories found", result)
 
     def test_limit_capped_at_50(self):
         _mock_engine.get_log.return_value = []
-        _get_recent(limit=200)
+        _get_recent_memories(limit=200)
         # Must request offset+50 at most
         _mock_engine.get_log.assert_called_once_with(limit=50)
 
@@ -312,12 +312,13 @@ class TestGetStatus(unittest.TestCase):
     def setUp(self):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
 
-    def test_returns_formatted_table(self):
-        _mock_engine.get_status.return_value = [_make_file_status()]
-        result = _get_status()
-        self.assertIn("src/foo.py", result)
-        self.assertIn("1.0 KB", result)  # 1024 bytes
-        self.assertIn("4.0 KB", result)  # 4096 bytes
+    def test_returns_tree_structure(self):
+        _mock_engine.get_status.return_value = [_make_file_status(path="/abs/code/src/foo.py")]
+        # Mocking resolve() behavior in a portable way for the tool's Path logic
+        with patch("pathlib.Path.resolve", side_effect=lambda x: Path(x)):
+             result = _get_status()
+             self.assertIn("📁 Root", result)
+             self.assertIn("src/ (1 files, 1.0 KB)", result)
 
     def test_no_tracked_files(self):
         _mock_engine.get_status.return_value = []

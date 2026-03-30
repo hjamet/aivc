@@ -27,3 +27,7 @@
 | [Phase 23 — State Sync](tasks/phase23_state_sync_reload.md) | Reload JIT du workspace via mtime | 2026-03-24 | `Up to date` |
 | [Phase 25 — Native Google Drive](tasks/phase25_native_google_drive.md) | Native Google Drive API replacing rclone | 2026-03-24 | `Up to date` |
 | [Phase 26 — Auto Sync Push](tasks/phase26_auto_sync_push.md) | Automatic push of missing commits at startup | 2026-03-24 | `Up to date` |
+| [Phase 27 — Remote Hints](tasks/phase27_remote_hints.md) | Multi-Machine Distinction & Path Mapping | 2026-03-24 | `Up to date` |
+| [Phase 28 — I/O Optimization](tasks/phase28_io_optimizations.md) | Batching & Fast Diff for local indexing | 2026-03-24 | `Up to date` |
+| [Phase 29 — Memory Refactor](tasks/phase29.md) | Remember tool, Blob sync removal, Tree Status | 2026-03-30 | `Up to date` |
+| [Phase 30 — Debt Cleanup](tasks/phase30_debt_cleanup.md) | Unification du backend (Commit -> Memory) et purge drive.py | 2026-03-30 | `Up to date` |

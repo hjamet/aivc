@@ -38,73 +38,69 @@ context beyond a single conversation.
 
 ## Core Concept
 
-AIVC stores **commits**: a short title + a detailed Markdown note you write yourself.
-Every commit also automatically snapshots any tracked files that were modified.
-Commits are indexed semantically, so you can retrieve them by meaning later.
+AIVC stores **memories**: a short title + a detailed Markdown note you write yourself.
+Every memory also automatically snapshots any tracked files that were modified.
+Memories are indexed semantically, so you can retrieve them by meaning later.
 
-## CRITICAL RULE — COMMIT OFTEN
+## CRITICAL RULE — REMEMBER OFTEN
 
-**You MUST create a commit after EVERY significant step.**
+**You MUST create a memory (call `remember`) after EVERY significant step.**
 
-A commit is required after:
+A memory is required after:
 - Completing a sub-task or an entire task.
 - Creating or modifying any artifact (file, script, document, test, config…).
 - Discovering a key finding or making an architectural decision.
 - Finishing any phase of a plan, even if work is still ongoing.
 - Any identifiable "checkpoint" in your reasoning.
 
-The commit note must be **detailed**. Do not write one-liners.
+The memory note must be **detailed**. Do not write one-liners.
 Document your reasoning, the decisions made, the problems encountered,
 and the solutions found. Think of it as a handover memo to your future self.
 
 ### Consulted Files
 
-When you create a commit, you can specify a list of `consulted_files`.
+When you create a memory, you can specify a list of `consulted_files`.
 These are files you have read and that were **truly useful** to you to
-accomplish your task (e.g., technical reference, code example, internal documentation),
-but that you did not modify. Untracked files will be auto-tracked if they
-exist on disk; non-existent files are silently ignored.
-
-**GOLDEN RULE**: Mention ONLY those documents containing information that you
-did not know before reading them. Do not add files for "politeness" or 
-surface utility. This would pollute your long-term memory.
+accomplish your task, but that you did not modify.
 
 ## Recall Funnel
 
 To retrieve memory, follow this two-step funnel:
 
-1. **`search_memory`** — for semantic search by meaning (idea, topic, solution).
-   → Returns commit titles/dates/IDs + the most relevant file paths. NEVER the full note.
-2. **`get_recent_commits`** — for recalling recent history without a specific query.
-   → Returns the last N commits with their files (chronological).
-3. **`consult_commit`** — to read the full note of a specific commit.
-   → Call this AFTER identifying a relevant commit via `search_memory` or `get_recent_commits`.
+1. **`recall`** — for semantic search by meaning (idea, topic, solution).
+   → Returns memory titles/dates/IDs + snippets. NEVER the full note.
+2. **`get_recent_memories`** — for recalling recent history chronologically.
+3. **`consult_memory`** — to read the full note of a specific memory.
+   → Call this AFTER identifying a relevant memory.
 
 4. **`search_files_bm25`** — for keyword search in the CURRENT state of files.
-   → This is the ONLY tool to search inside file contents. Use it for finding exact functions, variables, or code patterns.
-   → Unlike `search_memory` (semantic search in *past commit notes*), `search_files_bm25` looks at what is *currently* on disk for tracked files.
+
+## Remote Memories & Sync Policy
+
+AIVC synchronizes ONLY memory metadata (titles, notes) between machines. 
+**File contents (blobs) are NOT synchronized.** 
+If you see a memory marked as `[Remote: machine-id]`, the historical version 
+of files associated with it might not be available for `read_historical_file`.
 
 ## Tool Reference
 
 | Tool | Purpose |
 |------|---------|
-| `create_commit` | Save a memory checkpoint. Call this VERY often. |
-| `search_memory` | Semantic search over all past commit notes. |
-| `get_recent_commits` | Recent commit log (paginable). |
-| `consult_commit` | Read a specific commit note in full. |
-| `consult_file` | Get the AIVC history of a specific file (which commits touched it). |
-| `read_historical_file` | Read the content of a file as it was at a specific past commit. |
-| `get_status` | List tracked files with current size and history weight. |
-| `untrack` | **⚠️ VERY DESTRUCTIVE** — Accepts a **list** of paths/globs. STOPS surveillance and ERASES full history. |
-| `track` | Accepts a **list** of file paths, directory paths, or glob patterns. Directories start continuous surveillance. |
+| `remember` | Save a memory checkpoint. Call this VERY often. |
+| `recall` | Semantic search over all past memory notes. |
+| `get_recent_memories` | Recent memory log (paginable). |
+| `consult_memory` | Read a specific memory note in full. |
+| `consult_file` | Get the AIVC history of a specific file. |
+| `read_historical_file` | Read the content of a file as it was at a specific past memory. |
+| `get_status` | List tracked files with a navigable folder tree. |
+| `untrack` | **⚠️ VERY DESTRUCTIVE** — Erases history of specified files. |
+| `track` | Add files/dirs to surveillance and tracking. |
 | `search_files_bm25` | Lexical search (BM25) over current tracked file contents. |
 
 ## `untrack` Warning
 
-`untrack([paths])` is HIGHLY DESTRUCTIVE. Do NOT use it blindly.
-- If called on a file, it erases the file's entire history and blobs.
-- If called on a directory, it STOPS tracking it, AND PERMANENTLY ERASES THE HISTORY OF ALL FILES INSIDE IT.
-Do NOT use `untrack` without exploring `consult_file` or `search_memory` first to guarantee the files are truly useless.
+`untrack([paths])` is HIGHLY DESTRUCTIVE. It PERMANENTLY ERASES THE HISTORY of matching files. 
+Do NOT use it without exploring `consult_file` or `recall` first.
 """
 
 # ---------------------------------------------------------------------------
@@ -149,20 +145,64 @@ def _format_bytes(n: int) -> str:
     return f"{n / 1024 ** 2:.1f} MB"
 
 
+def _format_changes_compressed(changes, machine_id=None) -> str:
+    """Group large numbers of added/deleted files by directory to keep context clean."""
+    if not changes:
+        return "  (no tracked files changed)"
+    
+    # 1. Separate modifications/consultations from bulk additions/deletions
+    others = []
+    bulk: dict[tuple[str, str], list[str]] = {} # (action, dirname) -> [filenames]
+    
+    for c in changes:
+        if c.action in ("added", "deleted"):
+            p = Path(c.path)
+            dirname = str(p.parent)
+            bulk.setdefault((c.action, dirname), []).append(p.name)
+        else:
+            others.append(c)
+            
+    lines = []
+    
+    # 2. Add others normally
+    for c in others:
+        line = f"  - [{c.action}] {c.path}"
+        if c.action != "consulted":
+            line += f" ({c.format_impact()})"
+        
+        if machine_id and machine_id != _local_machine_id:
+            local_match = _engine.find_local_equivalent(c.path, c.blob_hash)
+            if local_match:
+                line += f" (probablement `{local_match}` localement)"
+        lines.append(line)
+        
+    # 3. Add bulk with threshold (e.g. > 10 files)
+    THRESHOLD = 10
+    for (action, dirname), filenames in bulk.items():
+        if len(filenames) > THRESHOLD:
+            lines.append(f"  - [{action}] {dirname}/ ({len(filenames)} files)")
+        else:
+            for fname in filenames:
+                path = os.path.join(dirname, fname)
+                lines.append(f"  - [{action}] {path}")
+                
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
-def create_commit(title: str, note: str, consulted_files: list[str] = []) -> str:
+def remember(title: str, note: str, consulted_files: list[str] = []) -> str:
     """Persist a memory checkpoint in AIVC.
 
     Call this tool after EVERY meaningful step: task completion, artefact creation,
     architectural decision, key discovery, or any checkpoint in your work.
     The note should be a rich, detailed Markdown document — your future self will
     read it to recall this moment. All tracked files that have changed since the last
-    commit are automatically associated with this commit.
+    memory are automatically associated with this memory.
 
     Args:
         title: Short, descriptive title (e.g. "Implemented user auth module").
@@ -173,24 +213,16 @@ def create_commit(title: str, note: str, consulted_files: list[str] = []) -> str
                          Files not yet tracked will be auto-tracked if they exist.
 
     Returns:
-        Confirmation with the commit ID and the list of files that were snapshotted.
+        Confirmation with the memory ID and the list of files that were snapshotted.
 
     Raises:
         RuntimeError: If no tracked file has changed and no files were consulted.
     """
     commit = _engine.create_commit(title, note, consulted_files=consulted_files)
-
-    files_summary = (
-        "\n".join(
-            f"  - [{c.action}] {c.path}" + (f" ({c.format_impact()})" if c.action != "consulted" else "")
-            for c in commit.changes
-        )
-        if commit.changes
-        else "  (no tracked files changed)"
-    )
+    files_summary = _format_changes_compressed(commit.changes)
 
     return (
-        f"✅ Commit created successfully.\n"
+        f"✅ Memory created successfully.\n"
         f"ID        : {commit.id}\n"
         f"Timestamp : {commit.timestamp}\n"
         f"Title     : {commit.title}\n"
@@ -199,22 +231,22 @@ def create_commit(title: str, note: str, consulted_files: list[str] = []) -> str
 
 
 @mcp.tool()
-def search_memory(query: str, top_n: int = 5, filter_glob: str = "", only_local: bool = False) -> str:
-    """Search past commit notes by semantic meaning.
+def recall(query: str, top_n: int = 5, filter_glob: str = "", only_local: bool = False) -> str:
+    """Recall past memories by semantic meaning.
 
     Uses a Bi-Encoder + Cross-Encoder pipeline to retrieve the most relevant
-    commits for a natural-language query. Returns only commit metadata (ID,
+    memories for a natural-language query. Returns only memory metadata (ID,
     title, date, score) — never the full note content — to avoid context bloat.
     Also surfaces the files most frequently associated with the top results.
 
-    Call `consult_commit(commit_id)` on a specific result to read its full note.
+    Call `consult_memory(memory_id)` on a specific result to read its full note.
 
     Args:
         query: Free-text search query. Write it as a question or a short description.
         top_n: Number of results to return (default 5, max 20).
-        filter_glob: Optional glob pattern (e.g. "src/*.py") to restrict search to commits
+        filter_glob: Optional glob pattern (e.g. "src/*.py") to restrict search to memories
                      that touched matching files.
-        only_local: If True, only search commits created on this machine.
+        only_local: If True, only search memories created on this machine.
     """
     top_n = min(top_n, 20)
     
@@ -230,7 +262,7 @@ def search_memory(query: str, top_n: int = 5, filter_glob: str = "", only_local:
         results = [r for r in results if getattr(r, 'machine_id', _local_machine_id) == _local_machine_id]
 
     if not results:
-        return warning_header + "No matching commits found in memory."
+        return warning_header + "No matching memories found."
 
     # Build commit list
     commit_lines = []
@@ -271,7 +303,7 @@ def search_memory(query: str, top_n: int = 5, filter_glob: str = "", only_local:
     else:
         output += "\n\n(No file associations found for these commits.)"
 
-    output += "\n\n💡 Use `consult_commit(commit_id)` to read a full note."
+    output += "\n\n💡 Use `consult_memory(memory_id)` to read a full note."
     return output
 
 
@@ -303,23 +335,23 @@ def search_files_bm25(query: str, top_n: int = 5, only_local: bool = True) -> st
 
 
 @mcp.tool()
-def consult_commit(commit_id: str) -> str:
-    """Read the full content of a specific commit.
+def consult_memory(memory_id: str) -> str:
+    """Read the full content of a specific memory.
 
-    Returns the complete Markdown note written when the commit was created,
+    Returns the complete Markdown note written when the memory was created,
     along with a summary of the files that were changed (path, action, size impact).
 
     Args:
-        commit_id: The UUID of the commit to read (obtained from `search_memory`
-                   or `get_recent_commits`).
+        memory_id: The UUID of the memory to read (obtained from `recall`
+                   or `get_recent_memories`).
 
     Returns:
         The full Markdown note and the list of file changes.
 
     Raises:
-        KeyError: If the commit_id does not exist.
+        KeyError: If the memory_id does not exist.
     """
-    commit = _engine.get_commit(commit_id)
+    commit = _engine.get_commit(memory_id)
 
     # Context (Prev/Next)
     prev_str = ""
@@ -332,7 +364,7 @@ def consult_commit(commit_id: str) -> str:
 
     next_str = ""
     try:
-        child = _engine.find_child_commit(commit_id)
+        child = _engine.find_child_commit(memory_id)
         if child:
             next_str = f"⬇️ **Next** : {child.title} (ID: {child.id})\n"
     except Exception:
@@ -342,51 +374,40 @@ def consult_commit(commit_id: str) -> str:
     if prev_str or next_str:
         context_block = f"{prev_str}{next_str}\n"
 
-    changes_summary = []
-    for c in commit.changes:
-        line = f"  - [{c.action}] {c.path}"
-        if c.action != "consulted":
-            line += f" ({c.format_impact()})"
-        
-        # Add local hint for remote commits
-        if commit.machine_id and commit.machine_id != _local_machine_id:
-            local_match = _engine.find_local_equivalent(c.path, c.blob_hash)
-            if local_match:
-                line += f" (probablement `{local_match}` localement)"
-        
-        changes_summary.append(line)
-    
-    changes_summary_str = "\n".join(changes_summary) if changes_summary else "  (no file changes recorded)"
+    changes_summary_str = _format_changes_compressed(commit.changes, commit.machine_id)
 
     machine_line = ""
+    remote_warning = ""
     if commit.machine_id and commit.machine_id != _local_machine_id:
         machine_line = f"**Machine**   : {commit.machine_id} (Distant)\n"
+        remote_warning = "> [!WARNING]\n> This memory was created on a remote machine. Historical file contents may not be available.\n\n"
 
     return (
-        f"# Commit: {commit.title}\n\n"
+        f"# Memory: {commit.title}\n\n"
+        f"{remote_warning}"
         f"**ID**        : {commit.id}\n"
         f"**Timestamp** : {commit.timestamp}\n"
-        f"**Parent**    : {commit.parent_id or 'none (initial commit)'}\n"
+        f"**Parent**    : {commit.parent_id or 'none (initial memory)'}\n"
         f"{machine_line}\n"
         f"{context_block}"
-        f"## Files Changed\n{changes_summary}\n\n"
+        f"## Files Recorded\n{changes_summary_str}\n\n"
         f"## Note\n\n{commit.note}"
     )
 
 
 @mcp.tool()
-def get_recent_commits(limit: int = 10, offset: int = 0, only_local: bool = False) -> str:
-    """Display the recent commit history (like `git log`).
+def get_recent_memories(limit: int = 10, offset: int = 0, only_local: bool = False) -> str:
+    """Display the recent memory history.
 
     Use this tool at the start of a session or when you need to recall what
     was done recently without having a specific search query.
     Results are in reverse chronological order (newest first).
-    Use `offset` and `limit` to paginate (e.g. offset=10 to see commits 11-20).
+    Use `offset` and `limit` to paginate (e.g. offset=10 to see memories 11-20).
 
     Args:
-        limit:  Number of commits to show (default 10, max 50).
-        offset: Number of commits to skip from the most recent (default 0).
-        only_local: If True, only show commits created on this machine.
+        limit:  Number of memories to show (default 10, max 50).
+        offset: Number of memories to skip from the most recent (default 0).
+        only_local: If True, only show memories created on this machine.
     """
     limit = min(limit, 50)
 
@@ -399,9 +420,9 @@ def get_recent_commits(limit: int = 10, offset: int = 0, only_local: bool = Fals
     page = all_recent[offset : offset + limit]
 
     if not page:
-        return "No commits found in this range."
+        return "No memories found in this range."
 
-    lines = [f"Showing commits {offset + 1}–{offset + len(page)} (newest first)\n"]
+    lines = [f"Showing memories {offset + 1}–{offset + len(page)} (newest first)\n"]
     for i, commit in enumerate(page, offset + 1):
         try:
             files = _engine.get_commit_files(commit.id)
@@ -424,7 +445,7 @@ def get_recent_commits(limit: int = 10, offset: int = 0, only_local: bool = Fals
             f"      Files : {files_str}"
         )
 
-    lines.append("\n💡 Use `consult_commit(commit_id)` to read a full commit note.")
+    lines.append("\n💡 Use `consult_memory(memory_id)` to read a full memory note.")
     return "\n".join(lines)
 
 
@@ -472,101 +493,125 @@ def consult_file(file_path: str) -> str:
 
 
 @mcp.tool()
-def read_historical_file(file_path: str, commit_id: str) -> str:
-    """Read the content of a tracked file as it was at a specific past commit.
+def read_historical_file(file_path: str, memory_id: str) -> str:
+    """Read the content of a tracked file as it was at a specific past memory.
 
-    Scans the commit chain backwards from `commit_id` to find the most recent
-    blob for `file_path` at or before that commit.
+    Scans the memory chain backwards from `memory_id` to find the most recent
+    blob for `file_path` at or before that memory.
 
-    If the file content exists only on a remote machine, it will be downloaded
-    automatically if cloud sync is enabled.
+    NOTE: Since Phase 29, file contents (blobs) from other machines are not 
+    synchronized. This tool will error if the file content is only available remotely.
 
     Args:
         file_path: The path of the file to read.
-        commit_id: The UUID of the commit at which to read the file.
+        memory_id: The UUID of the memory at which to read the file.
     """
-    warning_header = ""
     try:
-        raw: bytes = _engine.read_file_at_commit(file_path, commit_id)
-    except FileNotFoundError:
-        # If the file hasn't been found locally, it might be a distant blob.
-        # Find which commit exactly has this blob to know the machine_id.
-        commit = _engine.get_commit(commit_id)
-        target_commit = None
-        target_blob_hash = None
-        
-        # Walk back to find the blob hash
-        cid = commit_id
+        raw: bytes = _engine.read_file_at_commit(file_path, memory_id)
+        return raw.decode("utf-8")
+    except (KeyError, FileNotFoundError):
+        # Find which memory exactly has this blob to provide context
+        target_memory = None
+        cid = memory_id
         while cid:
-            c = _engine.get_commit(cid)
-            for change in c.changes:
-                if change.path == file_path and change.blob_hash:
-                    target_commit = c
-                    target_blob_hash = change.blob_hash
-                    break
-            if target_commit: break
-            cid = c.parent_id
+            try:
+                c = _engine.get_commit(cid)
+                for change in c.changes:
+                    if change.path == file_path and change.blob_hash:
+                        target_memory = c
+                        break
+                if target_memory: break
+                cid = c.parent_id
+            except KeyError:
+                break
             
-        if target_commit and target_commit.machine_id and target_commit.machine_id != _local_machine_id:
-            if not _sync_manager.enabled:
-                raise RuntimeError(
-                    f"File {file_path!r} exists only on remote machine {target_commit.machine_id!r} "
-                    "and cloud sync is disabled."
-                )
-            
-            # Show a warning to the agent
-            warning_header = f"⚠️  [Remote: {target_commit.machine_id}] This file was downloaded from the cloud.\n"
-            
-            # Attempt to fetch
-            _sync_manager.fetch_blob(target_blob_hash, target_commit.machine_id)
-            # Try reading again
-            raw = _engine.read_file_at_commit(file_path, commit_id)
-        else:
-            raise
-
-    return warning_header + raw.decode("utf-8")
+        if target_memory and target_memory.machine_id and target_memory.machine_id != _local_machine_id:
+            return (
+                f"⚠️ ERROR: Content of `{file_path}` is NOT available locally.\n\n"
+                f"This file version was recorded on a remote machine: `{target_memory.machine_id}`.\n"
+                "AIVC Phase 29+ does not synchronize file contents (blobs) across machines for security and performance.\n"
+                "Please synchronize your files manually (e.g., via `git pull`) to access this content."
+            )
+        
+        return f"⚠️ ERROR: File `{file_path}` or its content at memory `{memory_id}` could not be found locally."
 
 
 @mcp.tool()
-def get_status() -> str:
-    """List all files currently tracked by AIVC with their storage usage.
+def get_status(path: str = "") -> str:
+    """List tracked files with storage usage in a navigable folder tree.
 
-    Shows the current on-disk size of each tracked file and the total size
-    of its historical blobs in AIVC storage. Use this to understand which
-    files are consuming the most history space.
+    Displays a tree of depth 1 starting from the given path (or root if empty).
+    Shows the number of files and total size for each subfolder.
 
-    Returns:
-        A formatted table of tracked files with size information.
+    Args:
+        path: Optional subdirectory path to explore (e.g. "src/").
     """
     statuses = _engine.get_status()
-
     if not statuses:
         return "No files are currently tracked by AIVC."
 
-    header = f"{'File Path':<60} {'Current':>10} {'History':>10}"
-    separator = "-" * len(header)
-    rows = [header, separator]
-
-    MAX_DISPLAY = 100
-    display_statuses = statuses[:MAX_DISPLAY]
+    # Filter by path and build tree
+    root_path = Path(path).resolve() if path else None
     
-    for s in display_statuses:
-        current = _format_bytes(s.current_size) if s.current_size is not None else "missing"
-        history = _format_bytes(s.history_size)
-        rows.append(f"{s.path:<60} {current:>10} {history:>10}")
+    # {name: {"files": int, "size": int, "is_dir": bool}}
+    tree: dict[str, dict] = {}
+    total_files = 0
+    total_size = 0
 
-    if len(statuses) > MAX_DISPLAY:
-        hidden = len(statuses) - MAX_DISPLAY
-        rows.append(f"... and {hidden} more files not shown (output truncated to {MAX_DISPLAY} files) ...")
+    for s in statuses:
+        p = Path(s.path).resolve()
+        
+        # Check if file is within the requested path
+        try:
+            if root_path:
+                rel = p.relative_to(root_path)
+            else:
+                # We need a base for "root". We'll use the common root if possible, 
+                # or just the absolute paths.
+                rel = p # Keep absolute if no path requested
+        except ValueError:
+            continue # Not in this subtree
 
-    rows.append(separator)
-    rows.append(f"Total tracked: {len(statuses)} file(s)")
+        total_files += 1
+        size = s.current_size or 0
+        total_size += size
+
+        # Determine the first component after root_path
+        parts = rel.parts
+        if not parts: continue # The root itself
+        
+        name = parts[0]
+        is_dir = len(parts) > 1 or Path(s.path).is_dir() # Heuristic for dir
+        
+        if name not in tree:
+            tree[name] = {"files": 0, "size": 0, "is_dir": is_dir}
+        
+        tree[name]["files"] += 1
+        tree[name]["size"] += size
+
+    if not tree and path:
+        return f"No tracked files found under path: `{path}`"
+
+    # Sort: directories first, then files
+    sorted_items = sorted(tree.items(), key=lambda x: (not x[1]["is_dir"], x[0].lower()))
+
+    lines = []
+    header_path = path if path else "Root"
+    lines.append(f"📁 {header_path} ({total_files} tracked files, {_format_bytes(total_size)})")
+    lines.append("-" * 60)
+
+    for name, info in sorted_items:
+        prefix = "├── " if name != sorted_items[-1][0] else "└── "
+        if info["is_dir"]:
+            lines.append(f"{prefix}{name}/ ({info['files']} files, {_format_bytes(info['size'])})")
+        else:
+            lines.append(f"{prefix}{name} ({_format_bytes(info['size'])})")
+
+    lines.append("-" * 60)
+    lines.append("\n💡 TIP: Use `get_status(path='dir/name')` to explore subdirectories.")
+    lines.append("💡 NOTE: Hidden files/folders (starting with '.') are NEVER tracked automatically.")
     
-    # Admonition for the LLM
-    rows.append("\n💡 NOTE: Hidden files/folders (starting with '.') are NEVER tracked automatically.")
-    rows.append("💡 PRO-TIP: If you see useless files (build artifacts, temp files), use `untrack(path)` IMMEDIATELY to keep memory clean.")
-    
-    return "\n".join(rows)
+    return "\n".join(lines)
 
 
 @mcp.tool()

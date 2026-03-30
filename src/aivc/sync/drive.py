@@ -29,6 +29,8 @@ class NativeDriveSyncManager:
         self.storage_root = storage_root
         self.config = get_aivc_config().get("sync", {})
         self.enabled = self.config.get("enabled", False)
+        # Blob sync is disabled by default in Phase 29+ to avoid security/storage leaks
+        self.sync_blobs = self.config.get("sync_blobs", False)
         self.machine_id = get_machine_id()
 
         # Lazy Google Drive service
@@ -194,16 +196,12 @@ class NativeDriveSyncManager:
         self._upload_file(local_path, folder_id)
 
     def push_blob(self, blob_hash: str) -> None:
-        """Push a local blob to the global blob pool on Drive."""
-        if not self.enabled or not self.config.get("sync_blobs", True):
-            return
-
-        local_path = self.storage_root / "blobs" / blob_hash
-        if not local_path.exists():
-            return
-
-        folder_id = self._get_blobs_folder_id()
-        self._upload_file(local_path, folder_id, filename=blob_hash, skip_if_exists=True)
+        """Push a local blob to the global blob pool on Drive.
+        
+        DEPRECATED: Phase 29+ disables blob pushing to save Drive space 
+        and prevent machine-unauthorized data leaks.
+        """
+        return
 
     def push_missing(self) -> dict:
         """Finds all local commits and pushes those missing from Google Drive.
@@ -238,15 +236,8 @@ class NativeDriveSyncManager:
         for commit_file in missing_commits:
             commit_id = commit_file.replace(".json", "")
             
-            # Read local commit to find blobs and push them first
-            try:
-                content = json.loads((local_commits_dir / commit_file).read_text(encoding="utf-8"))
-                for change in content.get("changes", []):
-                    if change.get("blob_hash"):
-                        self.push_blob(change["blob_hash"])
-                        blobs_pushed += 1
-            except Exception:
-                pass
+            # Blobs are no longer pushed as of Phase 29.
+            # We ONLY push the commit JSON (memory metadata).
                 
             self.push_commit(commit_id)
             commits_pushed += 1
@@ -300,25 +291,17 @@ class NativeDriveSyncManager:
                 self._download_file(remote_file["id"], local_commits_dir / remote_file["name"])
 
     def fetch_blob(self, blob_hash: str, machine_id: str | None = None) -> None:
-        """Fetch a missing blob from the global pool on Drive."""
-        if not self.enabled:
-            raise RuntimeError("Cloud sync is disabled. Cannot fetch distant blob.")
-
-        service = self._get_service()
-        blobs_folder_id = self._get_blobs_folder_id()
-
-        query = f"name = '{blob_hash}' and '{blobs_folder_id}' in parents and trashed = false"
-        results = service.files().list(q=query, spaces="drive", fields="files(id)").execute()
-        files = results.get("files", [])
-
-        local_dir = self.storage_root / "blobs"
-        local_dir.mkdir(parents=True, exist_ok=True)
-        local_path = local_dir / blob_hash
-
-        if files:
-            self._download_file(files[0]["id"], local_path)
-        else:
-            raise FileNotFoundError(f"Blob {blob_hash} not found in global pool on Google Drive.")
+        """Fetch a missing blob from the global pool on Drive.
+        
+        DEPRECATED: Phase 29+ disables blob fetching. 
+        Files from other machines must be transferred manually (e.g. via git pull).
+        """
+        raise FileNotFoundError(
+            f"Blob {blob_hash} is not available locally. "
+            "Cloud blob syncing was disabled in Phase 29 for security and performance. "
+            "Please ensure you have synchronized your local files (e.g. git pull) "
+            "to access the content of this historical memory."
+        )
 
     def list_remote_machines(self) -> list[str]:
         """List machine IDs found on the remote Drive."""

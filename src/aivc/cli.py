@@ -87,7 +87,7 @@ def cmd_log(args: argparse.Namespace) -> None:
     commits = engine.get_log(limit=args.limit)
     
     if not commits:
-        print("No commits found in memory.")
+        print("No memories found in history.")
         return
 
     from aivc.config import get_machine_id
@@ -100,7 +100,7 @@ def cmd_log(args: argparse.Namespace) -> None:
         m_id = c.machine_id or "unknown"
         machine_tag = f" {MAGENTA}[{m_id}]{RESET}" if m_id != local_id else ""
 
-        print(f"{YELLOW}commit {c.id}{machine_tag}{RESET}")
+        print(f"{YELLOW}memory {c.id}{machine_tag}{RESET}")
         print(f"{DIM}Date:{RESET}    {c.timestamp}")
         print(f"{DIM}Files:{RESET}   {files_str}")
         print(f"\n    {BOLD}{c.title}{RESET}\n")
@@ -109,9 +109,9 @@ def cmd_log(args: argparse.Namespace) -> None:
 def cmd_search(args: argparse.Namespace) -> None:
     engine = _get_engine()
     if args.glob:
-        print(f"{DIM}Searching memory for: '{args.query}' (filter: '{args.glob}')...{RESET}\n")
+        print(f"{DIM}Recalling memories for: '{args.query}' (filter: '{args.glob}')...{RESET}\n")
     else:
-        print(f"{DIM}Searching memory for: '{args.query}'...{RESET}\n")
+        print(f"{DIM}Recalling memories for: '{args.query}'...{RESET}\n")
 
     # Ensure ML models are loaded and orphaned commits are reindexed
     import sys
@@ -321,7 +321,8 @@ Follow these steps (takes ~2 minutes):
     print(f"  Token saved to: {token_path}")
     print(f"  Config saved to: ~/.aivc/config.json")
     print(f"\n{YELLOW}Cloud sync is now ENABLED.{RESET}")
-    print(f"AIVC will automatically sync commits and blobs to your Google Drive.")
+    print(f"AIVC will automatically sync memory metadata (notes) to your Google Drive.")
+    print(f"{DIM}Note: File contents (blobs) are not synchronized as of Phase 29.{RESET}")
 
 
 def cmd_sync_push(args: argparse.Namespace) -> None:
@@ -340,7 +341,7 @@ def cmd_sync_push(args: argparse.Namespace) -> None:
         return
 
     print(f"{CYAN}{BOLD}AIVC Force Sync Push{RESET}")
-    print(f"{DIM}Analyzing local commits and comparing with Google Drive...{RESET}")
+    print(f"{DIM}Analyzing local memories and comparing with Google Drive...{RESET}")
     
     try:
         from aivc.sync.drive import NativeDriveSyncManager
@@ -351,11 +352,10 @@ def cmd_sync_push(args: argparse.Namespace) -> None:
         blobs = result["blobs_attempted"]
         
         if commits == 0:
-            print(f"\n{GREEN}✓ Everything is up-to-date! No missing local commits found.{RESET}")
+            print(f"\n{GREEN}✓ Everything is up-to-date! No missing local memories found.{RESET}")
         else:
             print(f"\n{GREEN}✓ Sync Push complete!{RESET}")
-            print(f"  Pushed {commits} missing commit(s).")
-            print(f"  Checked/Transferred {blobs} associated blob(s).")
+            print(f"  Pushed {commits} missing memory/ies.")
             
     except Exception as e:
         print(f"{RED}Error during sync push: {e}{RESET}")
@@ -395,7 +395,7 @@ def main() -> None:
     # status
     subparsers.add_parser(
         "status", 
-        help="List all tracked files with storage usage"
+        help="List tracked files with a navigable folder tree"
     )
 
     # migrate
@@ -418,20 +418,22 @@ def main() -> None:
         help="Optional glob patterns to ignore (only when tracking a directory)"
     )
 
-    # log
+    # memories (log)
     parser_log = subparsers.add_parser(
-        "log", 
-        help="Show recent commit history"
+        "memories", 
+        aliases=["log"],
+        help="Show recent memory history"
     )
     parser_log.add_argument(
         "-n", "--limit", type=int, default=10, 
-        help="Number of commits to show (default: 10)"
+        help="Number of memories to show (default: 10)"
     )
 
-    # search
+    # recall (search)
     parser_search = subparsers.add_parser(
-        "search", 
-        help="Semantic search over past commits"
+        "recall", 
+        aliases=["search"],
+        help="Semantic search over past memories"
     )
     parser_search.add_argument(
         "query", type=str, 
@@ -443,7 +445,7 @@ def main() -> None:
     )
     parser_search.add_argument(
         "-g", "--glob", type=str, default="", 
-        help="Optional glob pattern to restrict search to matching files"
+        help="Optional glob pattern to restrict recall to matching files"
     )
 
     # search-files (BM25)
@@ -486,7 +488,7 @@ def main() -> None:
     sync_sub = parser_sync.add_subparsers(dest="sync_command", required=True)
     sync_sub.add_parser("setup", help="Interactive Google Drive sync setup")
     sync_sub.add_parser("status", help="Check cloud sync status")
-    sync_sub.add_parser("push", help="Force push all missing local commits to Drive")
+    sync_sub.add_parser("push", help="Force push all missing local memories to Drive")
 
     args = parser.parse_args()
 
@@ -496,9 +498,9 @@ def main() -> None:
         cmd_migrate(args)
     elif args.command == "track":
         cmd_track(args)
-    elif args.command == "log":
+    elif args.command in ("memories", "log"):
         cmd_log(args)
-    elif args.command == "search":
+    elif args.command in ("recall", "search"):
         cmd_search(args)
     elif args.command == "search-files":
         cmd_search_files(args)
