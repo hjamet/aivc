@@ -343,7 +343,8 @@ class SemanticEngine:
         from rank_bm25 import BM25Okapi
         
         # 1. Get tokenized corpus from cache (handles I/O + regex caching)
-        corpus, valid_paths = self._bm25_cache.get_corpus(tracked_paths)
+        metadata = self._workspace.get_tracked_files_metadata()
+        corpus, valid_paths = self._bm25_cache.get_corpus(tracked_paths, metadata=metadata)
 
         if not corpus:
             return []
@@ -450,6 +451,14 @@ class SemanticEngine:
     def get_watched_dirs(self) -> dict[str, dict[str, Any]]:
         """Return exactly the watched directories state from workspace."""
         return self._workspace.get_watched_dirs()
+
+    def get_tracked_files_metadata(self) -> dict[str, dict]:
+        """Return the current metadata (mtime, size) for all tracked files from state."""
+        return self._workspace.get_tracked_files_metadata()
+
+    def get_tracked_paths(self) -> list[str]:
+        """Return exactly the tracked paths from workspace (fast, no disk I/O)."""
+        return self._workspace.get_tracked_paths()
 
     def untrack(self, path_or_glob: str) -> None:
         """Remove a file/dir from tracking. See :meth:`Workspace.untrack`."""

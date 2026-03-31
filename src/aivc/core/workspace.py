@@ -442,6 +442,14 @@ class Workspace:
         self._save_state()
         return memory
 
+    def get_tracked_files_metadata(self) -> dict[str, dict]:
+        """Return the current metadata (mtime, size) for all tracked files from state.
+        
+        This avoids expensive live disk stats on every call.
+        """
+        self._reload_state_if_needed()
+        return self._state.get("tracked_files", {})
+
     def get_status(self) -> list[FileStatus]:
         """Return the status of all tracked files.
 

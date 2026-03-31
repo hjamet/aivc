@@ -40,17 +40,26 @@ class BM25Cache:
         """Simple regex-based tokenization (lowercase, words)."""
         return re.findall(r'\w+', text.lower())
 
-    def get_corpus(self, tracked_paths: List[str]) -> Tuple[List[List[str]], List[str]]:
+    def get_corpus(
+        self, 
+        tracked_paths: List[str], 
+        metadata: Dict[str, Dict[str, Any]] | None = None
+    ) -> Tuple[List[List[str]], List[str]]:
         """Retrieve or compute tokens for the given tracked files.
         
         Args:
-            tracked_paths: List of relative paths to tracked files.
+            tracked_paths: List of absolute paths to tracked files.
+            metadata: Optional dict of {path: {"mtime": float, "size": int}} 
+                      from workspace state. If provided, skips disk stat syscalls.
             
         Returns:
             A tuple (list of token lists, list of available paths).
         """
         corpus = []
         valid_paths = []
+        
+        # Use provided metadata to avoid 1000s of disk stats (especially on WSL)
+        direct_metadata = metadata if metadata is not None else {}
         
         with sqlite3.connect(self._db_path) as conn:
             # Load existing cache in one go
@@ -59,28 +68,36 @@ class BM25Cache:
             
             new_cache_entries = []
             
-            for rel_path in tracked_paths:
-                p = Path(rel_path)
-                if not (p.exists() and p.is_file()):
-                    continue
+            for abs_path in tracked_paths:
+                p = Path(abs_path)
                 
                 try:
-                    stat = p.stat()
-                    mtime = stat.st_mtime
-                    size = stat.st_size
+                    # Get stats from memory/AIVC state if available, else hit disk ONCE
+                    meta = direct_metadata.get(abs_path)
+                    if meta:
+                        mtime = meta.get("mtime", 0.0)
+                        size = meta.get("size", 0)
+                    else:
+                        # Fallback for untracked files or manual calls
+                        if not (p.exists() and p.is_file()):
+                            continue
+                        stat = p.stat()
+                        mtime = stat.st_mtime
+                        size = stat.st_size
                     
-                    cached = cache.get(rel_path)
+                    cached = cache.get(abs_path)
                     if cached and cached[0] == mtime and cached[1] == size:
                         # Cache hit
                         tokens = json.loads(cached[2])
                     else:
                         # Cache miss (file changed or not in cache)
+                        # We still need one disk read here to get new content
                         content = p.read_text(encoding="utf-8", errors="ignore")
                         tokens = self.tokenize(content)
-                        new_cache_entries.append((rel_path, mtime, size, json.dumps(tokens)))
+                        new_cache_entries.append((abs_path, mtime, size, json.dumps(tokens)))
                     
                     corpus.append(tokens)
-                    valid_paths.append(rel_path)
+                    valid_paths.append(abs_path)
                 except Exception:
                     continue
 

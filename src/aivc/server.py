@@ -558,43 +558,56 @@ def get_status(path: str = "") -> str:
     Args:
         path: Optional subdirectory path to explore (e.g. "src/").
     """
-    # Use get_tracked_paths (fast, no SQLite/stat) instead of get_status
+    # Use get_tracked_paths (fast) + metadata (fast, from memory)
     tracked_paths = _get_engine().get_tracked_paths()
+    metadata = _get_engine().get_tracked_files_metadata()
+    
     if not tracked_paths:
         return "No files are currently tracked by AIVC."
 
-    # Resolve the filter path ONCE (not per file)
-    root_path = str(Path(path).resolve()) + os.sep if path else None
-    
+    # Determine virtual root for display
+    if path:
+        root_path = str(Path(path).resolve())
+    else:
+        # Find common root to avoid showing /home/lopilo/... hierarchy
+        try:
+            root_path = os.path.commonpath(tracked_paths)
+        except ValueError:
+            root_path = ""
+
     # {name: {"files": int, "size": int, "is_dir": bool}}
     tree: dict[str, dict] = {}
     total_files = 0
     total_size = 0
 
     for abs_path in tracked_paths:
-        # Paths are already absolute since Phase 6 — no resolve() needed
-        if root_path:
-            if not abs_path.startswith(root_path):
-                continue
-            rel = abs_path[len(root_path):]
-        else:
-            rel = abs_path
+        if root_path and not abs_path.startswith(root_path):
+            continue
 
         total_files += 1
-        # Size is not critical for tree display — skip expensive lookup
-        size = 0
+        # Retrieve size from in-memory metadata (zero O/S overhead)
+        file_meta = metadata.get(abs_path, {})
+        raw_size = file_meta.get("size", 0) if isinstance(file_meta, dict) else 0
+        size = int(raw_size) if raw_size is not None else 0
+        total_size += size
 
-        # Determine the first component after root_path
-        sep_index = rel.find(os.sep)
-        if sep_index == -1:
-            name = rel
-            is_dir = False
-        else:
-            name = rel[:sep_index]
-            is_dir = True
-        
-        if not name:
+        # Relative path from our virtual root
+        try:
+            rel_to_root = os.path.relpath(abs_path, root_path) if root_path else abs_path
+        except ValueError:
+            rel_to_root = abs_path
+            
+        if rel_to_root == ".":
             continue
+
+        # Determine the first component
+        parts = rel_to_root.split(os.sep)
+        if not parts or not parts[0]:
+            continue
+        
+        name = parts[0]
+        # It's a directory if it has more components
+        is_dir = len(parts) > 1
         
         if name not in tree:
             tree[name] = {"files": 0, "size": 0, "is_dir": is_dir}
