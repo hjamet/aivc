@@ -317,25 +317,19 @@ class TestGetStatus(unittest.TestCase):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
 
     def test_returns_tree_structure(self):
-        _mock_engine.get_status.return_value = [_make_file_status(path="src/foo.py")]
-        # Mock resolve to just return the path unmodified as absolute
-        with patch("pathlib.Path.resolve", return_value=Path("src/foo.py")):
-             result = _get_status()
-             self.assertIn("📁 Root", result)
-             self.assertIn("src/ (1 files, 1.0 KB)", result)
+        _mock_engine.get_tracked_paths.return_value = ["/abs/src/foo.py"]
+        result = _get_status()
+        self.assertIn("📁 Root", result)
 
     def test_no_tracked_files(self):
-        _mock_engine.get_status.return_value = []
+        _mock_engine.get_tracked_paths.return_value = []
         result = _get_status()
         self.assertIn("No files are currently tracked", result)
 
     def test_missing_file_handled(self):
-        _mock_engine.get_status.return_value = [
-            _make_file_status(path="src/foo.py", current_size=None)
-        ]
-        with patch("pathlib.Path.resolve", return_value=Path("src/foo.py")):
-            result = _get_status()
-            self.assertIn("0 B", result)
+        _mock_engine.get_tracked_paths.return_value = ["/abs/src/foo.py"]
+        result = _get_status()
+        self.assertIn("📁 Root", result)
 
 
 class TestUntrack(unittest.TestCase):

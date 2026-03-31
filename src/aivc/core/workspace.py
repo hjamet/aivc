@@ -458,9 +458,13 @@ class Workspace:
         for abs_path in self._state["tracked_files"]:
             p = Path(abs_path)
             
-            # WSL Performance: Avoid 3800 live os.stat calls across mount
-            tracker_data = self._state["tracked_files"][abs_path]
-            current_size = tracker_data.get("size")
+            # Current size: check disk for correctness (deleted file detection)
+            current_size = None
+            if p.exists() and p.is_file():
+                try:
+                    current_size = p.stat().st_size
+                except (PermissionError, OSError):
+                    current_size = None
 
             # History size: use bulk index map
             history_size = 0

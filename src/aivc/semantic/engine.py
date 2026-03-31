@@ -348,14 +348,22 @@ class SemanticEngine:
         if not corpus:
             return []
 
-        # 2. Memory-based BM25 score calculation
-        bm25 = BM25Okapi(corpus)
+        # 2. Cached BM25 index — only rebuild when corpus changes
+        paths_fingerprint = hash(tuple(valid_paths))
+        if (
+            not hasattr(self, '_bm25_index')
+            or self._bm25_fingerprint != paths_fingerprint
+        ):
+            self._bm25_index = BM25Okapi(corpus)
+            self._bm25_valid_paths = valid_paths
+            self._bm25_fingerprint = paths_fingerprint
+
         tokenized_query = self._bm25_cache.tokenize(query)
-        scores = bm25.get_scores(tokenized_query)
+        scores = self._bm25_index.get_scores(tokenized_query)
         
         # 3. Identify top N candidates based on score
         candidates = []
-        for path, score in zip(valid_paths, scores):
+        for path, score in zip(self._bm25_valid_paths, scores):
             if score > 0:
                 candidates.append((path, float(score)))
 

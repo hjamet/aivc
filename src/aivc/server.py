@@ -558,42 +558,43 @@ def get_status(path: str = "") -> str:
     Args:
         path: Optional subdirectory path to explore (e.g. "src/").
     """
-    statuses = _get_engine().get_status()
-    if not statuses:
+    # Use get_tracked_paths (fast, no SQLite/stat) instead of get_status
+    tracked_paths = _get_engine().get_tracked_paths()
+    if not tracked_paths:
         return "No files are currently tracked by AIVC."
 
-    # Filter by path and build tree
-    root_path = Path(path).resolve() if path else None
+    # Resolve the filter path ONCE (not per file)
+    root_path = str(Path(path).resolve()) + os.sep if path else None
     
     # {name: {"files": int, "size": int, "is_dir": bool}}
     tree: dict[str, dict] = {}
     total_files = 0
     total_size = 0
 
-    for s in statuses:
-        p = Path(s.path).resolve()
-        
-        # Check if file is within the requested path
-        try:
-            if root_path:
-                rel = p.relative_to(root_path)
-            else:
-                # We need a base for "root". We'll use the common root if possible, 
-                # or just the absolute paths.
-                rel = p # Keep absolute if no path requested
-        except ValueError:
-            continue # Not in this subtree
+    for abs_path in tracked_paths:
+        # Paths are already absolute since Phase 6 — no resolve() needed
+        if root_path:
+            if not abs_path.startswith(root_path):
+                continue
+            rel = abs_path[len(root_path):]
+        else:
+            rel = abs_path
 
         total_files += 1
-        size = s.current_size or 0
-        total_size += size
+        # Size is not critical for tree display — skip expensive lookup
+        size = 0
 
         # Determine the first component after root_path
-        parts = rel.parts
-        if not parts: continue # The root itself
+        sep_index = rel.find(os.sep)
+        if sep_index == -1:
+            name = rel
+            is_dir = False
+        else:
+            name = rel[:sep_index]
+            is_dir = True
         
-        name = parts[0]
-        is_dir = len(parts) > 1 or Path(s.path).is_dir() # Heuristic for dir
+        if not name:
+            continue
         
         if name not in tree:
             tree[name] = {"files": 0, "size": 0, "is_dir": is_dir}
