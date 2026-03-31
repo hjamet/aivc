@@ -96,6 +96,18 @@ class CoreIndex:
         ).fetchall()
         return {r[0] for r in rows}
 
+    def get_all_blob_hashes_by_file(self) -> dict[str, set[str]]:
+        """Return a mapping of file_path -> set(blob_hashes) for all files."""
+        rows = self._execute(
+            "SELECT path, blob_hash FROM file_changes WHERE blob_hash IS NOT NULL"
+        ).fetchall()
+        result = {}
+        for path, hash_ in rows:
+            if path not in result:
+                result[path] = set()
+            result[path].add(hash_)
+        return result
+
     def find_child(self, memory_id: str) -> tuple[str, str] | None:
         """Find the child memory ID and title for a given parent ID."""
         row = self._execute(

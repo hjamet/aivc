@@ -450,26 +450,29 @@ class Workspace:
         """
         self._reload_state_if_needed()
         statuses = []
+        
+        # O(1) bulk fetch of all historical blob hashes by file path (SQLite)
+        all_hashes = self._index.get_all_blob_hashes_by_file()
+        blob_size_cache = {}
+        
         for abs_path in self._state["tracked_files"]:
             p = Path(abs_path)
             
-            # Current size must reflect reality on disk
-            current_size = None
-            if p.exists() and p.is_file():
-                try:
-                    current_size = p.stat().st_size
-                except (PermissionError, OSError):
-                    current_size = None
+            # WSL Performance: Avoid 3800 live os.stat calls across mount
+            tracker_data = self._state["tracked_files"][abs_path]
+            current_size = tracker_data.get("size")
 
-            # History size: use index to find all blobs ever associated with this file
+            # History size: use bulk index map
             history_size = 0
-            hashes = self._index.get_blob_hashes_for_file(abs_path)
+            hashes = all_hashes.get(abs_path, set())
             for h in hashes:
-                try:
-                    history_size += self._blob_store.get_size(h)
-                except KeyError:
-                    # Blob is missing locally (likely due to metadata-only sync)
-                    pass
+                if h not in blob_size_cache:
+                    try:
+                        blob_size_cache[h] = self._blob_store.get_size(h)
+                    except KeyError:
+                        # Blob is missing locally (likely due to metadata-only sync)
+                        blob_size_cache[h] = 0
+                history_size += blob_size_cache[h]
 
             statuses.append(
                 FileStatus(

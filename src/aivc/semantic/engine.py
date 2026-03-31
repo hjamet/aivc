@@ -336,14 +336,13 @@ class SemanticEngine:
         Returns:
             A list of dicts: {"path": str, "score": float, "snippet": str}.
         """
-        tracked_files = self.get_status()
-        if not tracked_files:
+        tracked_paths = self._workspace.get_tracked_paths()
+        if not tracked_paths:
             return []
 
         from rank_bm25 import BM25Okapi
         
         # 1. Get tokenized corpus from cache (handles I/O + regex caching)
-        tracked_paths = [s.path for s in tracked_files]
         corpus, valid_paths = self._bm25_cache.get_corpus(tracked_paths)
 
         if not corpus:

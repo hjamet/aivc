@@ -41,9 +41,11 @@ venv.bak/
 .pytest_cache/
 
 # AIVC Data (Storage local pour le debug)
+.aivc_storage/
 .aivc_data/
 storage/
 blobs/
 commits/
 workspace.json
 refcounts.json
+*.db
