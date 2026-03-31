@@ -117,15 +117,23 @@ from aivc.semantic.engine import SemanticEngine  # noqa: E402
 from aivc.sync.drive import NativeDriveSyncManager
 from aivc.sync.background import BackgroundSyncer
 from aivc.config import get_machine_id
+import threading
 
-_engine = None
-_local_machine_id = None
+_engine: SemanticEngine | None = None
+_local_machine_id: str | None = None
+_lock = threading.Lock()
 
 def _get_engine() -> SemanticEngine:
+    """Lazy-load the SemanticEngine on the first tool call.
+    This prevents heavy ML dependencies from being loaded at import time,
+    which is crucial for fast CLI feedback and test suite stability.
+    """
     global _engine, _local_machine_id
     if _engine is None:
-        _engine = SemanticEngine(_storage_root)
-        _local_machine_id = get_machine_id()
+        with _lock:
+            if _engine is None:
+                _engine = SemanticEngine(_storage_root)
+                _local_machine_id = get_machine_id()
     return _engine
 
 # ---------------------------------------------------------------------------

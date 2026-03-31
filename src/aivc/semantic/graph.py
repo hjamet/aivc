@@ -62,7 +62,7 @@ class CooccurrenceGraph:
         """
         storage_root.mkdir(parents=True, exist_ok=True)
         self._db_path = storage_root / _DB_FILE
-        self._conn = sqlite3.connect(str(self._db_path))
+        self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL;")
         self._conn.execute("PRAGMA foreign_keys=ON;")
         self._conn.executescript(_SCHEMA)

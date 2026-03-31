@@ -465,7 +465,11 @@ class Workspace:
             history_size = 0
             hashes = self._index.get_blob_hashes_for_file(abs_path)
             for h in hashes:
-                history_size += self._blob_store.get_size(h)
+                try:
+                    history_size += self._blob_store.get_size(h)
+                except KeyError:
+                    # Blob is missing locally (likely due to metadata-only sync)
+                    pass
 
             statuses.append(
                 FileStatus(
