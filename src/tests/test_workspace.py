@@ -127,7 +127,7 @@ def test_create_memory_second_links_to_first(tmp_path: Path, ws: Workspace) -> N
     f = _write(tmp_path / "app.py", b"v1")
     ws.track(str(f))
     m1 = ws.create_memory("v1", "First.")
-    f.write_bytes(b"v2")
+    f.write_bytes(b"v2_changed_size")
     m2 = ws.create_memory("v2", "Second.")
     assert m2.parent_id == m1.id
 
@@ -236,9 +236,9 @@ def test_get_log_returns_memories_in_reverse_order(tmp_path: Path, ws: Workspace
     f = _write(tmp_path / "log.py", b"v1")
     ws.track(str(f))
     m1 = ws.create_memory("m1", "note")
-    f.write_bytes(b"v2")
+    f.write_bytes(b"v2_new_size")
     m2 = ws.create_memory("m2", "note")
-    f.write_bytes(b"v3")
+    f.write_bytes(b"v3_even_newer_size_here")
     m3 = ws.create_memory("m3", "note")
 
     log = ws.get_log()

@@ -127,7 +127,7 @@
             border-color: var(--accent);
         }
 
-        /* Sidebar: Commits */
+        /* Sidebar: Memorys */
         .sidebar {
             position: absolute;
             top: 24px;
@@ -164,8 +164,8 @@
             padding: 20px;
         }
 
-        /* Commit Card */
-        .commit-card {
+        /* Memory Card */
+        .memory-card {
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid var(--border-color);
             border-radius: 8px;
@@ -175,19 +175,19 @@
             cursor: pointer;
         }
 
-        .commit-card:hover {
+        .memory-card:hover {
             transform: translateY(-2px);
             border-color: var(--accent);
         }
 
-        .commit-title {
+        .memory-title {
             font-size: 15px;
             font-weight: 600;
             color: var(--accent);
             margin: 0 0 8px 0;
         }
 
-        .commit-meta {
+        .memory-meta {
             font-size: 12px;
             color: var(--text-muted);
             margin-bottom: 10px;
@@ -195,7 +195,7 @@
             justify-content: space-between;
         }
 
-        .commit-snippet {
+        .memory-snippet {
             font-size: 13px;
             line-height: 1.5;
             color: var(--text-main);
@@ -203,7 +203,7 @@
             opacity: 0.9;
         }
 
-        .commit-files {
+        .memory-files {
             font-size: 11px;
             color: #d2a8ff;
             background: rgba(210, 168, 255, 0.1);
@@ -214,8 +214,8 @@
             margin-top: 4px;
         }
 
-        /* Commit Detail View */
-        .commit-detail-back {
+        /* Memory Detail View */
+        .memory-detail-back {
             background: transparent;
             border: none;
             color: var(--accent);
@@ -228,9 +228,9 @@
             align-items: center;
             gap: 6px;
         }
-        .commit-detail-back:hover { color: var(--highlight); }
+        .memory-detail-back:hover { color: var(--highlight); }
 
-        .commit-detail-note {
+        .memory-detail-note {
             font-size: 13px;
             line-height: 1.7;
             color: var(--text-main);
@@ -245,13 +245,13 @@
             overflow-y: auto;
         }
 
-        .commit-detail-change {
+        .memory-detail-change {
             font-size: 12px;
             color: var(--text-muted);
             padding: 4px 0;
             border-bottom: 1px solid rgba(48,54,61,0.3);
         }
-        .commit-detail-change:last-child { border-bottom: none; }
+        .memory-detail-change:last-child { border-bottom: none; }
 
         /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
@@ -344,7 +344,7 @@
             const elements = [];
             
             // Nodes — smaller sizes to avoid overlap
-            const maxCommitCnt = Math.max(...graphData.nodes.map(n => n.commit_count), 1);
+            const maxMemoryCnt = Math.max(...graphData.nodes.map(n => n.memory_count), 1);
             graphData.nodes.forEach(n => {
                 elements.push({
                     data: {
@@ -352,7 +352,7 @@
                         label: n.label,
                         dir: n.directory,
                         // Base size 10, max +20 logarithmic
-                        size: 10 + (Math.log1p(n.commit_count) / Math.log1p(maxCommitCnt)) * 20,
+                        size: 10 + (Math.log1p(n.memory_count) / Math.log1p(maxMemoryCnt)) * 20,
                         color: hashColor(n.directory)
                     }
                 });
@@ -557,19 +557,19 @@ async function loadGitLog(append = false) {
 
     try {
         const res = await fetch(`/api/log?offset=${gitLogOffset}&limit=${gitLogLimit}`);
-        const commits = await res.json();
+        const memorys = await res.json();
         
-        if (commits.length < gitLogLimit) hasMoreLog = false;
-        gitLogOffset += commits.length;
+        if (memorys.length < gitLogLimit) hasMoreLog = false;
+        gitLogOffset += memorys.length;
 
-        const html = commits.map(c => `
-            <div class="commit-card" data-commit-id='${c.id}'>
-                <h3 class="commit-title">${c.title}</h3>
-                <div class="commit-meta">
+        const html = memorys.map(c => `
+            <div class="memory-card" data-memory-id='${c.id}'>
+                <h3 class="memory-title">${c.title}</h3>
+                <div class="memory-meta">
                     <span>${c.timestamp.substring(0,10)}</span>
                     <span style="font-family: monospace;">${c.id.substring(0,8)}</span>
                 </div>
-                <div class="commit-files">${c.file_count} file(s) modified</div>
+                <div class="memory-files">${c.file_count} file(s) modified</div>
             </div>
         `).join('');
 
@@ -581,11 +581,11 @@ async function loadGitLog(append = false) {
         }
 
         // Bind clicks
-        document.querySelectorAll('.commit-card:not(.bound)').forEach(card => {
+        document.querySelectorAll('.memory-card:not(.bound)').forEach(card => {
             card.classList.add('bound');
             card.addEventListener('click', async () => {
-                const commitId = card.getAttribute('data-commit-id');
-                await showCommitDetail(commitId);
+                const memoryId = card.getAttribute('data-memory-id');
+                await showMemoryDetail(memoryId);
             });
         });
 
@@ -615,14 +615,14 @@ async function showFileHistory(nodeId) {
         resultsTitle.innerHTML = `<div style="font-size: 14px; word-break: break-all; color: var(--highlight);">${filename}</div>`;
         
         resultsContent.innerHTML = `
-            <button class="commit-detail-back" id="backToLog">← Back to Git Log</button>
-            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">${history.length} commit(s)</div>
+            <button class="memory-detail-back" id="backToLog">← Back to Git Log</button>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">${history.length} memory(s)</div>
             ${history.map(c => `
-                <div class="commit-card" data-commit-id='${c.commit_id}'>
-                    <h3 class="commit-title">${c.title}</h3>
-                    <div class="commit-meta">
+                <div class="memory-card" data-memory-id='${c.memory_id}'>
+                    <h3 class="memory-title">${c.title}</h3>
+                    <div class="memory-meta">
                         <span>${c.timestamp.substring(0,10)}</span>
-                        <span style="font-family: monospace;">${c.commit_id.substring(0,8)}</span>
+                        <span style="font-family: monospace;">${c.memory_id.substring(0,8)}</span>
                     </div>
                 </div>
             `).join('')}
@@ -633,10 +633,10 @@ async function showFileHistory(nodeId) {
             loadGitLog(false);
         });
 
-        document.querySelectorAll('.commit-card').forEach(card => {
+        document.querySelectorAll('.memory-card').forEach(card => {
             card.addEventListener('click', async () => {
-                const commitId = card.getAttribute('data-commit-id');
-                await showCommitDetail(commitId);
+                const memoryId = card.getAttribute('data-memory-id');
+                await showMemoryDetail(memoryId);
             });
         });
 
@@ -751,7 +751,7 @@ async function showFileHistory(nodeId) {
 
             let involvedFilesGlobal = new Set();
             let fileRelevanceGlobal = {};  // file_path -> normalized relevance [0,1]
-            let lastSearchResults = [];  // Store for commit detail navigation
+            let lastSearchResults = [];  // Store for memory detail navigation
 
             searchInput.addEventListener('keydown', async (e) => {
                 if (e.key === 'Enter') {
@@ -776,12 +776,12 @@ async function showFileHistory(nodeId) {
                 
                 try {
                     const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-                    const commits = await res.json();
+                    const memorys = await res.json();
                     
                     searchSpinner.style.display = 'none';
                     resetBtn.style.display = 'block';
 
-                    if (commits.length === 0) {
+                    if (memorys.length === 0) {
                         resultsTitle.innerText = "No results";
                         resultsContent.innerHTML = "<p style='color: var(--text-muted);'>Try another query or different keywords.</p>";
                         sidebar.classList.add('open');
@@ -794,12 +794,12 @@ async function showFileHistory(nodeId) {
                     fileRelevanceGlobal = {};
 
                     // Normalize scores to [0, 1]
-                    const scores = commits.map(c => c.score);
+                    const scores = memorys.map(c => c.score);
                     const minScore = Math.min(...scores);
                     const maxScore = Math.max(...scores);
                     const scoreRange = (maxScore - minScore) || 1;
 
-                    commits.forEach(c => {
+                    memorys.forEach(c => {
                         const normalizedScore = (c.score - minScore) / scoreRange; // 0 to 1
                         c.file_paths.forEach(f => {
                             involvedFilesGlobal.add(f);
@@ -843,7 +843,7 @@ async function showFileHistory(nodeId) {
                     }
 
                     // Update Sidebar using centralized renderer
-                    renderSearchResults(commits);
+                    renderSearchResults(memorys);
                     sidebar.classList.add('open');
 
                 } catch (err) {
@@ -872,33 +872,33 @@ async function showFileHistory(nodeId) {
                 }
             }
 
-            // Commit Detail View
-            async function showCommitDetail(commitId) {
+            // Memory Detail View
+            async function showMemoryDetail(memoryId) {
                 resultsTitle.innerText = 'Loading...';
                 resultsContent.innerHTML = '';
                  sidebar.classList.add('open');
 
                 try {
-                    const res = await fetch(`/api/commit/${commitId}`);
-                    const commit = await res.json();
+                    const res = await fetch(`/api/memory/${memoryId}`);
+                    const memory = await res.json();
 
-                    if (commit.error) {
+                    if (memory.error) {
                         resultsTitle.innerText = 'Error';
-                        resultsContent.innerHTML = `<p style="color: #ff7b72;">${commit.error}</p>`;
+                        resultsContent.innerHTML = `<p style="color: #ff7b72;">${memory.error}</p>`;
                         return;
                     }
 
-                    resultsTitle.innerText = commit.title;
+                    resultsTitle.innerText = memory.title;
                     resultsContent.innerHTML = `
-                        <button class="commit-detail-back" id="backToResults">← Back</button>
-                        <div class="commit-meta">
-                            <span>${commit.timestamp.substring(0, 10)}</span>
-                            <span style="font-family: monospace; font-size: 11px;">${commit.id.substring(0, 8)}</span>
+                        <button class="memory-detail-back" id="backToResults">← Back</button>
+                        <div class="memory-meta">
+                            <span>${memory.timestamp.substring(0, 10)}</span>
+                            <span style="font-family: monospace; font-size: 11px;">${memory.id.substring(0, 8)}</span>
                         </div>
-                        <div class="commit-detail-note">${commit.note}</div>
-                        <h3 style="font-size: 14px; margin: 16px 0 8px; color: var(--highlight);">Modified files (${commit.changes.length})</h3>
-                        ${commit.changes.map(c => `
-                            <div class="commit-detail-change">
+                        <div class="memory-detail-note">${memory.note}</div>
+                        <h3 style="font-size: 14px; margin: 16px 0 8px; color: var(--highlight);">Modified files (${memory.changes.length})</h3>
+                        ${memory.changes.map(c => `
+                            <div class="memory-detail-change">
                                 <span style="color: ${c.action === 'added' ? '#7ee787' : c.action === 'deleted' ? '#ff7b72' : '#d2a8ff'};">[${c.action}]</span>
                                 ${c.path.split('/').pop()}
                                 <span style="color: var(--text-muted); margin-left: 8px;">${formatSize(c.size_after - c.size_before)}</span>
@@ -932,31 +932,31 @@ async function showFileHistory(nodeId) {
                 return `${sign}${(bytes / 1024).toFixed(1)} KB`;
             }
 
-            function renderSearchResults(commits) {
-                lastSearchResults = commits;
-                resultsTitle.innerText = `${commits.length} Commit${commits.length > 1 ? 's' : ''}`;
-                resultsContent.innerHTML = commits.map(c => `
-                    <div class="commit-card" data-files='${JSON.stringify(c.file_paths)}' data-commit-id='${c.commit_id}'>
-                        <h3 class="commit-title">${c.title}</h3>
-                        <div class="commit-meta">
+            function renderSearchResults(memorys) {
+                lastSearchResults = memorys;
+                resultsTitle.innerText = `${memorys.length} Memory${memorys.length > 1 ? 's' : ''}`;
+                resultsContent.innerHTML = memorys.map(c => `
+                    <div class="memory-card" data-files='${JSON.stringify(c.file_paths)}' data-memory-id='${c.memory_id}'>
+                        <h3 class="memory-title">${c.title}</h3>
+                        <div class="memory-meta">
                             <span>${c.timestamp.substring(0,10)}</span>
                             <span>Score: ${c.score.toFixed(3)}</span>
                         </div>
-                        <p class="commit-snippet">${c.snippet}...</p>
-                        ${c.file_paths.length ? `<div class="commit-files">${c.file_paths.length} file(s) associated</div>` : ''}
+                        <p class="memory-snippet">${c.snippet}...</p>
+                        ${c.file_paths.length ? `<div class="memory-files">${c.file_paths.length} file(s) associated</div>` : ''}
                     </div>
                 `).join('');
 
                 // Re-bind click handlers
-                document.querySelectorAll('.commit-card').forEach(card => {
+                document.querySelectorAll('.memory-card').forEach(card => {
                     card.addEventListener('click', async () => {
-                        const commitId = card.getAttribute('data-commit-id');
-                        await showCommitDetail(commitId);
+                        const memoryId = card.getAttribute('data-memory-id');
+                        await showMemoryDetail(memoryId);
                     });
                 });
 
                 // Re-bind hover handlers
-                document.querySelectorAll('.commit-card').forEach(card => {
+                document.querySelectorAll('.memory-card').forEach(card => {
                     card.addEventListener('mouseenter', () => {
                         const files = JSON.parse(card.getAttribute('data-files'));
                         cy.batch(() => {

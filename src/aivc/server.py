@@ -118,11 +118,15 @@ from aivc.sync.drive import NativeDriveSyncManager
 from aivc.sync.background import BackgroundSyncer
 from aivc.config import get_machine_id
 
-_engine = SemanticEngine(_storage_root)
-_sync_manager = NativeDriveSyncManager(_storage_root)
-_syncer = BackgroundSyncer(_storage_root)
+_engine = None
+_local_machine_id = None
 
-_local_machine_id = get_machine_id()
+def _get_engine() -> SemanticEngine:
+    global _engine, _local_machine_id
+    if _engine is None:
+        _engine = SemanticEngine(_storage_root)
+        _local_machine_id = get_machine_id()
+    return _engine
 
 # ---------------------------------------------------------------------------
 # FastMCP server instance
@@ -171,7 +175,7 @@ def _format_changes_compressed(changes, machine_id=None) -> str:
             line += f" ({c.format_impact()})"
         
         if machine_id and machine_id != _local_machine_id:
-            local_match = _engine.find_local_equivalent(c.path, c.blob_hash)
+            local_match = _get_engine().find_local_equivalent(c.path, c.blob_hash)
             if local_match:
                 line += f" (probablement `{local_match}` localement)"
         lines.append(line)
@@ -218,7 +222,7 @@ def remember(title: str, note: str, consulted_files: list[str] = []) -> str:
     Raises:
         RuntimeError: If no tracked file has changed and no files were consulted.
     """
-    memory = _engine.create_memory(title, note, consulted_files=consulted_files)
+    memory = _get_engine().create_memory(title, note, consulted_files=consulted_files)
     files_summary = _format_changes_compressed(memory.changes)
 
     return (
@@ -251,12 +255,12 @@ def recall(query: str, top_n: int = 5, filter_glob: str = "", only_local: bool =
     top_n = min(top_n, 20)
     
     # Check if indexing is in progress
-    indexing_queue_size = _engine.get_index_queue_size()
+    indexing_queue_size = _get_engine().get_index_queue_size()
     warning_header = ""
     if indexing_queue_size > 0:
         warning_header = f"⚠️  Note: {indexing_queue_size} recent memory(ies) are still being indexed and may be missing from search results.\n\n"
 
-    results = _engine.search(query, top_n=top_n, filter_glob=filter_glob)
+    results = _get_engine().search(query, top_n=top_n, filter_glob=filter_glob)
 
     if only_local:
         results = [r for r in results if getattr(r, 'machine_id', _local_machine_id) == _local_machine_id]
@@ -288,7 +292,7 @@ def recall(query: str, top_n: int = 5, filter_glob: str = "", only_local: bool =
         # If results are remote, try to find local hints
         is_remote = any(getattr(r, 'machine_id', "") != _local_machine_id for r in results)
         if is_remote:
-            local_match = _engine.find_local_equivalent(fp)
+            local_match = _get_engine().find_local_equivalent(fp)
             if local_match:
                 hint = f" (probablement `{local_match}` localement)"
         
@@ -319,7 +323,7 @@ def search_files_bm25(query: str, top_n: int = 5, only_local: bool = True) -> st
         top_n: Number of results to return (default 5).
         only_local: (Ignored) BM25 search is always local as it looks at disk.
     """
-    results = _engine.search_files_bm25(query, top_n=top_n)
+    results = _get_engine().search_files_bm25(query, top_n=top_n)
 
     if not results:
         return f"No matches found for keyword query: '{query}'"
@@ -351,20 +355,20 @@ def consult_memory(memory_id: str) -> str:
     Raises:
         KeyError: If the memory_id does not exist.
     """
-    memory = _engine.get_memory(memory_id)
+    memory = _get_engine().get_memory(memory_id)
 
     # Context (Prev/Next)
     prev_str = ""
     if memory.parent_id:
         try:
-            parent = _engine.get_memory(memory.parent_id)
+            parent = _get_engine().get_memory(memory.parent_id)
             prev_str = f"⬆️ **Prev** : {parent.title} (ID: {parent.id})\n"
         except KeyError:
             prev_str = f"⬆️ **Prev** : (metadata not found) (ID: {memory.parent_id})\n"
 
     next_str = ""
     try:
-        child = _engine.find_child_memory(memory_id)
+        child = _get_engine().find_child_memory(memory_id)
         if child:
             next_str = f"⬇️ **Next** : {child.title} (ID: {child.id})\n"
     except Exception:
@@ -412,7 +416,7 @@ def get_recent_memories(limit: int = 10, offset: int = 0, only_local: bool = Fal
     limit = min(limit, 50)
 
     # get_log fetches `offset + limit` memories and then slices.
-    all_recent = _engine.get_log(limit=offset + limit)
+    all_recent = _get_engine().get_log(limit=offset + limit)
     
     if only_local:
         all_recent = [m for m in all_recent if m.machine_id == _local_machine_id]
@@ -425,11 +429,11 @@ def get_recent_memories(limit: int = 10, offset: int = 0, only_local: bool = Fal
     lines = [f"Showing memories {offset + 1}–{offset + len(page)} (newest first)\n"]
     for i, memory in enumerate(page, offset + 1):
         try:
-            files = _engine.get_memory_files(memory.id)
+            files = _get_engine().get_memory_files(memory.id)
             formatted_files = []
             for f in files:
                 if memory.machine_id and memory.machine_id != _local_machine_id:
-                    local_match = _engine.find_local_equivalent(f)
+                    local_match = _get_engine().find_local_equivalent(f)
                     if local_match:
                         formatted_files.append(f"{f} (local: {Path(local_match).name})")
                         continue
@@ -467,7 +471,7 @@ def consult_file(file_path: str) -> str:
     Raises:
         KeyError: If the file is not in the AIVC co-occurrence graph.
     """
-    memory_ids = _engine.get_file_memories(file_path)
+    memory_ids = _get_engine().get_file_memories(file_path)
 
     if not memory_ids:
         return f"No memories found for file: {file_path}"
@@ -477,7 +481,7 @@ def consult_file(file_path: str) -> str:
 
     for mid in memory_ids:
         try:
-            memory = _engine.get_memory(mid)
+            memory = _get_engine().get_memory(mid)
             lines.append(
                 f"  - [{memory.timestamp[:10]}] {memory.title}\n"
                 f"    ID: {memory.id}"
@@ -507,7 +511,7 @@ def read_historical_file(file_path: str, memory_id: str) -> str:
         memory_id: The UUID of the memory at which to read the file.
     """
     try:
-        raw: bytes = _engine.read_file_at_memory(file_path, memory_id)
+        raw: bytes = _get_engine().read_file_at_memory(file_path, memory_id)
         return raw.decode("utf-8")
     except (KeyError, FileNotFoundError):
         # Find which memory exactly has this blob to provide context
@@ -515,7 +519,7 @@ def read_historical_file(file_path: str, memory_id: str) -> str:
         mid = memory_id
         while mid:
             try:
-                m = _engine.get_memory(mid)
+                m = _get_engine().get_memory(mid)
                 for change in m.changes:
                     if change.path == file_path and change.blob_hash:
                         target_memory = m
@@ -546,7 +550,7 @@ def get_status(path: str = "") -> str:
     Args:
         path: Optional subdirectory path to explore (e.g. "src/").
     """
-    statuses = _engine.get_status()
+    statuses = _get_engine().get_status()
     if not statuses:
         return "No files are currently tracked by AIVC."
 
@@ -642,7 +646,7 @@ def untrack(path_or_glob: list[str]) -> str:
     successes = []
     for p in path_or_glob:
         try:
-            _engine.untrack(p)
+            _get_engine().untrack(p)
             successes.append(p)
         except KeyError as e:
             errors.append(f"  ⚠️ {p}: {e}")
@@ -686,13 +690,13 @@ def track(path: list[str], ignores: list[str] = []) -> str:
 
     for p in path:
         try:
-            result = _engine.track(p, ignores)
+            result = _get_engine().track(p, ignores)
             all_newly_tracked.extend(result["newly_tracked"])
             total_hidden_skipped += result["hidden_skipped"]
 
             global _observer
             if _WATCHDOG_AVAILABLE and _observer is not None and Path(p).is_dir():
-                handler = AIVCWatcherHandler(_engine, p)
+                handler = AIVCWatcherHandler(_get_engine(), p)
                 _observer.schedule(handler, p, recursive=True)
         except ValueError as e:
             errors.append(f"  ⚠️ {p}: {e}")
@@ -776,7 +780,7 @@ def start_background_watchers():
         print("⚠️  'watchdog' library not found. Real-time surveillance disabled.", file=sys.stderr)
         return
 
-    watched_dirs = _engine.get_watched_dirs()
+    watched_dirs = _get_engine().get_watched_dirs()
     if not watched_dirs:
         return
 
@@ -786,12 +790,12 @@ def start_background_watchers():
         if os.path.isdir(path):
             # 1. Startup Sync (JIT track existing files)
             try:
-                _engine.track(path)
+                _get_engine().track(path)
             except Exception as e:
                 print(f"⚠️  Startup sync failed for {path}: {e}", file=sys.stderr)
 
             # 2. Schedule watcher
-            handler = AIVCWatcherHandler(_engine, path)
+            handler = AIVCWatcherHandler(_get_engine(), path)
             _observer.schedule(handler, path, recursive=True)
             count += 1
     
@@ -807,12 +811,15 @@ def start_background_watchers():
 
 def _trigger_ml_warmup():
     try:
-        _engine.warmup()
+        _get_engine().warmup()
     except Exception as e:
         print(f"Background ML warmup failed: {e}", file=sys.stderr)
 
 if __name__ == "__main__":
     import threading
+    from aivc.sync.background import BackgroundSyncer
+    
+    _syncer = BackgroundSyncer(_storage_root)
     
     # Pre-load heavy ML models in background to mask the cold startup latency
     # without blocking the Cursor JSON-RPC `initialize` handshake

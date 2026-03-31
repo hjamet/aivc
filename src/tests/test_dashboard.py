@@ -38,7 +38,7 @@ def test_dashboard_api_search():
     
     res = handler._api_search("query")
     assert len(res) == 1
-    assert res[0]["commit_id"] == "c1"
+    assert res[0]["memory_id"] == "c1"
     assert res[0]["title"] == "test title"
     assert res[0]["score"] == 0.95
 
@@ -67,13 +67,13 @@ def test_dashboard_api_head():
 
 def test_dashboard_api_log():
     engine = MagicMock()
-    mock_commit = MagicMock()
-    mock_commit.id = "c1"
-    mock_commit.title = "test log"
-    mock_commit.timestamp = "2024-01-01"
-    mock_commit.changes = ["a.py", "b.py"]
+    mock_memory = MagicMock()
+    mock_memory.id = "c1"
+    mock_memory.title = "test log"
+    mock_memory.timestamp = "2024-01-01"
+    mock_memory.changes = ["a.py", "b.py"]
     
-    engine.get_log.return_value = [mock_commit]
+    engine.get_log.return_value = [mock_memory]
     
     handler = DashboardHandler.__new__(DashboardHandler)
     handler.engine = engine
@@ -88,14 +88,14 @@ def test_dashboard_api_log():
 
 def test_dashboard_api_file_history():
     engine = MagicMock()
-    engine.get_file_history.return_value = [{"commit_id": "c1", "title": "test", "timestamp": "2024-01-01"}]
+    engine.get_file_history.return_value = [{"memory_id": "c1", "title": "test", "timestamp": "2024-01-01"}]
     
     handler = DashboardHandler.__new__(DashboardHandler)
     handler.engine = engine
     
     res = handler._api_file_history("a.py")
     engine.get_file_history.assert_called_once_with("a.py")
-    assert res[0]["commit_id"] == "c1"
+    assert res[0]["memory_id"] == "c1"
 
 
 def test_dashboard_api_file_history_error():

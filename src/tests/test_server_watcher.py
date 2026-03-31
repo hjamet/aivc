@@ -1,11 +1,14 @@
 """Unit tests for the MCP Server Watcher logic."""
 
 import os
+import sys
 import time
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from aivc.server import AIVCWatcherHandler, start_background_watchers, _engine
+
+os.environ["AIVC_STORAGE_ROOT"] = "/tmp/aivc_mock_root"
+from aivc.server import AIVCWatcherHandler, start_background_watchers
 
 def test_watcher_handler_ignores_hidden_files():
     mock_engine = MagicMock()
@@ -32,10 +35,13 @@ def test_watcher_handler_ignores_hidden_files():
     handler.on_created(event)
     mock_engine.track.assert_not_called()
 
-@patch("aivc.server._engine")
+@patch("aivc.server._get_engine")
 @patch("aivc.server.Observer")
 @patch("os.path.isdir")
-def test_start_background_watchers(mock_isdir, mock_observer_cls, mock_engine):
+def test_start_background_watchers(mock_isdir, mock_observer_cls, mock_get_engine):
+    mock_engine = MagicMock()
+    mock_get_engine.return_value = mock_engine
+    
     mock_isdir.return_value = True
     mock_engine.get_watched_dirs.return_value = {
         "/path/to/watch": {"ignores": []}

@@ -2,7 +2,7 @@
 
 **Long-term memory MCP server for LLM agents**, designed to help AI assistants remember their reasoning, decisions, and context across sessions.
 
-> **Status**: 🟢 **Phase 29 (In Progress)** : Memory Refactor, Metadata-only Sync & Tree Status.
+> **Status**: 🟢 **Phase 30 (Done)** : System Unification & Debt Cleanup.
 
 ### Concept
 
@@ -67,7 +67,7 @@ bash install.sh
 |--------------|-------------|
 | [Architecture Index](docs/index_architecture.md) | Technical architecture of the project |
 | [Tasks Index](docs/index_tasks.md) | Roadmap task specifications |
-| [Sync Policy](docs/index_sync.md) | Details on Phase 29 metadata-only sync |
+| [Sync Policy](docs/index_sync.md) | Details on Phase 29/30 metadata-only sync |
 
 ---
 
@@ -75,4 +75,4 @@ bash install.sh
 
 - `[x]` Phase 28: Synchronous I/O Optimization.
 - `[x]` Phase 29: Memory Refactor & Tree Status. [[Spec](docs/tasks/phase29.md)]
-- `[ ]` Phase 30: System Unification & Debt Cleanup. [[Spec](docs/tasks/phase30_debt_cleanup.md)]
+- `[x]` Phase 30: System Unification & Debt Cleanup. [[Spec](docs/tasks/phase30_debt_cleanup.md)]

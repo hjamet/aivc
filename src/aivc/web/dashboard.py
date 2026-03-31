@@ -53,9 +53,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.send_json(self._api_log(offset=offset, limit=limit))
             return
 
-        if parsed.path.startswith("/api/commit/"):
-            commit_id = parsed.path[len("/api/commit/"):]
-            self.send_json(self._api_commit(commit_id))
+        if parsed.path.startswith("/api/memory/"):
+            memory_id = parsed.path[len("/api/memory/"):]
+            self.send_json(self._api_memory(memory_id))
             return
 
         if parsed.path.startswith("/api/file-history/"):
@@ -96,7 +96,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         out = []
         for r in results:
             out.append({
-                "commit_id": r.memory_id,
+                "memory_id": r.memory_id,
                 "title": r.title,
                 "timestamp": r.timestamp,
                 "score": r.score,
@@ -105,19 +105,19 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             })
         return out
 
-    def _api_commit(self, commit_id: str):
-        """Return full commit details."""
+    def _api_memory(self, memory_id: str):
+        """Return full memory details."""
         try:
-            commit = self.engine.get_memory(commit_id)
-            if not commit:
-                return {"error": f"Memory {commit_id} not found"}
+            memory = self.engine.get_memory(memory_id)
+            if not memory:
+                return {"error": f"Memory {memory_id} not found"}
         except (KeyError, FileNotFoundError):
-            return {"error": f"Commit {commit_id} not found"}
+            return {"error": f"Memory {memory_id} not found"}
         return {
-            "id": commit.id,
-            "title": commit.title,
-            "timestamp": commit.timestamp,
-            "note": commit.note,
+            "id": memory.id,
+            "title": memory.title,
+            "timestamp": memory.timestamp,
+            "note": memory.note,
             "changes": [
                 {
                     "path": c.path,
@@ -125,15 +125,15 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     "size_before": c.bytes_removed,
                     "size_after": c.bytes_added,
                 }
-                for c in commit.changes
+                for c in memory.changes
             ],
         }
 
     def _api_log(self, offset: int = 0, limit: int = 10):
-        """Return paginated commit log."""
-        commits = self.engine.get_log(limit=limit, offset=offset)
+        """Return paginated memory log."""
+        memories = self.engine.get_log(limit=limit, offset=offset)
         out = []
-        for c in commits:
+        for c in memories:
             out.append({
                 "id": c.id,
                 "title": c.title,
