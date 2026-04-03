@@ -342,8 +342,14 @@ class CooccurrenceGraph:
 
         return {"nodes": nodes, "edges": edges_list}
 
-    def get_file_node_data(self) -> list[dict]:
+    def get_file_node_data(self, connected_files: set[str] | None = None) -> list[dict]:
         """Return enriched data for file nodes (documents) for visualisation.
+
+        Args:
+            connected_files: If provided, only return nodes whose file_path
+                             is in this set. Used by the dashboard to skip
+                             isolated (0-edge) nodes that would overwhelm
+                             the layout engine.
 
         Returns:
             A list of dicts: ``{"id": file_path, "label": file_name, "full_path": file_path, "memory_count": int, "directory": str}``
@@ -359,6 +365,8 @@ class CooccurrenceGraph:
         ).fetchall()
 
         for file_path, count in rows:
+            if connected_files is not None and file_path not in connected_files:
+                continue
             directory = str(Path(file_path).parent)
             if directory == ".":
                 directory = "/"

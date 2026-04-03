@@ -83,8 +83,13 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def _api_graph(self):
         """Return file nodes and co-occurrence edges."""
-        nodes = self.engine.get_file_node_data()
         edges = self.engine.get_file_cooccurrences()
+        # Only send nodes that participate in at least one edge
+        connected_files = set()
+        for e in edges:
+            connected_files.add(e["source"])
+            connected_files.add(e["target"])
+        nodes = self.engine.get_file_node_data(connected_files=connected_files)
         return {"nodes": nodes, "edges": edges}
 
     def _api_search(self, query: str):

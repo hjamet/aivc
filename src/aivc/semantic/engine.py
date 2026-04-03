@@ -431,9 +431,9 @@ class SemanticEngine:
         """Return the graph in visualisation format (nodes + edges)."""
         return self._graph.to_vis_data()
 
-    def get_file_node_data(self) -> list[dict]:
+    def get_file_node_data(self, connected_files: set[str] | None = None) -> list[dict]:
         """Return enriched data for file nodes (dashboard vis)."""
-        return self._graph.get_file_node_data()
+        return self._graph.get_file_node_data(connected_files=connected_files)
 
     def get_file_cooccurrences(self) -> list[dict]:
         """Return weighted file-to-file co-occurrence edges (dashboard vis)."""
