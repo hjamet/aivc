@@ -344,7 +344,7 @@
             const elements = [];
             
             // Nodes — smaller sizes to avoid overlap
-            const maxMemoryCnt = Math.max(...graphData.nodes.map(n => n.memory_count), 1);
+            const maxMemoryCnt = graphData.nodes.reduce((max, n) => Math.max(max, n.memory_count), 1);
             graphData.nodes.forEach(n => {
                 elements.push({
                     data: {
@@ -359,7 +359,7 @@
             });
 
             // Edges
-            const maxWeight = Math.max(...graphData.edges.map(e => e.weight), 1);
+            const maxWeight = graphData.edges.reduce((max, e) => Math.max(max, e.weight), 1);
             graphData.edges.forEach(e => {
                 elements.push({
                     data: {

@@ -76,3 +76,4 @@ bash install.sh
 - `[x]` Phase 28: Synchronous I/O Optimization.
 - `[x]` Phase 29: Memory Refactor & Tree Status. [[Spec](docs/tasks/phase29.md)]
 - `[x]` Phase 30: System Unification & Debt Cleanup. [[Spec](docs/tasks/phase30_debt_cleanup.md)]
+- `[x]` Bugfix: Infinite loading of large graphs in Web UI

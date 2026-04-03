@@ -379,11 +379,20 @@ class CooccurrenceGraph:
         """
         rows = self._execute(
             """
+            WITH valid_commits AS (
+                SELECT commit_id
+                FROM edges
+                GROUP BY commit_id
+                HAVING COUNT(file_path) <= 100
+            )
             SELECT e1.file_path, e2.file_path, COUNT(*) as weight
             FROM edges e1
             JOIN edges e2 ON e1.commit_id = e2.commit_id
+            JOIN valid_commits vc ON e1.commit_id = vc.commit_id
             WHERE e1.file_path < e2.file_path
             GROUP BY e1.file_path, e2.file_path
+            ORDER BY weight DESC
+            LIMIT 500
             """
         ).fetchall()
 
