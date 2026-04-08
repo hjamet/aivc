@@ -73,7 +73,7 @@ To retrieve memory, follow this two-step funnel:
 3. **`consult_memory`** — to read the full note of a specific memory.
    → Call this AFTER identifying a relevant memory.
 
-4. **`search_files_bm25`** — for keyword search in the CURRENT state of files.
+4. **`search_files`** — for keyword or regex search in the CURRENT state of files.
 
 ## Remote Memories & Sync Policy
 
@@ -95,7 +95,7 @@ of files associated with it might not be available for `read_historical_file`.
 | `get_status` | List tracked files with a navigable folder tree. |
 | `untrack` | **⚠️ VERY DESTRUCTIVE** — Erases history of specified files. |
 | `track` | Add files/dirs to surveillance and tracking. |
-| `search_files_bm25` | Lexical search (BM25) over current tracked file contents. |
+| `search_files` | Lexical search (Keywords or Regex) over current tracked file contents. |
 
 ## `untrack` Warning
 
@@ -320,26 +320,39 @@ def recall(query: str, top_n: int = 5, filter_glob: str = "", only_local: bool =
 
 
 @mcp.tool()
-def search_files_bm25(query: str, top_n: int = 5, only_local: bool = True) -> str:
-    """Search for keywords or exact code patterns in current tracked files.
+def search_files(
+    query: str, 
+    top_n: int = 5, 
+    is_regex: bool = False,
+    case_sensitive: bool = False
+) -> str:
+    """Search for keywords or regex patterns inside the content of tracked files.
 
-    Uses BM25 (lexical ranking) on the actual text content of files currently
-    on disk. This is the only tool that searches INSIDE the code/files.
+    This tool performs a fast, parallel scan of all currently tracked files on disk.
+    For keyword searches (default), it uses an 'AND' logic: it finds files where ALL
+    provided words are present, regardless of their order or location.
 
     Args:
-        query: Keywords or code fragment (e.g. "function_name" or "import os").
+        query: Search terms (e.g. "auth error") or a regex pattern.
         top_n: Number of results to return (default 5).
-        only_local: (Ignored) BM25 search is always local as it looks at disk.
+        is_regex: If True, treats query as a regular expression.
+        case_sensitive: If True, search is case sensitive (default False).
     """
-    results = _get_engine().search_files_bm25(query, top_n=top_n)
+    results = _get_engine().search_files(
+        query, 
+        top_n=top_n, 
+        is_regex=is_regex, 
+        case_sensitive=case_sensitive
+    )
 
     if not results:
-        return f"No matches found for keyword query: '{query}'"
+        type_str = "regex" if is_regex else "keyword"
+        return f"No matches found for {type_str} query: '{query}'"
 
-    lines = [f"## Lexical matches for: `{query}`\n"]
+    lines = [f"## Search results for: `{query}`\n"]
     for i, r in enumerate(results, 1):
         lines.append(
-            f"{i}. `{r['path']}` (score: {r['score']:.3f})\n"
+            f"{i}. `{r['path']}` (score: {r['score']:.1f})\n"
             f"   > {r['snippet']}"
         )
 

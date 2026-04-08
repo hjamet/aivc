@@ -18,6 +18,8 @@ import queue
 import time
 import atexit
 import os
+import re
+import concurrent.futures
 from pathlib import Path
 from typing import Any
 
@@ -57,7 +59,6 @@ class SemanticEngine:
         # Lazy — will be initialised on first access.
         self.__indexer = None
         self.__searcher = None
-        self.__bm25_cache = None
         self._local_hints_index = None
         
         # Prevent PyTorch/Chroma multithreading import gridlocks
@@ -233,21 +234,6 @@ class SemanticEngine:
                         raise
         return self.__searcher
 
-    @property
-    def _bm25_cache(self):
-        """Lazy-loaded BM25Cache (SQLite-backed tokenization cache)."""
-        if self.__bm25_cache is None:
-            with self._ml_lock:
-                if self.__bm25_cache is None:
-                    try:
-                        from aivc.search.bm25_cache import BM25Cache
-                        self.__bm25_cache = BM25Cache(self._storage_root)
-                    except RuntimeError as e:
-                        if "atexit" in str(e):
-                            return None
-                        raise
-        return self.__bm25_cache
-
     # ------------------------------------------------------------------
     # Commit lifecycle
     # ------------------------------------------------------------------
@@ -326,80 +312,192 @@ class SemanticEngine:
         
         return self._searcher.search(query, top_k=top_k, top_n=top_n)
 
-    def search_files_bm25(self, query: str, top_n: int = 5) -> list[dict]:
-        """Perform a lexical search (BM25) on current tracked file contents.
+    # Extensions known to be binary or useless for code/text search
+    _SKIP_EXTS: set[str] = {
+        '.pyc', '.pyo', '.map', '.npy', '.npz', '.pkl', '.pickle', '.bin',
+        '.exe', '.dll', '.so', '.o', '.a', '.woff', '.woff2', '.ttf', '.eot',
+        '.ico', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.bmp', '.webp',
+        '.mp3', '.mp4', '.wav', '.zip', '.gz', '.tar', '.rar', '.7z', '.pdf',
+        '.pth', '.pt', '.onnx', '.safetensors', '.parquet', '.feather',
+        '.h5', '.hdf5', '.db', '.sqlite', '.sqlite3', '.tfevents',
+    }
+    _MAX_FILE_SIZE: int = 512_000  # 512 KB
+
+    def _get_searchable_paths(self) -> list[str]:
+        """Return tracked paths filtered to only text-like, reasonably sized files.
         
+        Skips binary extensions and files > 512KB to avoid wasting I/O
+        on enormous CSVs, numpy arrays, source-maps, etc.
+        """
+        tracked_paths = self._workspace.get_tracked_paths()
+        metadata = self._workspace.get_tracked_files_metadata()
+        filtered = []
+        for p in tracked_paths:
+            ext = os.path.splitext(p)[1].lower()
+            if ext in self._SKIP_EXTS:
+                continue
+            m = metadata.get(p, {})
+            sz = m.get("size", 0) if isinstance(m, dict) else 0
+            if sz and sz > self._MAX_FILE_SIZE:
+                continue
+            filtered.append(p)
+        return filtered
+
+    def _grep_search(
+        self,
+        paths: list[str],
+        terms: list[str],
+        *,
+        is_regex: bool = False,
+        case_sensitive: bool = False,
+    ) -> list[str]:
+        """Use GNU grep subprocess to find files matching ALL terms (AND logic).
+        
+        Each term is piped through a separate grep invocation so only files
+        containing every term survive.  This is dramatically faster than
+        reading files in Python because grep uses mmap + C-level matching.
+        """
+        import subprocess, tempfile
+
+        current_paths = paths
+        grep_flags = ["-l"]  # list matching file names only
+        if not case_sensitive:
+            grep_flags.append("-i")
+        if not is_regex:
+            grep_flags.append("-F")  # fixed-string (faster)
+
+        for term in terms:
+            if not current_paths:
+                return []
+
+            # Write current candidate paths to a temp file (one per line)
+            tmp = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False
+            )
+            try:
+                for p in current_paths:
+                    tmp.write(p + "\n")
+                tmp.close()
+                result = subprocess.run(
+                    f"cat {tmp.name} | xargs -d '\\n' grep {' '.join(grep_flags)} -- {self._shell_escape(term)} 2>/dev/null",
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                current_paths = [
+                    l for l in result.stdout.strip().split("\n") if l
+                ]
+            finally:
+                try:
+                    os.unlink(tmp.name)
+                except OSError:
+                    pass
+
+        return current_paths
+
+    @staticmethod
+    def _shell_escape(s: str) -> str:
+        """Escape a string for safe use in a shell command."""
+        return "'" + s.replace("'", "'\\''") + "'"
+
+    def search_files(
+        self,
+        query: str,
+        top_n: int = 5,
+        is_regex: bool = False,
+        case_sensitive: bool = False,
+    ) -> list[dict]:
+        """Perform a fast lexical search (Keyword or Regex) on current tracked file contents.
+
+        Uses GNU grep as a subprocess for I/O-optimal matching, with
+        intelligent pre-filtering to skip binary/large files.
+
+        For keyword searches (default), uses AND logic: finds files where ALL
+        provided words are present, regardless of order or location.
+
         Args:
-            query: The search query text.
+            query: Search terms (e.g. "auth error") or a regex pattern.
             top_n: Number of results to return.
-            
+            is_regex: Whether to treat query as a regular expression.
+            case_sensitive: Whether the search should be case sensitive.
+
         Returns:
             A list of dicts: {"path": str, "score": float, "snippet": str}.
         """
-        tracked_paths = self._workspace.get_tracked_paths()
-        if not tracked_paths:
+        searchable = self._get_searchable_paths()
+        if not searchable:
             return []
 
-        from rank_bm25 import BM25Okapi
-        
-        # 1. Get tokenized corpus from cache (handles I/O + regex caching)
-        metadata = self._workspace.get_tracked_files_metadata()
-        corpus, valid_paths = self._bm25_cache.get_corpus(tracked_paths, metadata=metadata)
-
-        if not corpus:
+        # Split query into terms for AND matching (keyword mode)
+        # For regex mode, treat the whole query as a single pattern
+        terms = [query] if is_regex else query.split()
+        if not terms:
             return []
 
-        # 2. Cached BM25 index — only rebuild when corpus changes
-        paths_fingerprint = hash(tuple(valid_paths))
-        if (
-            not hasattr(self, '_bm25_index')
-            or self._bm25_fingerprint != paths_fingerprint
-        ):
-            self._bm25_index = BM25Okapi(corpus)
-            self._bm25_valid_paths = valid_paths
-            self._bm25_fingerprint = paths_fingerprint
+        # Phase 1: grep to find candidate files (fast, C-level I/O)
+        matching_paths = self._grep_search(
+            searchable, terms, is_regex=is_regex, case_sensitive=case_sensitive
+        )
 
-        tokenized_query = self._bm25_cache.tokenize(query)
-        scores = self._bm25_index.get_scores(tokenized_query)
-        
-        # 3. Identify top N candidates based on score
-        candidates = []
-        for path, score in zip(self._bm25_valid_paths, scores):
-            if score > 0:
-                candidates.append((path, float(score)))
+        if not matching_paths:
+            return []
 
-        candidates.sort(key=lambda x: x[1], reverse=True)
-        top_candidates = candidates[:top_n]
-        
-        # 4. Build snippets ONLY for the top candidates (lazy I/O)
-        import re
-        query_words = set(tokenized_query)
-        results = []
+        # Phase 2: score + snippet only for matching files (small set)
+        if is_regex:
+            flags = 0 if case_sensitive else re.IGNORECASE
+            pattern = re.compile(query, flags)
+        else:
+            search_terms = (
+                [t.lower() for t in terms]
+                if not case_sensitive
+                else list(terms)
+            )
 
-        for path, score in top_candidates:
-            snippet = ""
+        results: list[dict] = []
+        for path in matching_paths:
             try:
-                content = Path(path).read_text(encoding="utf-8", errors="ignore")
-                matches = [m.start() for m in re.finditer(r'\w+', content) if m.group().lower() in query_words]
-                
-                if matches:
-                    start = max(0, matches[0] - 100)
-                    end = min(len(content), start + 200)
-                    snippet = content[start:end].replace("\n", " ").strip()
-                    if start > 0: snippet = "..." + snippet
-                    if end < len(content): snippet = snippet + "..."
+                content = Path(path).read_text(
+                    encoding="utf-8", errors="ignore"
+                )
+                if is_regex:
+                    match = pattern.search(content)
+                    if not match:
+                        continue
+                    score = len(pattern.findall(content))
+                    first_pos = match.start()
                 else:
-                    snippet = content[:200].replace("\n", " ").strip() + "..."
+                    haystack = (
+                        content if case_sensitive else content.lower()
+                    )
+                    score = sum(haystack.count(t) for t in search_terms)
+                    first_pos = haystack.find(search_terms[0])
+
+                # Build snippet around first match
+                snip_start = max(0, first_pos - 100)
+                snip_end = min(len(content), snip_start + 200)
+                snippet = (
+                    content[snip_start:snip_end]
+                    .replace("\n", " ")
+                    .strip()
+                )
+                if snip_start > 0:
+                    snippet = "..." + snippet
+                if snip_end < len(content):
+                    snippet = snippet + "..."
+
+                results.append(
+                    {"path": path, "score": float(score), "snippet": snippet}
+                )
             except Exception:
-                snippet = "[Error reading file]"
+                continue
 
-            results.append({
-                "path": path,
-                "score": score,
-                "snippet": snippet
-            })
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results[:top_n]
 
-        return results
+    def search_files_bm25(self, query: str, top_n: int = 5) -> list[dict]:
+        """Legacy wrapper for compatibility."""
+        return self.search_files(query, top_n=top_n)
 
     # ------------------------------------------------------------------
     # Graph queries

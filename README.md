@@ -2,7 +2,7 @@
 
 **Long-term memory MCP server for LLM agents**, designed to help AI assistants remember their reasoning, decisions, and context across sessions.
 
-> **Status**: 🟢 **Phase 30 (Done)** : System Unification & Debt Cleanup.
+> **Status**: 🟢 **Phase 31 (Done)** : Ultra-Fast Search Engine (ThreadPool-based).
 
 ### Concept
 
@@ -43,7 +43,7 @@ bash install.sh
 | `consult_file` | Read | AIVC history of a file: list of memories that touched it. |
 | `read_historical_file` | Read | Content of a file as it was during a past memory (Local only). |
 | `track` / `untrack` | Management | Manage file surveillance and history. |
-| `search_files_bm25` | Read | Lexical search (BM25) in the current content of tracked files. |
+| `search_files` | Read | Fast lexical search (Keywords/Regex) in current file contents. **Parallel & Case-insensitive.** |
 
 ---
 
@@ -76,4 +76,5 @@ bash install.sh
 - `[x]` Phase 28: Synchronous I/O Optimization.
 - `[x]` Phase 29: Memory Refactor & Tree Status. [[Spec](docs/tasks/phase29.md)]
 - `[x]` Phase 30: System Unification & Debt Cleanup. [[Spec](docs/tasks/phase30_debt_cleanup.md)]
+- `[x]` Phase 31: Ultra-Fast Parallel Search (Obsidian-like).
 - `[x]` Bugfix: Infinite loading of large graphs in Web UI
