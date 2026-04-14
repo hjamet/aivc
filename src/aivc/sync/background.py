@@ -4,7 +4,6 @@ BackgroundSyncer: Daemon thread to pull commits periodically (or at startup).
 
 import sys
 import threading
-import time
 from pathlib import Path
 from aivc.sync.drive import NativeDriveSyncManager
 

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import fnmatch
 import sqlite3
-from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
 

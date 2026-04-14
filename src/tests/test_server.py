@@ -8,11 +8,8 @@ These tests validate the formatting and orchestration logic of each tool.
 from __future__ import annotations
 
 import os
-import sys
-import types
 import unittest
-from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock
 
 
 # ---------------------------------------------------------------------------

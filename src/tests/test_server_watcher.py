@@ -1,10 +1,6 @@
 """Unit tests for the MCP Server Watcher logic."""
 
 import os
-import sys
-import time
-import pytest
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 os.environ["AIVC_STORAGE_ROOT"] = "/tmp/aivc_mock_root"
