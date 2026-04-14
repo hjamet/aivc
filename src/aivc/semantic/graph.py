@@ -97,14 +97,14 @@ class CooccurrenceGraph:
             (memory.id, memory.title, memory.timestamp),
         )
 
-        for fp in file_paths:
-            self._execute(
+        if file_paths:
+            self._executemany(
                 "INSERT OR IGNORE INTO file_nodes (file_path) VALUES (?)",
-                (fp,),
+                [(fp,) for fp in file_paths],
             )
-            self._execute(
+            self._executemany(
                 "INSERT OR IGNORE INTO edges (commit_id, file_path) VALUES (?, ?)",
-                (memory.id, fp),
+                [(memory.id, fp) for fp in file_paths],
             )
 
         self._conn.commit()
