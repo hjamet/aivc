@@ -194,7 +194,7 @@ preserve context beyond a single conversation.
 ### 2. Start Every Session with Context Recovery
 Before doing ANY work, you MUST reconstruct your working context:
 1. Call \`get_recent_memories\` to see what was done recently.
-2. Perform **at least 5 \`recall\` calls** with varied queries to explore
+2. Perform **at least 1 \`recall\` call** with varied queries to explore
    relevant past memories (e.g. the current topic, related files, similar problems).
 3. Use \`consult_memory\` on the most relevant results to read the full details.
 4. Use \`consult_file\` to understand the history of files you will modify.
