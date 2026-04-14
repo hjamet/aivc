@@ -26,7 +26,7 @@ The idea is for `install.sh` to automatically inject a best practices block into
 * If `install.sh` is rerun, the block is **updated** (not duplicated).
 * The block contains the following recommendations:
   - Commit (via the `create_commit` tool, not git) at the slightest modification
-  - Always start with `get_recent_commits` + **5 `search_memory` minimum** to reconstruct the work context
+  - Always start with `get_recent_commits` + **1 `search_memory` minimum** to reconstruct the work context
   - Consult file history (`consult_file`) and commit history (`consult_commit`) to understand links and history
   - Do not attempt modifications already made in the past
   - Very detailed commit messages: errors encountered, resolutions, decisions made, observations, future recommendations
