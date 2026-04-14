@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aivc.core.memory import Memory
@@ -130,14 +130,15 @@ class CoreIndex:
         """
         from aivc.core.memory import memory_from_dict
 
+        # Optimization: Load all existing commit IDs into a set once
+        existing_commits_rows = self._execute("SELECT commit_id FROM commits").fetchall()
+        existing_commits = {r[0] for r in existing_commits_rows}
+
         new_count = 0
         for p in memories_dir.glob("*.json"):
             memory_id = p.stem
-            # Quick check if already indexed
-            exists = self._execute(
-                "SELECT 1 FROM commits WHERE commit_id = ?", (memory_id,)
-            ).fetchone()
-            if not exists:
+
+            if memory_id not in existing_commits:
                 try:
                     memory = memory_from_dict(json.loads(p.read_text(encoding="utf-8")))
                     self.add_memory(memory)

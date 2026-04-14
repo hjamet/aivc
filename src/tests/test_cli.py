@@ -5,7 +5,6 @@ Tests for the CLI module.
 from unittest.mock import patch, MagicMock
 import pytest
 import os
-import sys
 
 from aivc.cli import main, _format_bytes
 

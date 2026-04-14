@@ -288,7 +288,7 @@ Follow these steps (takes ~2 minutes):
         from google_auth_oauthlib.flow import InstalledAppFlow
     except ImportError:
         print(f"{RED}Error: Google auth libraries not installed.{RESET}")
-        print(f"Run: pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib")
+        print("Run: pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib")
         return
 
     client_config = {
@@ -319,15 +319,15 @@ Follow these steps (takes ~2 minutes):
 
     print(f"\n{GREEN}{BOLD}✓ Authentication successful!{RESET}")
     print(f"  Token saved to: {token_path}")
-    print(f"  Config saved to: ~/.aivc/config.json")
+    print("  Config saved to: ~/.aivc/config.json")
     print(f"\n{YELLOW}Cloud sync is now ENABLED.{RESET}")
-    print(f"AIVC will automatically sync memory metadata (notes) to your Google Drive.")
+    print("AIVC will automatically sync memory metadata (notes) to your Google Drive.")
     print(f"{DIM}Note: File contents (blobs) are not synchronized as of Phase 29.{RESET}")
 
 
 def cmd_sync_push(args: argparse.Namespace) -> None:
     """Force sync (push) of all missing local commits to Google Drive."""
-    from aivc.config import get_aivc_config, get_machine_id, get_token_path
+    from aivc.config import get_aivc_config, get_token_path
 
     config = get_aivc_config()
     sync_cfg = config.get("sync", {})

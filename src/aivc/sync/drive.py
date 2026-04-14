@@ -5,15 +5,12 @@ Replaces the legacy rclone-based sync with a native Python implementation
 using google-api-python-client, google-auth-httplib2, and google-auth-oauthlib.
 """
 
-import json
-import sys
 from pathlib import Path
 from typing import Any
 
 from aivc.config import (
     get_aivc_config,
     get_machine_id,
-    get_credentials_path,
     get_token_path,
 )
 
@@ -163,7 +160,6 @@ class NativeDriveSyncManager:
     def _download_file(self, file_id: str, local_path: Path) -> None:
         """Download a file from Drive to disk."""
         from googleapiclient.http import MediaIoBaseDownload
-        import io
 
         service = self._get_service()
         request = service.files().get_media(fileId=file_id)

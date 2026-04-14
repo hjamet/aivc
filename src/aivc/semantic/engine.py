@@ -19,7 +19,6 @@ import time
 import atexit
 import os
 import re
-import concurrent.futures
 from pathlib import Path
 from typing import Any
 
@@ -357,7 +356,8 @@ class SemanticEngine:
         containing every term survive.  This is dramatically faster than
         reading files in Python because grep uses mmap + C-level matching.
         """
-        import subprocess, tempfile
+        import subprocess
+        import tempfile
 
         current_paths = paths
         grep_flags = ["-l"]  # list matching file names only

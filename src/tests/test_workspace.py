@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from aivc.core.workspace import Workspace, FileStatus
+from aivc.core.workspace import Workspace
 
 
 @pytest.fixture
