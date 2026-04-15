@@ -32,7 +32,8 @@ def test_watcher_handler_ignores_hidden_files():
     mock_engine.track.assert_not_called()
 
 @patch("aivc.server._get_engine")
-@patch("aivc.server.Observer")
+@patch("aivc.server._WATCHDOG_AVAILABLE", True)
+@patch("aivc.server.Observer", create=True)
 @patch("os.path.isdir")
 def test_start_background_watchers(mock_isdir, mock_observer_cls, mock_get_engine):
     mock_engine = MagicMock()

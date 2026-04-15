@@ -53,9 +53,9 @@ def pytest_collection_modifyitems(
 
 
 def _check_ml_available() -> bool:
-    """Return True if sentence-transformers and chromadb can be imported."""
+    """Return True if fastembed and chromadb can be imported."""
     try:
-        import sentence_transformers  # noqa: F401
+        import fastembed  # noqa: F401
         import chromadb  # noqa: F401
         return True
     except ImportError:
