@@ -47,7 +47,9 @@ class _FastEmbedEF(EmbeddingFunction):
 
     @staticmethod
     def name() -> str:
-        return "aivc_fastembed"
+        # Spoof the original name to avoid ChromaDB schema validation errors
+        # on existing collections during the FastEmbed migration.
+        return "aivc_sentence_transformer"
 
     def get_config(self) -> dict:
         return {"name": self.name()}
