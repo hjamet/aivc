@@ -61,7 +61,7 @@ class SemanticEngine:
         self._local_hints_index = None
         
         # Prevent PyTorch/Chroma multithreading import gridlocks
-        self._ml_lock = threading.Lock()
+        self._ml_lock = threading.RLock()
 
         # Async Indexing & Sync
         self._index_queue = queue.Queue()
