@@ -18,7 +18,7 @@ os.environ["ANONYMIZED_TELEMETRY"] = "False"  # ChromaDB
 os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"  # HuggingFace
 
 # ML Model configurations
-BI_ENCODER_MODEL = "all-MiniLM-L6-v2"
+BI_ENCODER_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 def get_aivc_config() -> dict:

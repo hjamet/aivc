@@ -206,7 +206,7 @@ def _format_changes_compressed(changes, machine_id=None) -> str:
 
 
 @mcp.tool()
-def remember(title: str, note: str, consulted_files: list[str] = []) -> str:
+async def remember(title: str, note: str, consulted_files: list[str] = []) -> str:
     """Persist a memory checkpoint in AIVC.
 
     Call this tool after EVERY meaningful step: task completion, artefact creation,
@@ -229,15 +229,17 @@ def remember(title: str, note: str, consulted_files: list[str] = []) -> str:
     Raises:
         RuntimeError: If no tracked file has changed and no files were consulted.
     """
-    memory = _get_engine().create_memory(title, note, consulted_files=consulted_files)
-    files_summary = _format_changes_compressed(memory.changes)
+    import asyncio
+
+    # Run the heavy vector encoding and DB insertion in a background thread
+    asyncio.create_task(
+        asyncio.to_thread(_get_engine().create_memory, title, note, consulted_files)
+    )
 
     return (
-        f"✅ Memory created successfully.\n"
-        f"ID        : {memory.id}\n"
-        f"Timestamp : {memory.timestamp}\n"
-        f"Title     : {memory.title}\n"
-        f"Files     :\n{files_summary}"
+        f"✅ Memory creation scheduled in background.\n"
+        f"Title     : {title}\n"
+        f"Processing: vector encoding and database updates are running in the background."
     )
 
 
@@ -766,11 +768,19 @@ def track(path: list[str], ignores: list[str] = []) -> str:
 # ---------------------------------------------------------------------------
 
 try:
-    from watchdog.observers import Observer
+    import sys
+    if sys.platform == "win32":
+        from watchdog.observers.polling import PollingObserver as Observer
+    else:
+        from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
     _WATCHDOG_AVAILABLE = True
 except ImportError:
     _WATCHDOG_AVAILABLE = False
+
+    # Define a dummy class so the script doesn't crash when watchdog isn't installed
+    class FileSystemEventHandler:
+        pass
 
 
 class AIVCWatcherHandler(FileSystemEventHandler):

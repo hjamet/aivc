@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 import chromadb
 from chromadb import EmbeddingFunction, Documents, Embeddings
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 
 if TYPE_CHECKING:
     from aivc.core.memory import Memory
@@ -27,37 +27,38 @@ _COLLECTION_NAME = "aivc_memories"
 
 # Module-level singleton to prevent ChromaDB's build_from_config from
 # loading the model a second time (~5s wasted on Windows NTFS).
-_shared_model: SentenceTransformer | None = None
+_shared_model: TextEmbedding | None = None
 
 
-def _get_shared_model() -> SentenceTransformer:
-    """Return the shared SentenceTransformer model (lazy singleton)."""
+def _get_shared_model() -> TextEmbedding:
+    """Return the shared TextEmbedding model (lazy singleton)."""
     global _shared_model
     if _shared_model is None:
-        _shared_model = SentenceTransformer(BI_ENCODER_MODEL)
+        # Use FastEmbed's TextEmbedding for faster embeddings and no torch dependency
+        _shared_model = TextEmbedding(BI_ENCODER_MODEL)
     return _shared_model
 
 
-class _SentenceTransformerEF(EmbeddingFunction):
-    """ChromaDB-compatible embedding function backed by SentenceTransformers."""
+class _FastEmbedEF(EmbeddingFunction):
+    """ChromaDB-compatible embedding function backed by FastEmbed."""
 
-    def __init__(self, model: SentenceTransformer) -> None:
+    def __init__(self, model: TextEmbedding) -> None:
         self._model = model
 
     @staticmethod
     def name() -> str:
-        return "aivc_sentence_transformer"
+        return "aivc_fastembed"
 
     def get_config(self) -> dict:
         return {"name": self.name()}
 
     @staticmethod
-    def build_from_config(config: dict) -> "_SentenceTransformerEF":
+    def build_from_config(config: dict) -> "_FastEmbedEF":
         # Reuse the shared singleton — do NOT create a new model instance
-        return _SentenceTransformerEF(_get_shared_model())
+        return _FastEmbedEF(_get_shared_model())
 
     def __call__(self, input: Documents) -> Embeddings:  # noqa: A002
-        return self._model.encode(list(input), convert_to_numpy=True).tolist()
+        return [e.tolist() for e in self._model.embed(list(input))]
 
 
 class Indexer:
@@ -83,7 +84,7 @@ class Indexer:
         self._chroma_dir.mkdir(parents=True, exist_ok=True)
 
         self._model = _get_shared_model()
-        self._ef = _SentenceTransformerEF(self._model)
+        self._ef = _FastEmbedEF(self._model)
 
         self._client = chromadb.PersistentClient(path=str(self._chroma_dir))
         self._collection = self._client.get_or_create_collection(

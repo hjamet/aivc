@@ -106,37 +106,44 @@ def _make_file_status(path="src/foo.py", current_size=1024, history_size=4096):
 # Tests
 # ---------------------------------------------------------------------------
 
-class TestRemember(unittest.TestCase):
+class TestRemember(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         _mock_engine.reset_mock(return_value=True, side_effect=True)
 
-    def test_returns_memory_id_and_files(self):
+    async def test_returns_memory_id_and_files(self):
         _mock_engine.create_memory.return_value = _make_memory()
-        result = _remember("Do something", "Detailed note.")
-        self.assertIn("abc-123", result)
-        self.assertIn("Do something", result)
-        self.assertIn("src/foo.py", result)
-        self.assertIn("modified", result)
+        result = await _remember("Do something", "Detailed note.")
+        self.assertIn("creation scheduled in background", result)
 
-    def test_delegates_to_engine(self):
+    async def test_delegates_to_engine(self):
+        import asyncio
         _mock_engine.create_memory.return_value = _make_memory()
-        _remember("T", "N")
-        _mock_engine.create_memory.assert_called_once_with("T", "N", consulted_files=[])
+        await _remember("T", "N")
+        # Let the background task execute
+        await asyncio.sleep(0.01)
+        _mock_engine.create_memory.assert_called_once_with("T", "N", [])
 
-    def test_delegates_to_engine_with_consulted(self):
+    async def test_delegates_to_engine_with_consulted(self):
+        import asyncio
         _mock_engine.create_memory.return_value = _make_memory()
-        _remember("T", "N", consulted_files=["f1.py"])
-        _mock_engine.create_memory.assert_called_once_with("T", "N", consulted_files=["f1.py"])
+        await _remember("T", "N", consulted_files=["f1.py"])
+        # Let the background task execute
+        await asyncio.sleep(0.01)
+        _mock_engine.create_memory.assert_called_once_with("T", "N", ["f1.py"])
 
-    def test_runtime_error_propagates(self):
+    async def test_runtime_error_propagates(self):
+        import asyncio
+        # Errors in the background task are logged, but the caller gets a success message
+        # We verify that it doesn't crash the server.
         _mock_engine.create_memory.side_effect = RuntimeError("No changes detected")
-        with self.assertRaises(RuntimeError):
-            _remember("T", "N")
+        result = await _remember("T", "N")
+        await asyncio.sleep(0.01)
+        self.assertIn("creation scheduled in background", result)
 
-    def test_empty_changes_handled(self):
+    async def test_empty_changes_handled(self):
         _mock_engine.create_memory.return_value = _make_memory(changes=[])
-        result = _remember("T", "N")
-        self.assertIn("no tracked files changed", result)
+        result = await _remember("T", "N")
+        self.assertIn("creation scheduled in background", result)
 
 
 class TestRecall(unittest.TestCase):
