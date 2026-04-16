@@ -208,9 +208,19 @@ class NativeDriveSyncManager:
         
         # 2. Get remote memories for this machine
         query = f"'{memories_folder_id}' in parents and trashed = false"
-        # We might need pagination if > 100 memories, but fine for MVP
-        results = service.files().list(q=query, spaces="drive", fields="files(name)").execute()
-        remote_memories = {f["name"] for f in results.get("files", [])}
+
+        remote_memories = set()
+        page_token = None
+        while True:
+            results = service.files().list(
+                q=query, spaces="drive", fields="nextPageToken, files(name)",
+                pageSize=1000, pageToken=page_token
+            ).execute()
+            remote_memories.update(f["name"] for f in results.get("files", []))
+
+            page_token = results.get("nextPageToken")
+            if not page_token:
+                break
         
         missing_memories = local_memories - remote_memories
         
@@ -237,8 +247,19 @@ class NativeDriveSyncManager:
 
         # List machine folders in AIVC_Sync
         query = f"'{root_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-        results = service.files().list(q=query, spaces="drive", fields="files(id, name)").execute()
-        machine_folders = results.get("files", [])
+
+        machine_folders = []
+        page_token = None
+        while True:
+            results = service.files().list(
+                q=query, spaces="drive", fields="nextPageToken, files(id, name)",
+                pageSize=1000, pageToken=page_token
+            ).execute()
+            machine_folders.extend(results.get("files", []))
+
+            page_token = results.get("nextPageToken")
+            if not page_token:
+                break
 
         local_memories_dir = self.storage_root / "commits"
         local_memories_dir.mkdir(parents=True, exist_ok=True)
@@ -264,14 +285,22 @@ class NativeDriveSyncManager:
 
             # List memory files
             files_query = f"'{memories_folder_id}' in parents and trashed = false"
-            files_result = service.files().list(
-                q=files_query, spaces="drive", fields="files(id, name)"
-            ).execute()
 
-            for remote_file in files_result.get("files", []):
-                if remote_file["name"] in existing_memories:
-                    continue
-                self._download_file(remote_file["id"], local_memories_dir / remote_file["name"])
+            page_token = None
+            while True:
+                files_result = service.files().list(
+                    q=files_query, spaces="drive", fields="nextPageToken, files(id, name)",
+                    pageSize=1000, pageToken=page_token
+                ).execute()
+
+                for remote_file in files_result.get("files", []):
+                    if remote_file["name"] in existing_memories:
+                        continue
+                    self._download_file(remote_file["id"], local_memories_dir / remote_file["name"])
+
+                page_token = files_result.get("nextPageToken")
+                if not page_token:
+                    break
 
     # Blob sync (push_blob, fetch_blob) has been purged in Phase 30.
 
@@ -284,7 +313,18 @@ class NativeDriveSyncManager:
         root_id = self._get_root_folder_id()
 
         query = f"'{root_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-        results = service.files().list(q=query, spaces="drive", fields="files(name)").execute()
-        folders = results.get("files", [])
+
+        folders = []
+        page_token = None
+        while True:
+            results = service.files().list(
+                q=query, spaces="drive", fields="nextPageToken, files(name)",
+                pageSize=1000, pageToken=page_token
+            ).execute()
+            folders.extend(results.get("files", []))
+
+            page_token = results.get("nextPageToken")
+            if not page_token:
+                break
 
         return [f["name"] for f in folders if f["name"] != "blobs" and f["name"] != self.machine_id]
