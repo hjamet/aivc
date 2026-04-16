@@ -237,10 +237,14 @@ class NativeDriveSyncManager:
             
         return {"memories_pushed": memories_pushed}
 
-    def pull_memories_from_others(self) -> None:
-        """Pull memories from other machines listed in config."""
+    def pull_memories_from_others(self) -> int:
+        """Pull memories from other machines listed in config.
+
+        Returns:
+            Number of memories downloaded.
+        """
         if not self.enabled:
-            return
+            return 0
 
         service = self._get_service()
         root_id = self._get_root_folder_id()
@@ -264,6 +268,8 @@ class NativeDriveSyncManager:
         local_memories_dir = self.storage_root / "commits"
         local_memories_dir.mkdir(parents=True, exist_ok=True)
         existing_memories = {f.name for f in local_memories_dir.iterdir() if f.suffix == ".json"}
+
+        pulled_count = 0
 
         for mf in machine_folders:
             if mf["name"] == self.machine_id or mf["name"] == "blobs":
@@ -297,10 +303,14 @@ class NativeDriveSyncManager:
                     if remote_file["name"] in existing_memories:
                         continue
                     self._download_file(remote_file["id"], local_memories_dir / remote_file["name"])
+                    pulled_count += 1
+                    existing_memories.add(remote_file["name"])
 
                 page_token = files_result.get("nextPageToken")
                 if not page_token:
                     break
+
+        return pulled_count
 
     # Blob sync (push_blob, fetch_blob) has been purged in Phase 30.
 
