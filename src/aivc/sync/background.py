@@ -10,10 +10,11 @@ from aivc.sync.drive import NativeDriveSyncManager
 class BackgroundSyncer:
     """Daemon responsible for pulling distant commits at startup and potentially periodically."""
     
-    def __init__(self, storage_root: Path):
+    def __init__(self, storage_root: Path, on_pull_callback=None):
         self.manager = NativeDriveSyncManager(storage_root)
         self._stop_event = threading.Event()
         self._thread = None
+        self._on_pull_callback = on_pull_callback
 
     def start(self):
         """Start the background pull thread."""
@@ -28,7 +29,11 @@ class BackgroundSyncer:
         while not self._stop_event.is_set():
             try:
                 # 1. Pull from others
-                self.manager.pull_memories_from_others()
+                pulled = self.manager.pull_memories_from_others()
+                if pulled and pulled > 0:
+                    print(f"[AIVC Sync] Auto-pulled {pulled} distant memories from Drive.", file=sys.stderr)
+                    if self._on_pull_callback:
+                        self._on_pull_callback()
 
                 # 2. Push missing local memories
                 stats = self.manager.push_missing()

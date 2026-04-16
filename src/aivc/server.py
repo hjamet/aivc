@@ -863,7 +863,15 @@ if __name__ == "__main__":
     import threading
     from aivc.sync.background import BackgroundSyncer
     
-    _syncer = BackgroundSyncer(_storage_root)
+    def _on_sync_pull():
+        try:
+            _get_engine().migrate_index()
+            _get_engine().warmup()
+        except Exception as e:
+            import sys
+            print(f"Error during sync post-processing: {e}", file=sys.stderr)
+
+    _syncer = BackgroundSyncer(_storage_root, on_pull_callback=_on_sync_pull)
     
     # Pre-load heavy ML models in background to mask the cold startup latency
     # without blocking the Cursor JSON-RPC `initialize` handshake
