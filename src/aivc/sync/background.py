@@ -4,8 +4,11 @@ BackgroundSyncer: Daemon thread to pull commits periodically (or at startup).
 
 import sys
 import threading
+import logging
 from pathlib import Path
 from aivc.sync.drive import NativeDriveSyncManager
+
+logger = logging.getLogger(__name__)
 
 class BackgroundSyncer:
     """Daemon responsible for pulling distant commits at startup and potentially periodically."""
@@ -31,7 +34,7 @@ class BackgroundSyncer:
                 # 1. Pull from others
                 pulled = self.manager.pull_memories_from_others()
                 if pulled and pulled > 0:
-                    print(f"[AIVC Sync] Auto-pulled {pulled} distant memories from Drive.", file=sys.stderr)
+                    logger.info("[AIVC Sync] Auto-pulled %d distant memories from Drive.", pulled)
                     if self._on_pull_callback:
                         self._on_pull_callback()
 
@@ -39,11 +42,10 @@ class BackgroundSyncer:
                 stats = self.manager.push_missing()
                 pushed = stats.get("memories_pushed", 0)
                 if pushed > 0:
-                    print(f"[AIVC Sync] Auto-pushed {pushed} local memories to Drive.", file=sys.stderr)
+                    logger.info("[AIVC Sync] Auto-pushed %d local memories to Drive.", pushed)
 
             except Exception as e:
-                import sys
-                print(f"Background sync failed: {e}", file=sys.stderr)
+                logger.exception("Background sync failed: %s", e)
                 
             if self._stop_event.wait(60):
                 break
