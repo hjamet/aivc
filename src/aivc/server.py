@@ -147,6 +147,70 @@ _observer = None
 # ---------------------------------------------------------------------------
 
 
+def _render_file_tree(paths: list[str], path_extras: dict[str, str] = None, indent_prefix: str = "  ") -> str:
+    """Render a list of absolute paths as a hierarchical tree."""
+    if not paths:
+        return "—"
+
+    if len(paths) == 1:
+        common_root = os.path.dirname(paths[0])
+    else:
+        try:
+            # Safely find a common directory prefix
+            abs_paths = [os.path.abspath(p) for p in paths]
+            common_root = os.path.commonpath([os.path.dirname(p) for p in abs_paths])
+        except ValueError:
+            common_root = ""
+
+    tree: dict = {}
+
+    for path in paths:
+        if common_root:
+            try:
+                rel_path = os.path.relpath(path, common_root)
+            except ValueError:
+                rel_path = path
+        else:
+            rel_path = path
+
+        if rel_path == ".":
+            continue
+
+        parts = rel_path.split(os.sep)
+        current = tree
+        for part in parts[:-1]:
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+
+        current[parts[-1]] = path
+
+    lines = []
+    if common_root:
+        # Avoid double slash if common_root is already root (e.g. "/")
+        root_disp = common_root if common_root.endswith(os.sep) else common_root + os.sep
+        lines.append(f"{indent_prefix}{root_disp}")
+
+    def _traverse(node, prefix=""):
+        items = sorted(node.items(), key=lambda x: (not isinstance(x[1], dict), x[0].lower()))
+
+        for i, (name, value) in enumerate(items):
+            is_last = (i == len(items) - 1)
+            connector = "└── " if is_last else "├── "
+
+            if isinstance(value, dict):
+                lines.append(f"{indent_prefix}{prefix}{connector}{name}/")
+                extension = "    " if is_last else "│   "
+                _traverse(value, prefix + extension)
+            else:
+                extra = (path_extras or {}).get(value, "")
+                lines.append(f"{indent_prefix}{prefix}{connector}{name}{extra}")
+
+    _traverse(tree)
+
+    return "\n".join(lines) if len(lines) > 0 else f"{indent_prefix}—"
+
+
 def _format_bytes(n: int) -> str:
     """Format a byte count as a human-readable string."""
     if n < 1024:
@@ -157,47 +221,27 @@ def _format_bytes(n: int) -> str:
 
 
 def _format_changes_compressed(changes, machine_id=None) -> str:
-    """Group large numbers of added/deleted files by directory to keep context clean."""
+    """Render tracked file changes as a clear hierarchical tree."""
     if not changes:
         return "  (no tracked files changed)"
     
-    # 1. Separate modifications/consultations from bulk additions/deletions
-    others = []
-    bulk: dict[tuple[str, str], list[str]] = {} # (action, dirname) -> [filenames]
+    paths = []
+    extras = {}
     
     for c in changes:
-        if c.action in ("added", "deleted"):
-            p = Path(c.path)
-            dirname = str(p.parent)
-            bulk.setdefault((c.action, dirname), []).append(p.name)
-        else:
-            others.append(c)
-            
-    lines = []
-    
-    # 2. Add others normally
-    for c in others:
-        line = f"  - [{c.action}] {c.path}"
+        paths.append(c.path)
+        extra_parts = [f"[{c.action}]"]
         if c.action != "consulted":
-            line += f" ({c.format_impact()})"
+            extra_parts.append(f"({c.format_impact()})")
         
         if machine_id and machine_id != _local_machine_id:
             local_match = _get_engine().find_local_equivalent(c.path, c.blob_hash)
             if local_match:
-                line += f" (probablement `{local_match}` localement)"
-        lines.append(line)
-        
-    # 3. Add bulk with threshold (e.g. > 10 files)
-    THRESHOLD = 10
-    for (action, dirname), filenames in bulk.items():
-        if len(filenames) > THRESHOLD:
-            lines.append(f"  - [{action}] {dirname}/ ({len(filenames)} files)")
-        else:
-            for fname in filenames:
-                path = os.path.join(dirname, fname)
-                lines.append(f"  - [{action}] {path}")
+                extra_parts.append(f"(probablement `{local_match}` localement)")
                 
-    return "\n".join(lines)
+        extras[c.path] = " " + " ".join(extra_parts)
+
+    return _render_file_tree(paths, extras, indent_prefix="  ")
 
 
 # ---------------------------------------------------------------------------
@@ -295,24 +339,27 @@ def recall(query: str, top_n: int = 5, filter_glob: str = "", only_local: bool =
     for r in results:
         file_counter.update(r.file_paths)
 
-    file_lines = []
+    paths = []
+    extras = {}
     for fp, count in file_counter.most_common(10):
-        hint = ""
+        paths.append(fp)
+        extra_parts = [f"(in {count}/{len(results)} results)"]
+
         # If results are remote, try to find local hints
         is_remote = any(getattr(r, 'machine_id', "") != _local_machine_id for r in results)
         if is_remote:
             local_match = _get_engine().find_local_equivalent(fp)
             if local_match:
-                hint = f" (probablement `{local_match}` localement)"
-        
-        file_lines.append(f"  - {fp}{hint} (in {count}/{len(results)} results)")
+                extra_parts.append(f"(probablement `{local_match}` localement)")
+
+        extras[fp] = " " + " ".join(extra_parts)
 
     output = warning_header + "## Matching Memories\n\n"
     output += "\n".join(memory_lines)
 
-    if file_lines:
+    if paths:
         output += "\n\n## Most Relevant Files\n"
-        output += "\n".join(file_lines)
+        output += _render_file_tree(paths, extras, indent_prefix="  ")
     else:
         output += "\n\n(No file associations found for these memories.)"
 
@@ -452,15 +499,18 @@ def get_recent_memories(limit: int = 10, offset: int = 0, only_local: bool = Fal
     for i, memory in enumerate(page, offset + 1):
         try:
             files = _get_engine().get_memory_files(memory.id)
-            formatted_files = []
-            for f in files:
-                if memory.machine_id and memory.machine_id != _local_machine_id:
-                    local_match = _get_engine().find_local_equivalent(f)
-                    if local_match:
-                        formatted_files.append(f"{f} (local: {Path(local_match).name})")
-                        continue
-                formatted_files.append(f)
-            files_str = ", ".join(formatted_files) if formatted_files else "—"
+            if files:
+                paths = []
+                extras = {}
+                for f in files:
+                    paths.append(f)
+                    if memory.machine_id and memory.machine_id != _local_machine_id:
+                        local_match = _get_engine().find_local_equivalent(f)
+                        if local_match:
+                            extras[f] = f" (local: {Path(local_match).name})"
+                files_str = "\n" + _render_file_tree(paths, extras, indent_prefix="        ")
+            else:
+                files_str = "—"
         except KeyError:
             files_str = "—"
 
