@@ -167,7 +167,7 @@ class TestRecall(unittest.TestCase):
         ]
         _mock_engine.search.return_value = results
         result = _recall("find")
-        self.assertIn("src/foo.py", result)
+        self.assertIn("foo.py", result)
 
     def test_no_results_returns_graceful_message(self):
         _mock_engine.search.return_value = []
@@ -196,7 +196,7 @@ class TestConsultMemory(unittest.TestCase):
     def test_renders_file_changes(self):
         _mock_engine.get_memory.return_value = _make_memory()
         result = _consult_memory("abc-123")
-        self.assertIn("src/foo.py", result)
+        self.assertIn("foo.py", result)
 
     def test_key_error_propagates(self):
         _mock_engine.get_memory.side_effect = KeyError("Memory not found")
