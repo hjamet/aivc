@@ -171,7 +171,7 @@ class TestRecall(unittest.IsolatedAsyncioTestCase):
     async def test_no_results_returns_graceful_message(self):
         _mock_engine.search.return_value = []
         result = await _recall("nothing")
-        self.assertIn("No matching memories", result)
+        self.assertIn("Aucun souvenir trouvé", result)
 
     async def test_top_n_capped_at_20(self):
         _mock_engine.search.return_value = []
@@ -327,13 +327,13 @@ class TestGetRecentMemories(unittest.TestCase):
     def test_empty_range_returns_graceful_message(self):
         _mock_engine.get_log.return_value = []
         result = _get_recent_memories()
-        self.assertIn("No memories found", result)
+        self.assertIn("Aucun souvenir trouvé", result)
 
     def test_limit_capped_at_50(self):
         _mock_engine.get_log.return_value = []
         _get_recent_memories(limit=200)
         # Must request offset+50 at most
-        _mock_engine.get_log.assert_called_once_with(limit=50, include_remote=True, only_local=False)
+        _mock_engine.get_log.assert_called_once_with(limit=50)
 
 
 class TestGetFileHistoryMetadata(unittest.TestCase):
@@ -355,7 +355,8 @@ class TestGetFileHistoryMetadata(unittest.TestCase):
     def test_empty_memory_list(self):
         _mock_engine.get_file_memories.return_value = []
         result = _get_file_history_metadata("src/orphan.py")
-        self.assertIn("No memories found", result)
+        self.assertIn("Aucun souvenir trouvé", result)
+        self.assertIn("src/orphan.py", result)
 
 
 class TestReadPastFileContent(unittest.TestCase):

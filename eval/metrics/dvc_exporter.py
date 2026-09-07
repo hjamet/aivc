@@ -1,9 +1,9 @@
 """
 DVC Exporter & Metrics Aggregator for AIVC Matrix Evaluation Pipeline.
 
-Consolidates benchmark evaluation metrics from all 18 matrix combinations:
-- 3 Benchmarks: SWE-bench-CL, DevBench, Agentic RAG
-- 3 Models: google/gemini-3.7-flash, deepseek/deepseek-v4-pro, meta-models/Muse-Glimmer-30B
+Consolidates benchmark evaluation metrics from all matrix combinations:
+- 2 Benchmarks: SWE-bench-CL, DevBench
+- 3 Models: google/gemini-3.7-flash, deepseek/deepseek-v4-pro, meta/muse-glimmer
 - 2 Arms: aivc, baseline
 
 Aggregates token usage, OpenRouter/Together execution costs, Exploration Overhead Ratio (EOR),
@@ -42,16 +42,22 @@ COMPLETION_PRICE_PER_1M = 0.20
 STANDARD_BENCHMARKS = [
     "swebench_cl",
     "devbench",
-    "agentic_rag",
+    "commit_chronicles",
 ]
 
 BENCHMARK_FILES = [
     "swebench_cl_metrics.json",
     "swebench_cl_naive_metrics.json",
+    "swebench_cl_aivc_metrics.json",
+    "swebench_cl_baseline_metrics.json",
     "devbench_metrics.json",
     "devbench_naive_metrics.json",
-    "agentic_rag_metrics.json",
-    "agentic_rag_naive_metrics.json",
+    "devbench_aivc_metrics.json",
+    "devbench_baseline_metrics.json",
+    "commit_chronicles_metrics.json",
+    "commit_chronicles_naive_metrics.json",
+    "commit_chronicles_aivc_metrics.json",
+    "commit_chronicles_baseline_metrics.json",
     "dry_run_metrics.json",
 ]
 
@@ -63,7 +69,6 @@ class BenchmarkMetrics:
     benchmark_name: str
     arm: str = "aivc"
     model_name: str = DEFAULT_MODEL
-    arm: str = "aivc"
     total_tasks: int = 0
     successful_tasks: int = 0
     pass_rate: float = 0.0
@@ -194,24 +199,24 @@ SAMPLE_BENCHMARKS: Dict[str, Dict[str, Any]] = {
         "mui": 0.745,
         "ccsr": 0.420,
     },
-    "agentic_rag": {
-        "benchmark_name": "agentic_rag",
+    "commit_chronicles": {
+        "benchmark_name": "commit_chronicles",
         "model_name": DEFAULT_MODEL,
         "arm": "aivc",
-        "total_tasks": 15,
-        "successful_tasks": 15,
-        "pass_rate": 1.0,
-        "prompt_tokens": 48000,
-        "completion_tokens": 10000,
-        "total_tokens": 58000,
-        "prompt_cost_usd": 0.00240,
-        "completion_cost_usd": 0.00200,
-        "total_cost_usd": 0.00440,
-        "eor": 0.120,
-        "mui": 0.880,
-        "ccsr": 0.450,
-        "ndcg_at_5": 0.890,
-        "mrr": 0.910,
+        "total_tasks": 20,
+        "successful_tasks": 16,
+        "pass_rate": 0.80,
+        "prompt_tokens": 50000,
+        "completion_tokens": 13500,
+        "total_tokens": 63500,
+        "prompt_cost_usd": 0.00250,
+        "completion_cost_usd": 0.00270,
+        "total_cost_usd": 0.00520,
+        "eor": 0.195,
+        "mui": 0.730,
+        "ccsr": 0.410,
+        "ndcg_at_5": 0.810,
+        "mrr": 0.840,
     },
 }
 
@@ -268,8 +273,8 @@ class DVCExporter:
                 b_name = "swebench_cl"
             elif "devbench" in bmark_key:
                 b_name = "devbench"
-            elif "agentic_rag" in bmark_key:
-                b_name = "agentic_rag"
+            elif "commit_chronicles" in bmark_key or "chronicles" in bmark_key:
+                b_name = "commit_chronicles"
 
             m_name = data.get("model_name") or data.get("active_model") or DEFAULT_MODEL
             arm = data.get("arm") or summary_block.get("arm") or inferred_arm
@@ -283,6 +288,10 @@ class DVCExporter:
                 or summary_block.get("total_instances")
                 or summary_block.get("total_queries")
                 or summary_block.get("total_phases_executed")
+                or summary_block.get("total_commits")
+                or summary_block.get("total_commits_evaluated")
+                or summary_block.get("total_chronicles")
+                or summary_block.get("total_episodes")
                 or summary_block.get("total_repos")
                 or 0
             )
@@ -291,6 +300,7 @@ class DVCExporter:
                 or data.get("successful_steps")
                 or summary_block.get("resolved_instances")
                 or summary_block.get("resolved_queries")
+                or summary_block.get("resolved_commits")
                 or (int(summary_block.get("total_phases_executed", 0) * summary_block.get("phase_pass_rate", 1.0)) if "total_phases_executed" in summary_block else 0)
                 or summary_block.get("completed_sdlc_repos")
                 or 0
@@ -300,6 +310,7 @@ class DVCExporter:
                 data.get("pass_rate")
                 or data.get("accuracy")
                 or summary_block.get("resolve_rate_pass_at_1")
+                or summary_block.get("commit_resolution_rate")
                 or summary_block.get("sdlc_completion_rate")
                 or summary_block.get("phase_pass_rate")
                 or 0.0

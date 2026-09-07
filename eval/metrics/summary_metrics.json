@@ -1,38 +1,19 @@
 {
-  "aggregated_at": "2026-09-02T13:09:16.895655+00:00",
-  "total_matrix_runs": 14,
+  "aggregated_at": "2026-09-02T13:55:40.907140+00:00",
+  "total_matrix_runs": 11,
   "overall_summary": {
-    "total_tasks": 157,
-    "total_successful_tasks": 152,
-    "overall_pass_rate": 0.9682,
-    "total_tokens": 5703199,
-    "total_cost_usd": 0.356097,
-    "mean_eor": 0.7203,
-    "mean_mui": 0.0395,
-    "mean_ccsr": 0.6071,
-    "mean_ndcg_at_5": 0.3141,
-    "mean_mrr": 0.5806
+    "total_tasks": 111,
+    "total_successful_tasks": 106,
+    "overall_pass_rate": 0.955,
+    "total_tokens": 4691555,
+    "total_cost_usd": 0.296577,
+    "mean_eor": 0.7284,
+    "mean_mui": 0.0503,
+    "mean_ccsr": 0.6955,
+    "mean_ndcg_at_5": 0.4671,
+    "mean_mrr": 0.4495
   },
   "comparative_analysis": [
-    {
-      "benchmark": "agentic_rag",
-      "model_name": "google/gemini-3.7-flash",
-      "aivc_pass_rate": 0.9333333333333333,
-      "baseline_pass_rate": 1.0,
-      "delta_pass_rate": -0.0667,
-      "aivc_ndcg_at_5": 0.0,
-      "baseline_ndcg_at_5": 0.0,
-      "delta_ndcg_at_5": 0.0,
-      "aivc_mrr": 0.9333,
-      "baseline_mrr": 1.0,
-      "delta_mrr": -0.0667,
-      "aivc_cost_usd": 0.0285392,
-      "baseline_cost_usd": 0.01735835,
-      "cost_savings_pct": -64.41,
-      "eor_reduction": 0.2416,
-      "aivc_mui": 0.0,
-      "aivc_ccsr": -0.094
-    },
     {
       "benchmark": "devbench",
       "model_name": "google/gemini-3.7-flash",
@@ -74,170 +55,44 @@
   ],
   "matrix_runs": [
     {
-      "benchmark_name": "agentic_rag",
+      "benchmark_name": "commit_chronicles",
       "arm": "aivc",
       "model_name": "google/gemini-3.7-flash",
-      "total_tasks": 15,
-      "successful_tasks": 14,
-      "pass_rate": 0.9333,
+      "total_tasks": 2,
+      "successful_tasks": 1,
+      "pass_rate": 0.5,
       "token_counts": {
-        "prompt_tokens": 469864,
-        "completion_tokens": 25230,
-        "total_tokens": 495094
+        "prompt_tokens": 40283,
+        "completion_tokens": 10244,
+        "total_tokens": 50527
       },
       "costs_usd": {
-        "prompt_cost_usd": 0.023493,
-        "completion_cost_usd": 0.005046,
-        "total_cost_usd": 0.028539,
-        "baseline_estimated_cost_usd": 0.211
+        "prompt_cost_usd": 0.002014,
+        "completion_cost_usd": 0.002049,
+        "total_cost_usd": 0.004063,
+        "baseline_estimated_cost_usd": 0.0169
       },
       "evaluation_ratios": {
-        "exploration_overhead_ratio_eor": 0.5529,
+        "exploration_overhead_ratio_eor": 0.8195,
         "memory_utility_index_mui": 0.0,
-        "cumulative_cost_savings_ratio_ccsr": -0.094,
-        "tool_call_decay": 1.0909
+        "cumulative_cost_savings_ratio_ccsr": 0.6713,
+        "tool_call_decay": 0.0
       },
       "retrieval_metrics": {
-        "mean_reciprocal_rank_mrr": 0.9333,
-        "precision_at_1": 0.9333,
-        "precision_at_3": 0.9111,
-        "precision_at_5": 0.56,
-        "recall_at_1": 0.3111,
-        "recall_at_3": 0.9111,
-        "recall_at_5": 0.9333,
-        "ndcg_at_1": 0.0,
-        "ndcg_at_3": 0.0,
-        "ndcg_at_5": 0.0
-      },
-      "tool_telemetry": {
-        "total_tool_calls": 206,
-        "total_tool_interactions": 206
-      },
-      "is_sample_data": false
-    },
-    {
-      "benchmark_name": "agentic_rag",
-      "arm": "baseline",
-      "model_name": "google/gemini-3.7-flash",
-      "total_tasks": 15,
-      "successful_tasks": 15,
-      "pass_rate": 1.0,
-      "token_counts": {
-        "prompt_tokens": 259019,
-        "completion_tokens": 22037,
-        "total_tokens": 281056
-      },
-      "costs_usd": {
-        "prompt_cost_usd": 0.012951,
-        "completion_cost_usd": 0.004407,
-        "total_cost_usd": 0.017358,
-        "baseline_estimated_cost_usd": 0.211
-      },
-      "evaluation_ratios": {
-        "exploration_overhead_ratio_eor": 0.7945,
-        "memory_utility_index_mui": 0.0,
-        "cumulative_cost_savings_ratio_ccsr": 0.3115,
-        "tool_call_decay": 1.0
-      },
-      "retrieval_metrics": {
-        "mean_reciprocal_rank_mrr": 1.0,
-        "precision_at_1": 1.0,
-        "precision_at_3": 0.9778,
-        "precision_at_5": 0.6,
-        "recall_at_1": 0.3333,
-        "recall_at_3": 0.9778,
+        "mean_reciprocal_rank_mrr": 0.75,
+        "precision_at_1": 0.5,
+        "precision_at_3": 0.3333,
+        "precision_at_5": 0.3,
+        "recall_at_1": 0.25,
+        "recall_at_3": 0.75,
         "recall_at_5": 1.0,
-        "ndcg_at_1": 0.0,
-        "ndcg_at_3": 0.0,
-        "ndcg_at_5": 0.0
+        "ndcg_at_1": 0.5,
+        "ndcg_at_3": 0.622,
+        "ndcg_at_5": 0.7406
       },
       "tool_telemetry": {
-        "total_tool_calls": 186,
-        "total_tool_interactions": 186
-      },
-      "is_sample_data": false
-    },
-    {
-      "benchmark_name": "agentic_rag",
-      "arm": "baseline",
-      "model_name": "google/gemini-3.7-flash",
-      "total_tasks": 15,
-      "successful_tasks": 15,
-      "pass_rate": 1.0,
-      "token_counts": {
-        "prompt_tokens": 259019,
-        "completion_tokens": 22037,
-        "total_tokens": 281056
-      },
-      "costs_usd": {
-        "prompt_cost_usd": 0.012951,
-        "completion_cost_usd": 0.004407,
-        "total_cost_usd": 0.017358,
-        "baseline_estimated_cost_usd": 0.211
-      },
-      "evaluation_ratios": {
-        "exploration_overhead_ratio_eor": 0.7945,
-        "memory_utility_index_mui": 0.0,
-        "cumulative_cost_savings_ratio_ccsr": 0.3115,
-        "tool_call_decay": 1.0
-      },
-      "retrieval_metrics": {
-        "mean_reciprocal_rank_mrr": 1.0,
-        "precision_at_1": 1.0,
-        "precision_at_3": 0.9778,
-        "precision_at_5": 0.6,
-        "recall_at_1": 0.3333,
-        "recall_at_3": 0.9778,
-        "recall_at_5": 1.0,
-        "ndcg_at_1": 0.0,
-        "ndcg_at_3": 0.0,
-        "ndcg_at_5": 0.0
-      },
-      "tool_telemetry": {
-        "total_tool_calls": 186,
-        "total_tool_interactions": 186
-      },
-      "is_sample_data": false
-    },
-    {
-      "benchmark_name": "agentic_rag",
-      "arm": "baseline",
-      "model_name": "qwen/qwen3.7-flash",
-      "total_tasks": 3,
-      "successful_tasks": 3,
-      "pass_rate": 1.0,
-      "token_counts": {
-        "prompt_tokens": 4440,
-        "completion_tokens": 525,
-        "total_tokens": 4965
-      },
-      "costs_usd": {
-        "prompt_cost_usd": 0.000222,
-        "completion_cost_usd": 0.000105,
-        "total_cost_usd": 0.000327,
-        "baseline_estimated_cost_usd": 0.045
-      },
-      "evaluation_ratios": {
-        "exploration_overhead_ratio_eor": 0.75,
-        "memory_utility_index_mui": 0.0,
-        "cumulative_cost_savings_ratio_ccsr": 0.9911,
-        "tool_call_decay": 1.0
-      },
-      "retrieval_metrics": {
-        "mean_reciprocal_rank_mrr": 1.0,
-        "precision_at_1": 1.0,
-        "precision_at_3": 1.0,
-        "precision_at_5": 0.0,
-        "recall_at_1": 0.3333,
-        "recall_at_3": 1.0,
-        "recall_at_5": 0.0,
-        "ndcg_at_1": 0.0,
-        "ndcg_at_3": 0.0,
-        "ndcg_at_5": 0.0
-      },
-      "tool_telemetry": {
-        "total_tool_calls": 0,
-        "total_tool_interactions": 0
+        "total_tool_calls": 21,
+        "total_tool_interactions": 21
       },
       "is_sample_data": false
     },

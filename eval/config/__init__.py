@@ -12,12 +12,16 @@ os.environ.setdefault("AIVC_DISABLE_SYNC", "1")
 
 from .aivc_prompt_template import (
     AIVC_BENCHMARK_PROMPT,
+    AIVC_COMMIT_CHRONICLES_SYSTEM_PROMPT,
     AIVC_CORE_TOOLS_SCHEMA,
     AIVC_DEVBENCH_SYSTEM_PROMPT,
+    AIVC_MEMORY_TOOLS,
     AIVC_SYSTEM_PROMPT,
     BASH_TOOL_SCHEMA,
     BASELINE_BENCHMARK_PROMPT,
+    BASELINE_COMMIT_CHRONICLES_SYSTEM_PROMPT,
     BASELINE_DEVBENCH_SYSTEM_PROMPT,
+    COMMIT_CHRONICLES_DELIVERABLE_TOOL_SCHEMA,
     DEVBENCH_DELIVERABLE_TOOL_SCHEMA,
     WORKSPACE_TOOLS_SCHEMA,
     get_aivc_system_prompt,
@@ -55,6 +59,7 @@ try:
         TOGETHER_BASE_URL,
         TOGETHER_BATCH_ENDPOINT,
         TOGETHER_FILES_ENDPOINT,
+        apply_cache_control,
         sanitize_messages,
     )
 except (ImportError, ValueError):
@@ -72,6 +77,7 @@ except (ImportError, ValueError):
             TOGETHER_BASE_URL,
             TOGETHER_BATCH_ENDPOINT,
             TOGETHER_FILES_ENDPOINT,
+            apply_cache_control,
             sanitize_messages,
         )
     except ImportError:
@@ -88,16 +94,23 @@ except (ImportError, ValueError):
             TOGETHER_BASE_URL,
             TOGETHER_BATCH_ENDPOINT,
             TOGETHER_FILES_ENDPOINT,
+            apply_cache_control,
             sanitize_messages,
         )
 
 
 __all__ = [
     "AIVC_BENCHMARK_PROMPT",
+    "AIVC_COMMIT_CHRONICLES_SYSTEM_PROMPT",
     "AIVC_CORE_TOOLS_SCHEMA",
     "AIVC_DEVBENCH_SYSTEM_PROMPT",
+    "AIVC_MEMORY_TOOLS",
     "AIVC_SYSTEM_PROMPT",
     "BASH_TOOL_SCHEMA",
+    "BASELINE_BENCHMARK_PROMPT",
+    "BASELINE_COMMIT_CHRONICLES_SYSTEM_PROMPT",
+    "BASELINE_DEVBENCH_SYSTEM_PROMPT",
+    "COMMIT_CHRONICLES_DELIVERABLE_TOOL_SCHEMA",
     "DEVBENCH_DELIVERABLE_TOOL_SCHEMA",
     "WORKSPACE_TOOLS_SCHEMA",
     "get_aivc_system_prompt",
@@ -125,6 +138,7 @@ __all__ = [
     "InferenceBadRequestError",
     "InferenceRateLimitError",
     "InferenceTimeoutError",
+    "apply_cache_control",
     "sanitize_messages",
     "OPENROUTER_BASE_URL",
     "TOGETHER_BASE_URL",

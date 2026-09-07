@@ -56,9 +56,12 @@ A memory is required after:
 - User confirmed a fact or decision.
 - Any identifiable "checkpoint" in your reasoning.
 
-The memory note must be **detailed**. Do not write one-liners.
-Document your reasoning, the decisions made, the problems encountered,
-and the solutions found. Think of it as a handover memo to your future self.
+Format the note as a dense **Post-It** (2-3 telegraphic bullet points):
+- `📌 **[Contexte]** : ...` (trigger / objective)
+- `📌 **[Logique/Décision]** : ...` (core mechanism / rationale)
+- `📌 **[Impact]** : ...` (consequence / invariant / next steps)
+
+Do NOT repeat file paths inside the note (they belong in `read_files` and `edited_files`).
 
 ### Read and Edited Files
 
@@ -70,6 +73,10 @@ that were modified or created for the task.
 ## CRITICAL RULE — RECALL FIRST
 
 **You MUST call `recall` whenever user mentions anything fuzzy, an unfamiliar project, concept or context. Never make assumptions—always call `recall` first to retrieve context.**
+
+## CRITICAL RULE — COLD-START FALLBACK
+
+**If `recall` or `get_recent_memories` returns no memories (empty memory / cold start), immediately stop memory queries and switch directly to codebase exploration (`view_file`, `grep_search`, `list_dir`). Call `remember` as you make progress to populate memory.**
 
 ## Recall Funnel
 
@@ -163,6 +170,19 @@ mcp = FastMCP(name="aivc", instructions=_SYSTEM_PROMPT)
 # ---------------------------------------------------------------------------
 # Helper formatting functions
 # ---------------------------------------------------------------------------
+
+
+def _format_cold_start_payload(context_hint: str = "") -> str:
+    """Standard assertive payload returned when no memories match or store is empty.
+    Forces calling LLMs to immediately break out of memory exploration loops
+    and fallback to raw file tools (view_file, grep_search, list_dir).
+    """
+    hint = f" ({context_hint})" if context_hint else ""
+    return (
+        f"Aucun souvenir trouvé{hint} (mémoire vide / première exploration sur ce composant). "
+        "BASCULE IMMÉDIATE : Ne consultez pas davantage la mémoire, explorez directement le code "
+        "via grep_search / view_file / list_dir. Appelez remember dès que vous progressez pour peupler la mémoire !"
+    )
 
 
 def _render_file_tree(paths: list[str], path_extras: dict[str, str] = None, indent_prefix: str = "  ") -> str:
@@ -313,33 +333,16 @@ async def remember(
     edited_files: list[str] | None = None,
     urls: list[str] | None = None,
 ) -> str:
-    """Persist a memory checkpoint in AIVC.
+    """Save a memory checkpoint.
 
-    Must be called whenever progress is made (completed major edit, understood concept/architecture, or user confirmed fact) tied to read_files or edited_files.
-    The note should be a rich, detailed Markdown document — your future self will
-    read it to recall this moment. All tracked files that have changed since the last
-    memory are automatically associated with this memory.
+    Format note as 2-3 dense Post-It bullets (📌 **[Contexte]** : ..., 📌 **[Logique/Décision]** : ..., 📌 **[Impact]** : ...). Do not repeat file paths inside note.
 
     Args:
-        title: Short, descriptive title (e.g. "Implemented user auth module").
-        note: Detailed Markdown note documenting what was done, why, how, and any
-              important context. The more detail, the better the future recall.
-        read_files: Optional list of files that were consulted and
-                    provided CRUCIAL context for this task, but not modified.
-                    Files not yet tracked will be auto-tracked if they exist on disk.
-                    Directories or untracked non-existent files will raise strict validation errors.
-        edited_files: Optional list of file paths that were modified/created for this task.
-                      Files not yet tracked will be auto-tracked if they exist on disk.
-                      Directories or untracked non-existent files will raise strict validation errors.
-        urls: Optional list of web URLs or links that were consulted or relevant to this memory.
-
-    Returns:
-        Confirmation with the memory ID and the list of files that were snapshotted.
-
-    Raises:
-        ValueError: If any paths in read_files or edited_files are directories or
-                    untracked non-existent files.
-        RuntimeError: If no tracked file has changed and no files were read/edited.
+        title: Short descriptive title.
+        note: Markdown Post-It (2-3 bullets: Contexte, Décision, Impact).
+        read_files: Key consulted files without modifications.
+        edited_files: Files modified or created.
+        urls: Consulted URLs/links.
     """
     import asyncio
     from pathlib import Path
@@ -380,22 +383,12 @@ async def remember(
 
 @mcp.tool()
 async def recall(query: str, top_n: int = 5, filter_glob: str = "") -> str:
-    """Recall past memories by semantic meaning.
-
-    Must be called whenever user mentions anything fuzzy, an unfamiliar project, concept or context. Never make assumptions—always call recall first to retrieve context.
-
-    Uses a Bi-Encoder + Cross-Encoder pipeline to retrieve the most relevant
-    memories for a natural-language query. Returns only memory metadata (ID,
-    title, date, score) — never the full note content — to avoid context bloat.
-    Also surfaces the files most frequently associated with the top results.
-
-    Call `consult_memory(memory_id)` on a specific result to read its full note.
+    """Search past memories semantically. Returns metadata and snippet (call consult_memory for full note).
 
     Args:
-        query: Free-text search query. Write it as a question or a short description.
-        top_n: Number of results to return (default 5, max 20).
-        filter_glob: Optional glob pattern (e.g. "src/*.py") to restrict search to memories
-                     that touched matching files.
+        query: Search query (topic, idea, question).
+        top_n: Max results (default 5, max 20).
+        filter_glob: Optional glob pattern to filter by file path.
     """
     import asyncio
     top_n = min(top_n, 20)
@@ -424,7 +417,7 @@ async def recall(query: str, top_n: int = 5, filter_glob: str = "") -> str:
     results = await asyncio.to_thread(engine.search, query, top_n=top_n, filter_glob=filter_glob)
 
     if not results:
-        return warning_header + "No matching memories found."
+        return warning_header + _format_cold_start_payload()
 
     # Build memory list
     memory_lines = []
@@ -473,20 +466,10 @@ async def recall(query: str, top_n: int = 5, filter_glob: str = "") -> str:
 
 @mcp.tool()
 def consult_memory(memory_id: str) -> str:
-    """Read the full content of a specific memory.
-
-    Returns the complete Markdown note written when the memory was created,
-    along with a summary of the files that were changed (path, action, size impact).
+    """Read full note and file diffs for a memory ID.
 
     Args:
-        memory_id: The UUID of the memory to read (obtained from `recall`
-                   or `get_recent_memories`).
-
-    Returns:
-        The full Markdown note and the list of file changes.
-
-    Raises:
-        KeyError: If the memory_id does not exist.
+        memory_id: Memory UUID.
     """
     memory = _get_engine().get_memory(memory_id)
 
@@ -562,16 +545,11 @@ def consult_memory(memory_id: str) -> str:
 
 @mcp.tool()
 def get_recent_memories(limit: int = 10, offset: int = 0) -> str:
-    """Display the recent memory history.
-
-    Use this tool at the start of a session or when you need to recall what
-    was done recently without having a specific search query.
-    Results are in reverse chronological order (newest first).
-    Use `offset` and `limit` to paginate (e.g. offset=10 to see memories 11-20).
+    """List recent memories chronologically with activity heatmap.
 
     Args:
-        limit:  Number of memories to show (default 10, max 50).
-        offset: Number of memories to skip from the most recent (default 0).
+        limit: Max memories (default 10, max 50).
+        offset: Offset to skip (default 0).
     """
     limit = min(limit, 50)
 
@@ -582,7 +560,7 @@ def get_recent_memories(limit: int = 10, offset: int = 0) -> str:
     page = all_recent[offset : offset + limit]
 
     if not page:
-        return "No memories found in this range."
+        return _format_cold_start_payload()
 
     lines = [f"Showing memories {offset + 1}–{offset + len(page)} (newest first)\n"]
 
@@ -633,23 +611,17 @@ def get_recent_memories(limit: int = 10, offset: int = 0) -> str:
 
 @mcp.tool()
 def get_file_history_metadata(file_path: str) -> str:
-    """Retrieve the chronological list of all memories (commits) that modified or consulted a specific file. Useful to understand WHEN a file was changed and WHY, but DOES NOT return the actual file content.
+    """List past memories that touched or consulted a file.
 
     Args:
-        file_path: The path of the file to look up (as tracked by AIVC).
-
-    Returns:
-        A list of commits that touched this file (ID, Date, Title).
-
-    Raises:
-        KeyError: If the file is not in the AIVC co-occurrence graph.
+        file_path: Target file path.
     """
     from pathlib import Path
     abs_path = str(Path(file_path).resolve())
     memory_ids = _get_engine().get_file_memories(abs_path)
 
     if not memory_ids:
-        return f"No memories found for file: {file_path}"
+        return _format_cold_start_payload(f"pour `{file_path}`")
 
     lines = [f"## AIVC History for: `{file_path}`\n"]
     lines.append(f"{len(memory_ids)} memory(ies) have touched this file:\n")
@@ -672,15 +644,12 @@ def get_file_history_metadata(file_path: str) -> str:
 
 @mcp.tool()
 def read_past_file_content(file_path: str, memory_id: str, diff_against: str = "current") -> str:
-    """Retrieve the actual text content of a file exactly as it was at the time of a specific past memory. Use this to restore old code or compare previous implementations. Note: requires both the file path and the memory_id obtained from get_file_history_metadata.
+    """Read historical file content or diff at a specific memory version.
 
     Args:
-        file_path: The path of the file to read.
-        memory_id: The UUID of the memory at which to read the file.
-        diff_against: Compare the historical file content against another version. 
-                      Values: "current" (default, diff against the local disk version),
-                      "parent" (diff against the parent memory's version), 
-                      "none" (return the raw historical content).
+        file_path: Target file path.
+        memory_id: Memory UUID.
+        diff_against: 'current' (vs disk), 'parent' (vs parent), or 'none' (raw).
     """
     import difflib
     import os

@@ -26,8 +26,14 @@ def consolidate_tool_interactions(eval_dir: Path) -> None:
     if not interaction_files:
         interaction_files = [
             metrics_dir / "swebench_cl_tool_interactions.jsonl",
+            metrics_dir / "swebench_cl_aivc_tool_interactions.jsonl",
+            metrics_dir / "swebench_cl_baseline_tool_interactions.jsonl",
             metrics_dir / "devbench_tool_interactions.jsonl",
-            metrics_dir / "agentic_rag_tool_interactions.jsonl",
+            metrics_dir / "devbench_aivc_tool_interactions.jsonl",
+            metrics_dir / "devbench_baseline_tool_interactions.jsonl",
+            metrics_dir / "commit_chronicles_tool_interactions.jsonl",
+            metrics_dir / "commit_chronicles_aivc_tool_interactions.jsonl",
+            metrics_dir / "commit_chronicles_baseline_tool_interactions.jsonl",
         ]
     seen_lines = set()
     collected = []

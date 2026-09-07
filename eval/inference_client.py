@@ -82,17 +82,65 @@ class InferenceTimeoutError(InferenceError):
 
 
 # ---------------------------------------------------------------------------
-# Centralized Message & Tool Call Sanitizer
+# Centralized Message & Tool Call Sanitizer & KV-Cache Helper
 # ---------------------------------------------------------------------------
+
+def apply_cache_control(
+    messages: List[Dict[str, Any]],
+    tools: Optional[List[Dict[str, Any]]] = None,
+    cache_system: bool = True,
+    cache_tools: bool = True,
+) -> Tuple[List[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
+    """
+    Inject Anthropic / OpenRouter KV-cache control breakpoint markers (`{"type": "ephemeral"}`).
+
+    Ensures:
+    - The system prompt block is marked with cache_control for prefix KV caching
+    - The tool definitions list has cache_control attached to the last tool
+    - Deterministic dictionary formatting for maximum KV cache hit rates
+    """
+    new_messages: List[Dict[str, Any]] = []
+    system_cached = False
+
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        m = dict(msg)
+        role = m.get("role", "user")
+
+        if role == "system" and cache_system and not system_cached:
+            content = m.get("content", "")
+            if isinstance(content, str):
+                m["content"] = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
+                system_cached = True
+            elif isinstance(content, list) and content:
+                new_content = [dict(c) if isinstance(c, dict) else {"type": "text", "text": str(c)} for c in content]
+                has_cc = any("cache_control" in c for c in new_content)
+                if not has_cc and new_content:
+                    new_content[-1]["cache_control"] = {"type": "ephemeral"}
+                m["content"] = new_content
+                system_cached = True
+        new_messages.append(m)
+
+    new_tools: Optional[List[Dict[str, Any]]] = None
+    if tools is not None:
+        new_tools = [dict(t) for t in tools]
+        if cache_tools and new_tools:
+            has_tool_cc = any("cache_control" in t for t in new_tools)
+            if not has_tool_cc:
+                new_tools[-1]["cache_control"] = {"type": "ephemeral"}
+
+    return new_messages, new_tools
+
 
 def sanitize_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Sanitize and normalize message history to prevent API validation errors.
 
     Guarantees:
-    - Tool call arguments are valid serialized JSON strings
+    - Tool call arguments are valid serialized JSON strings with deterministic key ordering (sort_keys=True)
     - Tool call types are set to 'function'
-    - Content fields for system, user, and tool messages are strings (not None)
+    - Content fields for system, user, and tool messages are strings or structured parts (with cache_control preserved)
     - All messages have valid role and content keys
     """
     sanitized: List[Dict[str, Any]] = []
@@ -116,7 +164,7 @@ def sanitize_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
                     raw_args = fn.get("arguments", "{}")
                     if isinstance(raw_args, dict):
-                        fn["arguments"] = json.dumps(raw_args, ensure_ascii=False)
+                        fn["arguments"] = json.dumps(raw_args, ensure_ascii=False, sort_keys=True)
                     elif isinstance(raw_args, str):
                         raw_args_trimmed = raw_args.strip()
                         if not raw_args_trimmed:
@@ -125,9 +173,9 @@ def sanitize_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                             try:
                                 parsed = json.loads(raw_args_trimmed)
                                 if isinstance(parsed, dict):
-                                    fn["arguments"] = json.dumps(parsed, ensure_ascii=False)
+                                    fn["arguments"] = json.dumps(parsed, ensure_ascii=False, sort_keys=True)
                                 else:
-                                    fn["arguments"] = json.dumps({"value": parsed}, ensure_ascii=False)
+                                    fn["arguments"] = json.dumps({"value": parsed}, ensure_ascii=False, sort_keys=True)
                             except Exception:
                                 fn["arguments"] = "{}"
                     else:
@@ -143,9 +191,20 @@ def sanitize_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
                 m["tool_calls"] = valid_tcs
 
-            # Content in assistant message can be None or string
+            # Content in assistant message can be None, string, or structured list
             if m.get("content") is None:
                 m["content"] = ""
+            elif isinstance(m["content"], list):
+                sanitized_parts: List[Dict[str, Any]] = []
+                for part in m["content"]:
+                    if isinstance(part, dict):
+                        p_copy = dict(part)
+                        if "text" in p_copy and p_copy["text"] is not None and not isinstance(p_copy["text"], str):
+                            p_copy["text"] = str(p_copy["text"])
+                        sanitized_parts.append(p_copy)
+                    elif isinstance(part, str):
+                        sanitized_parts.append({"type": "text", "text": part})
+                m["content"] = sanitized_parts
             elif not isinstance(m["content"], str):
                 m["content"] = str(m["content"])
 
@@ -158,12 +217,24 @@ def sanitize_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         elif role in ("system", "user"):
             if "content" not in m or m["content"] is None:
                 m["content"] = ""
+            elif isinstance(m["content"], list):
+                sanitized_parts = []
+                for part in m["content"]:
+                    if isinstance(part, dict):
+                        p_copy = dict(part)
+                        if "text" in p_copy and p_copy["text"] is not None and not isinstance(p_copy["text"], str):
+                            p_copy["text"] = str(p_copy["text"])
+                        sanitized_parts.append(p_copy)
+                    elif isinstance(part, str):
+                        sanitized_parts.append({"type": "text", "text": part})
+                m["content"] = sanitized_parts
             elif not isinstance(m["content"], str):
                 m["content"] = str(m["content"])
 
         sanitized.append(m)
 
     return sanitized
+
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +287,9 @@ def get_model_provider_mapping() -> Dict[str, str]:
         "qwen/qwen-2.5-72b-instruct": "together",
 
         # 3. Compact Open-weights SLM (Together AI)
+        "meta/muse-glimmer": "together",
         "muse/muse-glimmer": "together",
+        "meta-models/Muse-Glimmer-30B": "together",
         "meta-llama/llama-3.1-8b-instruct": "together",
         "qwen/qwen-2.5-7b-instruct": "together",
     }
@@ -267,6 +340,7 @@ class InferenceClient:
         app_referer: str = "https://github.com/aivc/aivc",
         app_title: str = "AIVC Benchmark Suite",
         headers: Optional[Dict[str, str]] = None,
+        enable_cache_control: bool = False,
     ):
         self.default_model = default_model
         self.fallback_model = fallback_model
@@ -278,6 +352,7 @@ class InferenceClient:
         self.app_referer = app_referer
         self.app_title = app_title
         self.custom_headers = headers or {}
+        self.enable_cache_control = enable_cache_control
         self.provider_mapping = get_model_provider_mapping()
 
         # Resolve provider
@@ -436,7 +511,7 @@ class InferenceClient:
                 name = fn.get("name", "")
                 desc = fn.get("description", "")
                 params = fn.get("parameters", {})
-                prompt_sections.append(f"- Tool `{name}`: {desc}\n  Parameters JSON Schema: {json.dumps(params)}")
+                prompt_sections.append(f"- Tool `{name}`: {desc}\n  Parameters JSON Schema: {json.dumps(params, sort_keys=True)}")
             prompt_sections.append("\n### RESPONSE FORMAT INSTRUCTION:")
             prompt_sections.append(
                 "Decide the next action or tool to call. You MUST respond with a single JSON object in the following format:\n"
@@ -472,7 +547,7 @@ class InferenceClient:
                 prompt_sections.append(f"[USER]:\n{content}\n")
             elif role == "assistant":
                 if tool_calls:
-                    prompt_sections.append(f"[ASSISTANT]:\n{content}\nTool Calls: {json.dumps(tool_calls)}\n")
+                    prompt_sections.append(f"[ASSISTANT]:\n{content}\nTool Calls: {json.dumps(tool_calls, sort_keys=True)}\n")
                 else:
                     prompt_sections.append(f"[ASSISTANT]:\n{content}\n")
             elif role == "tool":
@@ -509,7 +584,7 @@ class InferenceClient:
             if isinstance(tc, dict) and "function" in tc:
                 fn = tc["function"]
                 if isinstance(fn.get("arguments"), dict):
-                    fn["arguments"] = json.dumps(fn["arguments"])
+                    fn["arguments"] = json.dumps(fn["arguments"], sort_keys=True)
 
         return {
             "id": f"chatcmpl_native_{int(time.time())}",
@@ -544,6 +619,7 @@ class InferenceClient:
         model: Optional[str] = None,
         fallback_model: Optional[str] = None,
         provider: Optional[str] = None,
+        enable_cache_control: Optional[bool] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """
@@ -558,6 +634,7 @@ class InferenceClient:
             model: Primary model override (defaults to self.default_model).
             fallback_model: Fallback model override (defaults to self.fallback_model).
             provider: Provider override ('openrouter', 'together', etc.).
+            enable_cache_control: Enable KV-cache breakpoint tagging (cache_control ephemeral).
             **kwargs: Extra parameters passed to the request payload.
 
         Returns:
@@ -587,7 +664,12 @@ class InferenceClient:
 
         resolved_fallback = fallback_model if fallback_model is not None else self.fallback_model
 
-        # Sanitize messages
+        # KV-cache optimization / cache_control injection
+        should_cache = self.enable_cache_control if enable_cache_control is None else enable_cache_control
+        if should_cache:
+            messages, tools = apply_cache_control(messages, tools)
+
+        # Sanitize messages (preserves structured cache_control blocks)
         clean_messages = sanitize_messages(messages)
 
         if not target_api_key:
@@ -617,7 +699,7 @@ class InferenceClient:
             if v is not None:
                 payload[k] = v
 
-        encoded_data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        encoded_data = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
         headers = self._build_headers(provider=req_provider)
         headers["Authorization"] = f"Bearer {target_api_key}"
 
@@ -679,7 +761,7 @@ class InferenceClient:
                                 for tc in m["tool_calls"]:
                                     if "function" in tc and isinstance(tc["function"], dict):
                                         tc["function"]["arguments"] = "{}"
-                        encoded_data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+                        encoded_data = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
                         time.sleep(1.0)
                         continue
 
@@ -783,9 +865,9 @@ class InferenceClient:
     @staticmethod
     def prepare_batch_jsonl(requests: List[Dict[str, Any]]) -> str:
         """
-        Convert a list of batch request dictionaries into a standard JSONL string.
+        Convert a list of batch request dictionaries into a standard JSONL string with deterministic key sorting.
         """
-        lines = [json.dumps(req, ensure_ascii=False) for req in requests]
+        lines = [json.dumps(req, ensure_ascii=False, sort_keys=True) for req in requests]
         return "\n".join(lines) + "\n"
 
     def upload_batch_file(
@@ -852,7 +934,7 @@ class InferenceClient:
 
         req = urllib.request.Request(
             TOGETHER_BATCH_ENDPOINT,
-            data=json.dumps(payload).encode("utf-8"),
+            data=json.dumps(payload, sort_keys=True).encode("utf-8"),
             headers=headers,
             method="POST",
         )
@@ -906,6 +988,7 @@ __all__ = [
     "InferenceBadRequestError",
     "InferenceRateLimitError",
     "InferenceTimeoutError",
+    "apply_cache_control",
     "sanitize_messages",
     "OPENROUTER_BASE_URL",
     "TOGETHER_BASE_URL",

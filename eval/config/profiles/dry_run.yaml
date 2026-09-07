@@ -3,21 +3,19 @@
 
 profile: "dry_run"
 
-# Target models evaluated in dry run
+# Target models evaluated in dry run (bi-platform validation)
 model: "google/gemini-3.7-flash"
 models:
   - "google/gemini-3.7-flash"
-  - "deepseek/deepseek-v4-flash-0731"
-  - "deepseek/deepseek-v4-pro"
-  - "meta-models/Muse-Glimmer-30B"
+  - "meta/muse-glimmer"
 
-# Execution limits per benchmark (N=15)
+# Execution limits per benchmark (N=30)
 limits:
-  agentic_rag: 15
-  swebench_cl: 15
-  devbench: 15
+  swebench_cl: 30
+  devbench: 30
+  commit_chronicles: 30
 
-limit: 15
+limit: 30
 
 reset_checkpoint: true
 max_turns: 50

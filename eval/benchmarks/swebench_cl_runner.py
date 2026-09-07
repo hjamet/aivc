@@ -1418,18 +1418,24 @@ def main() -> None:
     )
     parser.add_argument(
         "--checkpoint-file",
+        "--checkpoint-path",
+        dest="checkpoint_file",
         type=Path,
         default=None,
         help="Path to JSONL checkpoint file",
     )
     parser.add_argument(
         "--metrics-file",
+        "--metrics-path",
+        dest="metrics_file",
         type=Path,
         default=None,
         help="Path to output metrics JSON file",
     )
     parser.add_argument(
         "--curves-file",
+        "--plots-path",
+        dest="curves_file",
         type=Path,
         default=None,
         help="Path to output plot curves CSV file",

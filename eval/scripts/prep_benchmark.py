@@ -28,32 +28,7 @@ for p in [str(REPO_ROOT), str(EVAL_DIR), str(SCRIPT_DIR)]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
-SUPPORTED_BENCHMARKS = ["agentic_rag", "devbench", "swebench_cl"]
-
-
-def check_agentic_rag_env(eval_dir: Path) -> Dict[str, Any]:
-    """Validate dependencies and directory structure for Agentic RAG benchmark."""
-    checks: Dict[str, Any] = {}
-
-    # 1. Check prompt template and schemas
-    try:
-        from aivc_prompt_template import AIVC_AGENTIC_RAG_SYSTEM_PROMPT, AIVC_RAG_TOOLS_SCHEMA  # noqa
-        checks["prompt_templates"] = True
-    except Exception as e:
-        checks["prompt_templates"] = f"Warning: {e}"
-
-    # 2. Check runner module
-    runner_path = eval_dir / "benchmarks" / "agentic_rag_runner.py"
-    checks["runner_present"] = runner_path.exists()
-
-    # 3. Check HuggingFace / Datasets availability
-    try:
-        import huggingface_hub  # noqa
-        checks["huggingface_hub"] = True
-    except ImportError:
-        checks["huggingface_hub"] = "Not installed (using built-in default sequence fallback)"
-
-    return checks
+SUPPORTED_BENCHMARKS = ["devbench", "swebench_cl", "commit_chronicles"]
 
 
 def check_devbench_env(eval_dir: Path) -> Dict[str, Any]:
@@ -96,6 +71,34 @@ def check_swebench_cl_env(eval_dir: Path) -> Dict[str, Any]:
     return checks
 
 
+def check_commit_chronicles_env(eval_dir: Path) -> Dict[str, Any]:
+    """Validate dependencies and directory structure for Commit Chronicles benchmark."""
+    checks: Dict[str, Any] = {}
+
+    # 1. Check prompt template and deliverable schemas
+    try:
+        from config import COMMIT_CHRONICLES_DELIVERABLE_TOOL_SCHEMA  # noqa
+        checks["deliverable_tools"] = True
+    except Exception as e:
+        checks["deliverable_tools"] = f"Warning: {e}"
+
+    # 2. Check runner module
+    runner_path = eval_dir / "benchmarks" / "commit_chronicles_runner.py"
+    checks["runner_present"] = runner_path.exists()
+
+    # 3. Check git & datasets availability
+    git_available = shutil.which("git") is not None
+    checks["git_available"] = git_available
+
+    try:
+        import datasets  # noqa
+        checks["datasets"] = True
+    except ImportError:
+        checks["datasets"] = "Not installed (using local commit sequences fallback)"
+
+    return checks
+
+
 def prepare_benchmark(benchmark: str, eval_dir: Optional[Path] = None) -> Path:
     """Run preparation steps and write verification flag file."""
     base_eval = eval_dir or EVAL_DIR
@@ -110,12 +113,12 @@ def prepare_benchmark(benchmark: str, eval_dir: Optional[Path] = None) -> Path:
 
     print(f"[PREP] Initializing preparation for benchmark: '{benchmark}'...")
 
-    if benchmark == "agentic_rag":
-        checks = check_agentic_rag_env(base_eval)
-    elif benchmark == "devbench":
+    if benchmark == "devbench":
         checks = check_devbench_env(base_eval)
     elif benchmark == "swebench_cl":
         checks = check_swebench_cl_env(base_eval)
+    elif benchmark == "commit_chronicles":
+        checks = check_commit_chronicles_env(base_eval)
     else:
         raise ValueError(f"Unsupported benchmark '{benchmark}'. Expected one of {SUPPORTED_BENCHMARKS}")
 
@@ -144,7 +147,7 @@ if __name__ == "__main__":
         type=str,
         required=True,
         choices=SUPPORTED_BENCHMARKS,
-        help="Benchmark to prepare (agentic_rag, devbench, swebench_cl)",
+        help=f"Benchmark to prepare ({', '.join(SUPPORTED_BENCHMARKS)})",
     )
     parser.add_argument(
         "--eval-dir",

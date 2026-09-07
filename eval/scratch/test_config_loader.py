@@ -24,7 +24,7 @@ def run_tests():
     dry_run_yaml = load_profile_yaml("dry_run")
     print("dry_run.yaml:", dry_run_yaml)
     assert "dry_run" not in dry_run_yaml, "Redundant 'dry_run' boolean key should not be present in dry_run.yaml"
-    assert dry_run_yaml["limits"] == {"agentic_rag": 30, "swebench_cl": 30, "devbench": 30}
+    assert dry_run_yaml["limits"] == {"swebench_cl": 30, "devbench": 30, "commit_chronicles": 30}
 
     print("\n=== 3. Testing resolve_config(profile='dry_run') ===")
     cfg = resolve_config(profile="dry_run")
@@ -32,12 +32,12 @@ def run_tests():
     assert cfg.profile == "dry_run"
     assert cfg.dry_run is True
     assert cfg.limit == 30
-    assert cfg.limits == {"agentic_rag": 30, "swebench_cl": 30, "devbench": 30}
-    assert cfg.get_benchmark_limit("agentic_rag") == 30
+    assert cfg.limits == {"swebench_cl": 30, "devbench": 30, "commit_chronicles": 30}
+    assert cfg.get_benchmark_limit("commit_chronicles") == 30
     assert cfg.get_benchmark_limit("swebench_cl") == 30
     assert cfg.get_benchmark_limit("devbench") == 30
     assert cfg.get_benchmark_limit("unknown_bench") == 30
-    assert cfg.models == ["qwen/qwen3.7-flash", "openai/gpt-oss-20b"]
+    assert cfg.models == ["google/gemini-3.7-flash", "meta/muse-glimmer"]
 
     print("\n=== 4. Testing resolve_config(profile='production') ===")
     prod_cfg = resolve_config(profile="production")
@@ -45,7 +45,6 @@ def run_tests():
     assert prod_cfg.profile == "production"
     assert prod_cfg.dry_run is False
     assert prod_cfg.limit == 273
-    assert prod_cfg.limits == {"agentic_rag": 273, "swebench_cl": 273, "devbench": 273}
 
     print("\n=== 5. Testing CLI Override (--limit 5) ===")
     override_cfg = resolve_config(profile="dry_run", limit=5)

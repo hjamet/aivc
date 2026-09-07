@@ -8,14 +8,16 @@ model: "google/gemini-3.7-flash"
 models:
   # 1. Closed-source Frontier API (via OpenRouter)
   - "google/gemini-3.7-flash"
-  - "openai/gpt-5.6-luna-pro"
-  - "meta-models/Muse-Glimmer-30B"
+  # 2. Datacenter Open-weights (via Together AI)
+  - "deepseek/deepseek-v4-pro"
+  # 3. Compact Open-weights SLM (via Together AI)
+  - "meta/muse-glimmer"
 
 # Execution limits per benchmark (full paper evaluation sequence)
 limits:
-  agentic_rag: 273
   swebench_cl: 273
   devbench: 273
+  commit_chronicles: 273
 
 # Full dataset budget & crash-recovery policy
 limit: 273  # Full benchmark sequence (273 episodes)

@@ -46,11 +46,24 @@ models:
   # ---------------------------------------------------------------------------
   # 3. Compact Open-weights SLM (via Together AI)
   # ---------------------------------------------------------------------------
+  "meta/muse-glimmer":
+    name: "Muse Glimmer"
+    provider: "together"
+    prompt_price_per_1m: 0.15
+    completion_price_per_1m: 0.15
+    batch_prompt_price_per_1m: 0.075
+    batch_completion_price_per_1m: 0.075
+    context_window: 128000
+    supports_tools: true
+    description: "Compact 30B SLM open-weights model on Together AI for fast agentic workflows."
+
   "muse/muse-glimmer":
     name: "Muse Glimmer"
     provider: "together"
     prompt_price_per_1m: 0.15
     completion_price_per_1m: 0.15
+    batch_prompt_price_per_1m: 0.075
+    batch_completion_price_per_1m: 0.075
     context_window: 128000
     supports_tools: true
     description: "Compact 30B SLM open-weights model on Together AI for fast agentic workflows."
@@ -75,24 +88,6 @@ models:
     context_window: 64000
     supports_tools: true
     description: "High-performance, cost-effective production benchmark model for coding & memory evaluations."
-
-  "deepseek/deepseek-v4-pro":
-    name: "DeepSeek v4 Pro"
-    provider: "openrouter"
-    prompt_price_per_1m: 0.14
-    completion_price_per_1m: 0.56
-    context_window: 128000
-    supports_tools: true
-    description: "Frontier reasoning and coding model from DeepSeek for comprehensive benchmarks."
-
-  "google/gemini-3.7-flash":
-    name: "Gemini 3.7 Flash"
-    provider: "openrouter"
-    prompt_price_per_1m: 0.05
-    completion_price_per_1m: 0.20
-    context_window: 1000000
-    supports_tools: true
-    description: "Frontier multimodal & long-context model with 1M context window."
 
   "openai/gpt-5.6-luna-pro":
     name: "GPT-5.6 Luna Pro"
@@ -160,13 +155,13 @@ models:
   "meta-models/Muse-Glimmer-30B":
     name: "Muse Glimmer 30B"
     provider: "together"
-    prompt_price_per_1m: 0.35
-    completion_price_per_1m: 1.50
-    batch_prompt_price_per_1m: 0.175
-    batch_completion_price_per_1m: 0.75
+    prompt_price_per_1m: 0.15
+    completion_price_per_1m: 0.15
+    batch_prompt_price_per_1m: 0.075
+    batch_completion_price_per_1m: 0.075
     context_window: 131072
     supports_tools: true
-    description: "Open-source 30B foundation model hosted on Together AI. Supports real-time API ($0.35/$1.50 per 1M) and asynchronous Batch API with 50% discount ($0.175/$0.75 per 1M)."
+    description: "Open-source 30B foundation model hosted on Together AI for fast agentic workflows."
 
   "openai/gpt-oss-20b":
     name: "GPT-OSS 20B"

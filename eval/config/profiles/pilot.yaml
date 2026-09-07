@@ -1,4 +1,4 @@
-﻿# AIVC Evaluation Profile: Pilot Run Testing
+# AIVC Evaluation Profile: Pilot Run Testing
 # Optimized for quick validation, smoke tests, and N=15 benchmark iterations.
 
 profile: "pilot"
@@ -7,15 +7,14 @@ profile: "pilot"
 model: "google/gemini-3.7-flash"
 models:
   - "google/gemini-3.7-flash"
-  - "deepseek/deepseek-v4-flash-0731"
   - "deepseek/deepseek-v4-pro"
-  - "meta-models/Muse-Glimmer-30B"
+  - "meta/muse-glimmer"
 
 # Execution limits per benchmark (N=15)
 limits:
-  agentic_rag: 15
   swebench_cl: 15
   devbench: 15
+  commit_chronicles: 15
 
 limit: 15
 reset_checkpoint: true

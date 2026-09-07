@@ -44,9 +44,12 @@ A memory is required after:
 - User confirmed a fact or decision.
 - Any identifiable "checkpoint" in your reasoning.
 
-The memory note must be **detailed**. Do not write one-liners.
-Document your reasoning, the decisions made, the problems encountered,
-and the solutions found. Think of it as a handover memo to your future self.
+Format the note as a dense **Post-It** (2-3 telegraphic bullet points):
+- `📌 **[Contexte]** : ...` (trigger / objective)
+- `📌 **[Logique/Décision]** : ...` (core mechanism / rationale)
+- `📌 **[Impact]** : ...` (consequence / invariant / next steps)
+
+Do NOT repeat file paths inside the note (they belong in `read_files` and `edited_files`).
 
 ### Read and Edited Files
 
@@ -58,6 +61,10 @@ that were modified or created for the task.
 ## CRITICAL RULE — RECALL FIRST
 
 **You MUST call `recall` whenever user mentions anything fuzzy, an unfamiliar project, concept or context. Never make assumptions—always call `recall` first to retrieve context.**
+
+## CRITICAL RULE — COLD-START FALLBACK
+
+**If `recall` or `get_recent_memories` returns no memories (empty memory / cold start), immediately stop memory queries and switch directly to codebase exploration (`view_file`, `grep_search`, `list_dir`). Call `remember` as you make progress to populate memory.**
 
 ## Recall Funnel
 
@@ -94,7 +101,7 @@ You are an expert autonomous software engineer solving benchmark engineering tas
 You are equipped with **AIVC (AI Version Control)**, a persistent long-term memory system that retains knowledge across episodes.
 
 ## Core Memory Tools (AIVC):
-1. `remember(title: str, note: str, read_files: list[str] = [], edited_files: list[str] = [])`: Save a detailed memory checkpoint with tracked file associations.
+1. `remember(title: str, note: str, read_files: list[str] = [], edited_files: list[str] = [])`: Save a dense Post-It memory checkpoint (Contexte, Décision, Impact) with tracked file associations.
 2. `recall(query: str, top_n: int = 5)`: Semantic search over past memory notes across current and previous episodes.
 3. `get_recent_memories(limit: int = 10, offset: int = 0)`: Inspect recent memory history chronologically.
 4. `consult_memory(memory_id: str)`: Read the full markdown note of a specific memory.
@@ -110,7 +117,7 @@ You are equipped with **AIVC (AI Version Control)**, a persistent long-term memo
 ## Mandatory Execution Protocol:
 - **Recall First**: At the start of every task, call `recall` to retrieve past solutions, architectural patterns, and bug fixes from previous episodes.
 - **Recall Funnel**: `recall` -> `consult_memory` (if relevant) -> `get_file_history_metadata` (if investigating a modified file).
-- **Remember Progress**: Whenever you identify a root cause or develop a working fix, call `remember` with a detailed technical note and specify `read_files` and `edited_files`.
+- **Remember Progress**: Whenever you identify a root cause or develop a working fix, call `remember` with a dense Post-It note (Contexte, Décision, Impact) and specify `read_files` and `edited_files`.
 - **Final Submission**: When your patch is ready and tested, call `submit_patch` with the unified diff.
 """
 
@@ -124,43 +131,17 @@ AIVC_CORE_TOOLS_SCHEMA: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "remember",
-            "description": (
-                "Save a detailed memory checkpoint. Must be called whenever progress is made "
-                "(completed edit, understood concept/architecture, or found a solution) tied to "
-                "read_files or edited_files."
-            ),
+            "description": "Save memory checkpoint formatted as a dense Post-It note with tracked read and edited file associations.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "title": {
-                        "type": "string",
-                        "description": "Short, descriptive title of the memory checkpoint.",
-                    },
+                    "title": {"type": "string", "description": "Short title of the memory note."},
                     "note": {
                         "type": "string",
-                        "description": (
-                            "Detailed Markdown note documenting reasoning, findings, problems, "
-                            "and solutions. Think of it as a handover memo to your future self."
-                        ),
+                        "description": "Dense markdown Post-It note (2-3 bullet points: Contexte, Logique/Décision, Impact). Do not repeat file paths inside note.",
                     },
-                    "read_files": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of files read that provided essential context.",
-                        "default": [],
-                    },
-                    "edited_files": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of files created or modified for this task.",
-                        "default": [],
-                    },
-                    "urls": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Optional list of URLs or web links consulted.",
-                        "default": [],
-                    },
+                    "read_files": {"type": "array", "items": {"type": "string"}, "description": "Files consulted."},
+                    "edited_files": {"type": "array", "items": {"type": "string"}, "description": "Files modified."},
                 },
                 "required": ["title", "note"],
             },
@@ -170,28 +151,12 @@ AIVC_CORE_TOOLS_SCHEMA: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "recall",
-            "description": (
-                "Recall past memories by semantic meaning. Must be called whenever user mentions "
-                "anything fuzzy, an unfamiliar project, concept or context. Uses semantic search "
-                "and returns memory titles, IDs, dates, and snippets (never full notes)."
-            ),
+            "description": "Semantic and keyword search across past memory notes.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Free-text semantic search query describing the problem, concept, or topic.",
-                    },
-                    "top_n": {
-                        "type": "integer",
-                        "description": "Number of results to return (default 5, max 20).",
-                        "default": 5,
-                    },
-                    "filter_glob": {
-                        "type": "string",
-                        "description": "Optional glob pattern (e.g. 'src/*.py') to restrict search to touched files.",
-                        "default": "",
-                    },
+                    "query": {"type": "string", "description": "Search query."},
+                    "top_n": {"type": "integer", "description": "Max results to return (default 5)."},
                 },
                 "required": ["query"],
             },
@@ -201,23 +166,12 @@ AIVC_CORE_TOOLS_SCHEMA: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "get_recent_memories",
-            "description": (
-                "Display recent memory history in reverse chronological order (newest first). "
-                "Useful at the start of a session or to inspect chronological activity."
-            ),
+            "description": "Retrieve recent memories in reverse chronological order.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "limit": {
-                        "type": "integer",
-                        "description": "Number of memories to return (default 10, max 50).",
-                        "default": 10,
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "description": "Number of memories to skip from the most recent (default 0).",
-                        "default": 0,
-                    },
+                    "limit": {"type": "integer", "description": "Max memories (default 10)."},
+                    "offset": {"type": "integer", "description": "Offset from latest (default 0)."},
                 },
             },
         },
@@ -226,17 +180,11 @@ AIVC_CORE_TOOLS_SCHEMA: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "consult_memory",
-            "description": (
-                "Read the complete content of a specific memory note. Call this after identifying "
-                "a relevant memory ID via `recall` or `get_recent_memories`."
-            ),
+            "description": "Retrieve full markdown content and metadata of a memory by ID.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "memory_id": {
-                        "type": "string",
-                        "description": "The UUID of the memory note to read.",
-                    },
+                    "memory_id": {"type": "string", "description": "Target memory ID."},
                 },
                 "required": ["memory_id"],
             },
@@ -246,17 +194,11 @@ AIVC_CORE_TOOLS_SCHEMA: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "get_file_history_metadata",
-            "description": (
-                "Retrieve the chronological list of all memories that modified or consulted a specific file. "
-                "Useful to understand when a file was changed and why."
-            ),
+            "description": "Get version history and memory notes for a tracked file.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "The relative or absolute path of the file to inspect.",
-                    },
+                    "file_path": {"type": "string", "description": "Relative or absolute path of file."},
                 },
                 "required": ["file_path"],
             },
@@ -266,29 +208,16 @@ AIVC_CORE_TOOLS_SCHEMA: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "read_past_file_content",
-            "description": (
-                "Retrieve the actual text content or unified diff of a file at a specific past memory snapshot. "
-                "Requires both the file path and the memory ID."
-            ),
+            "description": "Read file snapshot content or diff for a past memory checkpoint.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "The path of the file to read.",
-                    },
-                    "memory_id": {
-                        "type": "string",
-                        "description": "The UUID of the past memory snapshot.",
-                    },
+                    "file_path": {"type": "string", "description": "Path of file."},
+                    "memory_id": {"type": "string", "description": "Memory snapshot ID."},
                     "diff_against": {
                         "type": "string",
                         "enum": ["current", "parent", "none"],
-                        "description": (
-                            "Comparison mode: 'current' (diff vs local disk), "
-                            "'parent' (diff vs parent memory), 'none' (raw content)."
-                        ),
-                        "default": "current",
+                        "description": "Diff target mode: current, parent, or none.",
                     },
                 },
                 "required": ["file_path", "memory_id"],
@@ -296,6 +225,10 @@ AIVC_CORE_TOOLS_SCHEMA: List[Dict[str, Any]] = [
         },
     },
 ]
+
+# Backward-compatibility alias
+AIVC_MEMORY_TOOLS: List[Dict[str, Any]] = AIVC_CORE_TOOLS_SCHEMA
+
 
 
 WORKSPACE_TOOLS_SCHEMA: List[Dict[str, Any]] = [
@@ -399,7 +332,7 @@ You are an expert autonomous software engineer working through the Software Deve
 You have access to persistent AIVC long-term memory to coordinate architecture, environment configuration, code changes, and test suites across SDLC phases.
 
 ## Core AIVC Memory Tools:
-1. `remember(title: str, note: str, read_files: list, edited_files: list)`: Save memory note and file snapshots.
+1. `remember(title: str, note: str, read_files: list, edited_files: list)`: Save dense Post-It memory checkpoint (Contexte, Décision, Impact) and file snapshots.
 2. `recall(query: str, limit: int = 5)`: Semantic search over past memory notes across this and previous phases.
 3. `get_recent_memories(limit: int = 10, offset: int = 0)`: Get recent memory logs chronologically.
 4. `consult_memory(memory_id: str)`: Read a specific memory note in full.
@@ -414,7 +347,7 @@ You have access to persistent AIVC long-term memory to coordinate architecture, 
 
 ## Protocol Rules:
 - At each new SDLC phase, call `recall` to consult previous phases' design decisions and file contracts.
-- Always call `remember` after drafting or implementing code/config.
+- Always call `remember` after drafting or implementing code/config (format note as dense Post-It: Contexte, Décision, Impact).
 - Call `submit_phase_deliverable` when the phase goal is achieved.
 """
 
@@ -495,7 +428,80 @@ Each SDLC phase is executed independently and statelessly with zero persistent m
 
 
 # ---------------------------------------------------------------------------
-# 4. Helper Functions
+# 4. Commit Chronicles System Instructions & Deliverable Schema
+# ---------------------------------------------------------------------------
+
+AIVC_COMMIT_CHRONICLES_SYSTEM_PROMPT: str = """# AIVC — AI Version Control (Long-Term Memory) for Commit Chronicles
+
+You are an expert autonomous software engineer evaluating software evolution across sequential commit chronologies.
+You have access to persistent AIVC long-term memory to retain context, track architectural evolutions, trace refactorings, and maintain cross-commit knowledge across the repository history.
+
+## Core AIVC Memory Tools:
+1. `remember(title: str, note: str, read_files: list = [], edited_files: list = [])`: Save dense Post-It memory checkpoint (Contexte, Décision, Impact) and file snapshots at key commit milestones.
+2. `recall(query: str, top_n: int = 5)`: Semantic search over past commit chronicles, refactorings, and bug resolutions.
+3. `get_recent_memories(limit: int = 10, offset: int = 0)`: Inspect historical commit chronicle logs chronologically.
+4. `consult_memory(memory_id: str)`: Read full analysis and context of a specific historical checkpoint.
+5. `get_file_history_metadata(file_path: str)`: Trace commit evolution and historical changes for a specific file.
+6. `read_past_file_content(file_path: str, memory_id: str, diff_against: str = "current")`: Retrieve past file state or diff.
+
+## Workspace & Submission Tools:
+7. `view_file(file_path: str, start_line: int = 1, end_line: int = 100)`: Read lines from a file in the workspace.
+8. `grep_search(query: str, search_path: str = ".")`: Search for patterns across repository files.
+9. `list_dir(directory: str = ".")`: List contents of a directory.
+10. `submit_commit(commit_message: str, patch: str, explanation: str)`: Submit the synthesized commit and final patch for the current chronicle step.
+
+## Protocol Rules:
+- At each new commit chronicle step, call `recall` and `get_file_history_metadata` to reconstruct context from earlier commits.
+- Call `remember` whenever you identify crucial architectural decisions, bug roots, or refactoring patterns (format note as dense Post-It: Contexte, Décision, Impact).
+- Submit the validated patch and commit message via `submit_commit` (or `submit_patch`).
+"""
+
+BASELINE_COMMIT_CHRONICLES_SYSTEM_PROMPT: str = """# Autonomous Software Engineer for Commit Chronicles (Stateless Baseline)
+
+You are an expert autonomous software engineer evaluating software evolution across sequential commit chronologies.
+You operate in a **stateless, ephemeral environment** with zero persistent memory transfer across commit steps.
+
+## Workspace Tools:
+1. `view_file(file_path: str, start_line: int = 1, end_line: int = 100)`: Read lines from a file in the workspace.
+2. `grep_search(query: str, search_path: str = ".")`: Search for text patterns across the repository.
+3. `list_dir(directory: str = ".")`: List files and subdirectories.
+4. `submit_commit(commit_message: str, patch: str, explanation: str)`: Submit the synthesized commit and final patch for the current chronicle step.
+
+## Protocol Rules:
+- Inspect codebase files and history using `grep_search`, `list_dir`, and `view_file`.
+- Synthesize the required commit patch and message for the active chronicle step.
+- Call `submit_commit` (or `submit_patch`) when the resolution is complete.
+"""
+
+COMMIT_CHRONICLES_DELIVERABLE_TOOL_SCHEMA: Dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "submit_commit",
+        "description": "Submit synthesized commit patch, commit message, and technical explanation for the current Commit Chronicles step.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "commit_message": {
+                    "type": "string",
+                    "description": "Concise and descriptive git commit message.",
+                },
+                "patch": {
+                    "type": "string",
+                    "description": "Unified git diff format patch representing the commit changes.",
+                },
+                "explanation": {
+                    "type": "string",
+                    "description": "Technical explanation and rationale of the change.",
+                },
+            },
+            "required": ["patch"],
+        },
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# 5. Helper Functions
 # ---------------------------------------------------------------------------
 
 def get_aivc_system_prompt(
@@ -506,15 +512,20 @@ def get_aivc_system_prompt(
 ) -> str:
     """Return the system prompt for AIVC or baseline, optionally including benchmark instructions."""
     is_baseline = str(arm).lower() in ("baseline", "naive")
+    b_type = str(benchmark_type).lower() if benchmark_type else ""
     if is_baseline:
-        if benchmark_type in ("devbench", "sdlc"):
+        if b_type in ("devbench", "sdlc"):
             base = BASELINE_DEVBENCH_SYSTEM_PROMPT
+        elif b_type in ("commit_chronicles", "chronicles"):
+            base = BASELINE_COMMIT_CHRONICLES_SYSTEM_PROMPT
         else:
             base = BASELINE_BENCHMARK_PROMPT
     else:
-        if benchmark_type in ("devbench", "sdlc"):
+        if b_type in ("devbench", "sdlc"):
             base = AIVC_DEVBENCH_SYSTEM_PROMPT
-        elif benchmark_mode or benchmark_type in ("swebench_cl", "swebench", "agentic_rag", "rag"):
+        elif b_type in ("commit_chronicles", "chronicles"):
+            base = AIVC_COMMIT_CHRONICLES_SYSTEM_PROMPT
+        elif benchmark_mode or b_type in ("swebench_cl", "swebench"):
             base = AIVC_BENCHMARK_PROMPT
         else:
             base = AIVC_SYSTEM_PROMPT
@@ -533,6 +544,7 @@ def get_benchmark_tools_schema(
     """Return harmonized list of tool schemas for benchmark agent execution."""
     tools: List[Dict[str, Any]] = []
     is_baseline = str(arm).lower() in ("baseline", "naive")
+    b_type = str(benchmark_type).lower() if benchmark_type else ""
 
     if not is_baseline:
         tools.extend(copy.deepcopy(AIVC_CORE_TOOLS_SCHEMA))
@@ -540,8 +552,13 @@ def get_benchmark_tools_schema(
     if include_workspace:
         ws_tools = [t for t in WORKSPACE_TOOLS_SCHEMA if t["function"]["name"] != "submit_patch"]
         tools.extend(copy.deepcopy(ws_tools))
-        if benchmark_type in ("devbench", "sdlc"):
+        if b_type in ("devbench", "sdlc"):
             tools.append(copy.deepcopy(DEVBENCH_DELIVERABLE_TOOL_SCHEMA))
+        elif b_type in ("commit_chronicles", "chronicles"):
+            tools.append(copy.deepcopy(COMMIT_CHRONICLES_DELIVERABLE_TOOL_SCHEMA))
+            submit_tool = [t for t in WORKSPACE_TOOLS_SCHEMA if t["function"]["name"] == "submit_patch"]
+            if submit_tool:
+                tools.extend(copy.deepcopy(submit_tool))
         else:
             submit_tool = [t for t in WORKSPACE_TOOLS_SCHEMA if t["function"]["name"] == "submit_patch"]
             if submit_tool:

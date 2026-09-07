@@ -492,8 +492,8 @@ def add_eval_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         "--profile",
         type=str,
         default=None,
-        choices=["dry_run", "pilot", "production"],
-        help="Evaluation execution profile (dry_run / pilot: fast N=15-30; production: 273 tasks/full paper).",
+        choices=["dry_run", "pilot", "eval", "production"],
+        help="Evaluation execution profile (dry_run / pilot / eval: fast N=15-30; production: 273 tasks/full paper).",
     )
 
     group.add_argument(

@@ -135,38 +135,6 @@ stages:
       md5: d45ef3d50f9427c616a3bab533e38855.dir
       size: 3568
       nfiles: 20
-  eval_agentic_rag:
-    cmd: python eval/benchmarks/agentic_rag_runner.py --limit 30 --max-turns 50 
-      --max-tokens 4096 --max-cost 0.1 --model qwen/qwen3.7-flash
-    deps:
-    - path: .dvc-viewer/hashes/eval_agentic_rag.hash
-      hash: md5
-      md5: b8e4cd513d273f9d25a020964a6f9b29
-      size: 64
-    - path: eval/benchmarks/agentic_rag_runner.py
-      hash: md5
-      md5: c36bf1372a85271d1150064b1b673d7c
-      size: 70625
-    params:
-      params.yaml:
-        eval.limit: 30
-        eval.max_cost_per_instance_usd: 0.1
-        eval.max_tokens: 4096
-        eval.max_turns: 50
-        eval.model: qwen/qwen3.7-flash
-    outs:
-    - path: eval/metrics/agentic_rag_metrics.json
-      hash: md5
-      md5: 3405957d53fd4e592ef5820cb37eff14
-      size: 1528
-    - path: eval/metrics/agentic_rag_tool_interactions.jsonl
-      hash: md5
-      md5: 61de07669a9cc8e338728d03b2f8452e
-      size: 282409
-    - path: eval/plots/agentic_rag_curves.csv
-      hash: md5
-      md5: cd2fb249f1628fdcc3b47ff17ef62a37
-      size: 3390
   aggregate_metrics:
     cmd: python eval/scripts/aggregate_metrics.py
     deps:
@@ -174,14 +142,6 @@ stages:
       hash: md5
       md5: cb8a0d20d0c691a619179b2de791aee9
       size: 64
-    - path: eval/metrics/agentic_rag_aivc_metrics.json
-      hash: md5
-      md5: 5afd6959d1040903cd3aa1deae48cc74
-      size: 1435
-    - path: eval/metrics/agentic_rag_baseline_metrics.json
-      hash: md5
-      md5: b7addbc93958798a1e4270140e9c986b
-      size: 1348
     - path: eval/metrics/devbench_aivc_metrics.json
       hash: md5
       md5: 424b0ac7a5940a96d2d39b765e1f1adc
@@ -215,22 +175,6 @@ stages:
       hash: md5
       md5: ce2d8288f01588c31610a9800eda58a5
       size: 2658
-  prep_agentic_rag:
-    cmd: python eval/scripts/prep_benchmark.py --benchmark agentic_rag
-    deps:
-    - path: .dvc-viewer/hashes/prep_agentic_rag.hash
-      hash: md5
-      md5: 4c04453ab4eaf787aa3c200f842caca9
-      size: 64
-    - path: eval/scripts/prep_benchmark.py
-      hash: md5
-      md5: ebcc26dc2ff7ee54bf41dac0b7a7060f
-      size: 5145
-    outs:
-    - path: eval/setup/agentic_rag_ready.flag
-      hash: md5
-      md5: 4894689ebac19ff4a6d6cf99bc128e35
-      size: 243
   prep_devbench:
     cmd: python eval/scripts/prep_benchmark.py --benchmark devbench
     deps:
@@ -263,82 +207,6 @@ stages:
       hash: md5
       md5: 18e6719ec196cdd50c3d8cb906c57afe
       size: 237
-  eval_agentic_rag_aivc:
-    cmd: python eval/benchmarks/agentic_rag_runner.py --limit 15 --max-turns 50 
-      --max-tokens 4096 --max-cost 0.1 --arm aivc --metrics-file 
-      eval/metrics/agentic_rag_aivc_metrics.json --curves-file 
-      eval/plots/agentic_rag_aivc_curves.csv --checkpoint-file 
-      eval/checkpoints/agentic_rag_aivc_checkpoint.jsonl
-    deps:
-    - path: .dvc-viewer/hashes/eval_agentic_rag_aivc.hash
-      hash: md5
-      md5: ab12216b0c1fe27bab2e74a680aaa28d
-      size: 64
-    - path: eval/benchmarks/agentic_rag_runner.py
-      hash: md5
-      md5: ba55614359f139702fce90f0c31411ff
-      size: 72283
-    - path: eval/setup/agentic_rag_ready.flag
-      hash: md5
-      md5: 4894689ebac19ff4a6d6cf99bc128e35
-      size: 243
-    params:
-      params.yaml:
-        eval.limit: 15
-        eval.max_cost_per_instance_usd: 0.1
-        eval.max_tokens: 4096
-        eval.max_turns: 50
-    outs:
-    - path: eval/metrics/agentic_rag_aivc_metrics.json
-      hash: md5
-      md5: 5afd6959d1040903cd3aa1deae48cc74
-      size: 1435
-    - path: eval/metrics/agentic_rag_aivc_tool_interactions.jsonl
-      hash: md5
-      md5: 9bcde6d54477ea54f40178291e6d0d88
-      size: 127007
-    - path: eval/plots/agentic_rag_aivc_curves.csv
-      hash: md5
-      md5: 7ec14fee97f4d9df80dca26f4a9d111f
-      size: 3329
-  eval_agentic_rag_baseline:
-    cmd: python eval/benchmarks/agentic_rag_runner.py --limit 15 --max-turns 50 
-      --max-tokens 4096 --max-cost 0.1 --arm baseline --metrics-file 
-      eval/metrics/agentic_rag_baseline_metrics.json --curves-file 
-      eval/plots/agentic_rag_baseline_curves.csv --checkpoint-file 
-      eval/checkpoints/agentic_rag_baseline_checkpoint.jsonl
-    deps:
-    - path: .dvc-viewer/hashes/eval_agentic_rag_baseline.hash
-      hash: md5
-      md5: ab12216b0c1fe27bab2e74a680aaa28d
-      size: 64
-    - path: eval/benchmarks/agentic_rag_runner.py
-      hash: md5
-      md5: ba55614359f139702fce90f0c31411ff
-      size: 72283
-    - path: eval/setup/agentic_rag_ready.flag
-      hash: md5
-      md5: 4894689ebac19ff4a6d6cf99bc128e35
-      size: 243
-    params:
-      params.yaml:
-        eval.limit: 15
-        eval.max_cost_per_instance_usd: 0.1
-        eval.max_tokens: 4096
-        eval.max_turns: 50
-    outs:
-    - path: eval/metrics/agentic_rag_baseline_metrics.json
-      hash: md5
-      md5: b7addbc93958798a1e4270140e9c986b
-      size: 1348
-    - path: eval/metrics/agentic_rag_baseline_tool_interactions.jsonl
-      hash: md5
-      md5: 3303ca19f60641e61a887a88c83be4cc
-      size: 106207
-    - path: eval/plots/agentic_rag_baseline_curves.csv
-      hash: md5
-      md5: 54ebec5854297890529fbe609fb85863
-      size: 3332
   eval_devbench_aivc:
     cmd: python eval/benchmarks/devbench_runner.py --limit 15 --max-turns 50 
       --max-tokens 4096 --max-cost 0.1 --arm aivc --metrics-path 

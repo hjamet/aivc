@@ -4,11 +4,6 @@ stages:
     always_changed: true
     outs:
     - .dvc-viewer/hashes: {cache: false}
-  prep_agentic_rag:
-    cmd: python eval/scripts/prep_benchmark.py --benchmark agentic_rag
-    deps: [eval/scripts/prep_benchmark.py, .dvc-viewer/hashes/prep_agentic_rag.hash]
-    outs:
-    - eval/setup/agentic_rag_ready.flag: {cache: false}
   prep_devbench:
     cmd: python eval/scripts/prep_benchmark.py --benchmark devbench
     deps: [eval/scripts/prep_benchmark.py, .dvc-viewer/hashes/prep_devbench.hash]
@@ -19,34 +14,11 @@ stages:
     deps: [eval/scripts/prep_benchmark.py, .dvc-viewer/hashes/prep_swebench_cl.hash]
     outs:
     - eval/setup/swebench_cl_ready.flag: {cache: false}
-  eval_agentic_rag_aivc:
-    cmd: python eval/benchmarks/agentic_rag_runner.py --limit ${eval.limit} --max-turns
-      ${eval.max_turns} --max-tokens ${eval.max_tokens} --max-cost ${eval.max_cost_per_instance_usd}
-      --arm aivc --metrics-file eval/metrics/agentic_rag_aivc_metrics.json --curves-file
-      eval/plots/agentic_rag_aivc_curves.csv --checkpoint-file eval/checkpoints/agentic_rag_aivc_checkpoint.jsonl
-    params: [eval.limit, eval.max_turns, eval.max_tokens, eval.max_cost_per_instance_usd]
-    deps: [eval/setup/agentic_rag_ready.flag, eval/benchmarks/agentic_rag_runner.py,
-      .dvc-viewer/hashes/eval_agentic_rag_aivc.hash]
+  prep_commit_chronicles:
+    cmd: python eval/scripts/prep_benchmark.py --benchmark commit_chronicles
+    deps: [eval/scripts/prep_benchmark.py, .dvc-viewer/hashes/prep_commit_chronicles.hash]
     outs:
-    - eval/metrics/agentic_rag_aivc_tool_interactions.jsonl: {cache: false}
-    metrics:
-    - eval/metrics/agentic_rag_aivc_metrics.json: {cache: false}
-    plots:
-    - eval/plots/agentic_rag_aivc_curves.csv: {cache: false}
-  eval_agentic_rag_baseline:
-    cmd: python eval/benchmarks/agentic_rag_runner.py --limit ${eval.limit} --max-turns
-      ${eval.max_turns} --max-tokens ${eval.max_tokens} --max-cost ${eval.max_cost_per_instance_usd}
-      --arm baseline --metrics-file eval/metrics/agentic_rag_baseline_metrics.json
-      --curves-file eval/plots/agentic_rag_baseline_curves.csv --checkpoint-file eval/checkpoints/agentic_rag_baseline_checkpoint.jsonl
-    params: [eval.limit, eval.max_turns, eval.max_tokens, eval.max_cost_per_instance_usd]
-    deps: [eval/setup/agentic_rag_ready.flag, eval/benchmarks/agentic_rag_runner.py,
-      .dvc-viewer/hashes/eval_agentic_rag_baseline.hash]
-    outs:
-    - eval/metrics/agentic_rag_baseline_tool_interactions.jsonl: {cache: false}
-    metrics:
-    - eval/metrics/agentic_rag_baseline_metrics.json: {cache: false}
-    plots:
-    - eval/plots/agentic_rag_baseline_curves.csv: {cache: false}
+    - eval/setup/commit_chronicles_ready.flag: {cache: false}
   eval_devbench_aivc:
     cmd: python eval/benchmarks/devbench_runner.py --limit ${eval.limit} --max-turns
       ${eval.max_turns} --max-tokens ${eval.max_tokens} --max-cost ${eval.max_cost_per_instance_usd}
@@ -101,12 +73,41 @@ stages:
     - eval/metrics/swebench_cl_baseline_metrics.json: {cache: false}
     plots:
     - eval/plots/swebench_cl_baseline_curves.csv: {cache: false}
+  eval_commit_chronicles_aivc:
+    cmd: python eval/benchmarks/commit_chronicles_runner.py --limit ${eval.limit}
+      --max-turns ${eval.max_turns} --max-tokens ${eval.max_tokens} --max-cost ${eval.max_cost_per_instance_usd}
+      --arm aivc --metrics-path eval/metrics/commit_chronicles_aivc_metrics.json --plots-path
+      eval/plots/commit_chronicles_aivc_curves.csv --checkpoint-path eval/checkpoints/commit_chronicles_aivc_checkpoint.jsonl
+    params: [eval.limit, eval.max_turns, eval.max_tokens, eval.max_cost_per_instance_usd]
+    deps: [eval/setup/commit_chronicles_ready.flag, eval/benchmarks/commit_chronicles_runner.py,
+      .dvc-viewer/hashes/eval_commit_chronicles_aivc.hash]
+    outs:
+    - eval/metrics/commit_chronicles_aivc_tool_interactions.jsonl: {cache: false}
+    metrics:
+    - eval/metrics/commit_chronicles_aivc_metrics.json: {cache: false}
+    plots:
+    - eval/plots/commit_chronicles_aivc_curves.csv: {cache: false}
+  eval_commit_chronicles_baseline:
+    cmd: python eval/benchmarks/commit_chronicles_runner.py --limit ${eval.limit}
+      --max-turns ${eval.max_turns} --max-tokens ${eval.max_tokens} --max-cost ${eval.max_cost_per_instance_usd}
+      --arm baseline --metrics-path eval/metrics/commit_chronicles_baseline_metrics.json
+      --plots-path eval/plots/commit_chronicles_baseline_curves.csv --checkpoint-path
+      eval/checkpoints/commit_chronicles_baseline_checkpoint.jsonl
+    params: [eval.limit, eval.max_turns, eval.max_tokens, eval.max_cost_per_instance_usd]
+    deps: [eval/setup/commit_chronicles_ready.flag, eval/benchmarks/commit_chronicles_runner.py,
+      .dvc-viewer/hashes/eval_commit_chronicles_baseline.hash]
+    outs:
+    - eval/metrics/commit_chronicles_baseline_tool_interactions.jsonl: {cache: false}
+    metrics:
+    - eval/metrics/commit_chronicles_baseline_metrics.json: {cache: false}
+    plots:
+    - eval/plots/commit_chronicles_baseline_curves.csv: {cache: false}
   aggregate_metrics:
     cmd: python eval/scripts/aggregate_metrics.py
-    deps: [eval/scripts/aggregate_metrics.py, eval/metrics/agentic_rag_aivc_metrics.json,
-      eval/metrics/agentic_rag_baseline_metrics.json, eval/metrics/devbench_aivc_metrics.json,
+    deps: [eval/scripts/aggregate_metrics.py, eval/metrics/devbench_aivc_metrics.json,
       eval/metrics/devbench_baseline_metrics.json, eval/metrics/swebench_cl_aivc_metrics.json,
-      eval/metrics/swebench_cl_baseline_metrics.json, .dvc-viewer/hashes/aggregate_metrics.hash]
+      eval/metrics/swebench_cl_baseline_metrics.json, eval/metrics/commit_chronicles_aivc_metrics.json,
+      eval/metrics/commit_chronicles_baseline_metrics.json, .dvc-viewer/hashes/aggregate_metrics.hash]
     outs:
     - eval/metrics/tool_interactions.jsonl: {cache: false}
     metrics:
